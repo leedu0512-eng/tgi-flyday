@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TGI FlyDay · Spectator view</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<style>body.idle { cursor: none; }</style>
+</head>
+<body>
+<div class="offline-banner">Reconnecting…</div>
+<div id="screen" class="pb">
+  <div class="chequer"></div>
+  <header class="pb-head">
+    <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+    <span id="meta" class="meta">Practice</span>
+    <span id="wallclock" class="wallclock num"></span>
+    <button id="signinBtn" class="pb-signin">Sign in / Leave</button>
+  </header>
+  <div id="main" class="pb-main"></div>
+  <div id="next" class="pb-next"></div>
+</div>
+
+<!-- The kiosk, opened over the big screen when kiosk and screen share one PC. -->
+<div id="signin" class="pb-signin-overlay" hidden>
+  <div class="pb-signin-panel">
+    <button id="signinClose" class="pb-signin-close" aria-label="Close">✕</button>
+    <iframe id="signinFrame" title="Pilot sign-in" allow="camera; autoplay"></iframe>
+  </div>
+</div>
+
+<script type="module">
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl } from '/assets/common.js';
+
+// Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
+// line-up, and the next heat on the orange board while a heat flies.
+const $ = (id) => document.getElementById(id);
+let state = null;
+
+const WORD = {
+  changeover: 'Up next',
+  arming: 'Arm your quads',
+  running: 'Flying',
+  freeflight: 'Free flight',
+  paused: 'Paused',
+};
+
+function plates(heat, pm) {
+  // Only the pilots who fly: empty slots aren't shown.
+  return `<div class="plates">${heat.slots.map((s, i) => {
+    const p = s.pilotId ? pm.get(s.pilotId) : null;
+    const c = `--c:${SLOT_COLORS[i]}`;
+    if (!p) return '';
+    const img = photoUrl(p);
+    return `<div class="plate ${img ? 'photo' : ''}" style="${c}">
+      ${img ? `<img src="${img}" alt="">` : ''}
+      <span class="ch">${esc(s.channel)}</span><span class="nm">${esc(NAME(p.callsign))}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function render() {
+  if (!state) return;
+  const c = state.clock;
+  const screen = $('screen');
+  $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}`;
+
+  if (c.phase === 'stopped' || c.phase === 'waiting') {
+    screen.classList.add('no-next');
+    $('next').innerHTML = '';
+    const msg = c.phase === 'waiting' ? 'Waiting for pilots · join a heat at the kiosk' : 'Practice is not running';
+    $('main').className = 'pb-idle';
+    $('main').innerHTML = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
+    return;
+  }
+  const pm = pilotMap(state);
+  const key = c.paused ? 'paused' : c.phase;
+  $('main').className = 'pb-main';
+  $('main').innerHTML = `
+    <div class="pb-board">
+      <div class="plank top"><span class="heat">HEAT ${c.heat + 1}</span><span class="word ${key}">${WORD[key].toUpperCase()}</span></div>
+      <div class="plank clock-plank"><span id="bigclock" class="bigclock num"></span></div>
+      <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
+    </div>
+    ${plates(state.heats[c.heat], pm)}`;
+  renderNext(pm);
+  tick();
+}
+
+/** While a heat flies, the next heat's pilots see they're up and get ready. */
+function renderNext(pm) {
+  const c = state.clock;
+  const n = c.phase === 'running' && state.nextHeat != null ? state.heats[state.nextHeat] : null;
+  const pilots = n ? n.slots.map((s) => ({ p: s.pilotId ? pm.get(s.pilotId) : null, ch: s.channel })).filter((x) => x.p) : [];
+  $('screen').classList.toggle('no-next', !pilots.length);
+  if (!pilots.length) { $('next').innerHTML = ''; return; }
+  $('next').innerHTML = `
+    <div class="tag"><span>GET READY</span><b>${n.index === c.heat ? 'SAME HEAT' : `HEAT ${n.index + 1}`}</b></div>
+    <div class="list">${pilots.map((x) => `<div class="who"><span>${esc(x.ch)}</span><b>${esc(NAME(x.p.callsign))}</b></div>`).join('')}</div>`;
+}
+
+function tick() {
+  if (!state) return;
+  $('wallclock').textContent = wallClock(state);
+  const el = $('bigclock');
+  if (!el) return;
+  const c = state.clock;
+  const free = c.phase === 'freeflight';
+  const arming = c.phase === 'arming' && !c.paused;
+  const ms = clockMs(c);
+  // The start BEEP comes at a random moment: never show a countdown to it.
+  el.textContent = arming ? 'ARM' : fmt(ms);
+  el.className = 'bigclock num' + (arming ? ' word arming' : c.phase === 'changeover' ? ' changeover' : '') +
+    (c.phase === 'running' && !c.paused && ms != null && ms <= 10000 ? ' low' : '');
+  fitClock(el);
+  const total = c.phase === 'running' ? state.config.heatSeconds * 1000 : c.phase === 'changeover' ? state.config.changeoverSeconds * 1000 : 0;
+  $('barLabel').textContent = free ? 'NO TIME LIMIT' : arming ? 'START COMING' : c.phase === 'changeover' ? 'TO START' : 'REMAINING';
+  $('barFill').style.width = total && ms != null ? `${Math.max(0, Math.min(100, (ms / total) * 100))}%` : free ? '100%' : '0%';
+}
+setInterval(tick, 100);
+
+/**
+ * The clock is as big as the board allows: a longer time (10:00, or free flight past an
+ * hour) or a narrow screen makes it shrink until it fits. Measured only when that changes.
+ */
+let fitKey = '', fitEl = null;
+function fitClock(el) {
+  const key = `${el.textContent.length}|${el.classList.contains('word')}|${innerWidth}x${innerHeight}`;
+  if (key === fitKey && el === fitEl) return;
+  fitKey = key;
+  fitEl = el;
+  el.style.fontSize = '';
+  const box = el.parentElement;
+  const cs = getComputedStyle(box);
+  const roomW = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const roomH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const textW = range.getBoundingClientRect().width;
+  const size = parseFloat(getComputedStyle(el).fontSize);
+  // Digits stand about 0.75 of the font size tall.
+  const scale = Math.min(1, (roomW * 0.92) / textW, (roomH * 0.92) / (size * 0.75));
+  if (scale < 1) el.style.fontSize = `${size * scale}px`;
+}
+addEventListener('resize', () => { fitKey = ''; });
+// Measured before the stencil font arrived? Measure again once it has.
+document.fonts?.addEventListener('loadingdone', () => { fitKey = ''; });
+document.fonts?.ready.then(() => { fitKey = ''; });
+
+// The mouse shows while it moves and hides after 3 seconds, so it never sits on the TVs.
+let idleTimer;
+function wake() {
+  document.body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add('idle'), 3000);
+}
+for (const ev of ['mousemove', 'mousedown', 'keydown']) document.addEventListener(ev, wake);
+wake();
+
+// ---------- sign in without leaving the big screen ----------
+// The kiosk opens in a panel over the board; it closes by itself once the pilot is done
+// (the kiosk goes back to its start), with ✕, or by tapping outside it.
+const signin = $('signin');
+const frame = $('signinFrame');
+if (new URLSearchParams(location.search).has('nosignin')) $('signinBtn').hidden = true;
+function openSignin() {
+  frame.src = '/kiosk?embed';
+  signin.hidden = false;
+}
+function closeSignin() {
+  signin.hidden = true;
+  frame.src = 'about:blank'; // also switches the webcam off
+}
+$('signinBtn').addEventListener('click', openSignin);
+$('signinClose').addEventListener('click', closeSignin);
+signin.addEventListener('click', (e) => { if (e.target === signin) closeSignin(); });
+addEventListener('message', (e) => {
+  if (e.origin === location.origin && e.data?.flyday === 'kiosk-done') closeSignin();
+});
+
+connect({
+  onState(s) { state = s; render(); },
+  onStatus(online) { document.body.classList.toggle('offline', !online); },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FlyDay RD">
+<meta name="theme-color" content="#000000">
+<title>TGI FlyDay · RD phone</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/mark.svg">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="m">
+<div class="offline-banner">Lost connection to the RD PC. Reconnecting…</div>
+
+<header class="m-top">
+  <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span id="wallclock" class="wallclock num"></span>
+</header>
+
+<main>
+  <!-- Session -->
+  <section id="tab-session" class="m-tab">
+    <div class="card status">
+      <div class="row"><span id="phase" class="pill">–</span><span id="heatLabel" class="heat"></span></div>
+      <div id="clock" class="clock num">–:––</div>
+      <div id="meta" class="meta"></div>
+      <div id="controls" class="controls"></div>
+    </div>
+    <div class="card">
+      <h2 id="lineupTitle">Line-up</h2>
+      <div id="lineup" class="m-lineup"></div>
+    </div>
+  </section>
+
+  <!-- Heats -->
+  <section id="tab-heats" class="m-tab" hidden>
+    <div class="m-bar">
+      <span class="muted" id="heatsInfo"></span>
+      <button id="compact" class="btn small primary">Compact heats</button>
+    </div>
+    <p class="hint">Tap a name to move or swap pilots. Tap a channel to change it for that heat only.</p>
+    <div id="heats"></div>
+  </section>
+
+  <!-- Pilots -->
+  <section id="tab-pilots" class="m-tab" hidden>
+    <form id="addForm" class="m-add">
+      <input id="addName" class="input" placeholder="Callsign" autocomplete="off" autocapitalize="words" maxlength="24">
+      <button class="btn primary">Add</button>
+    </form>
+    <div id="unseated"></div>
+    <input id="filter" class="input m-filter" placeholder="Find a pilot" autocomplete="off">
+    <div id="pilots"></div>
+  </section>
+</main>
+
+<nav class="m-nav">
+  <button data-tab="session" class="on"><span class="dot" id="navDot"></span>Session</button>
+  <button data-tab="heats">Heats</button>
+  <button data-tab="pilots">Pilots <span id="pilotCount" class="count"></span><span id="waitingCount" class="count waiting"></span></button>
+</nav>
+
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME } from '/assets/common.js';
+
+// RD remote for a phone. Controls the same session as the console, but makes no sound:
+// callouts always come from the RD PC.
+const $ = (id) => document.getElementById(id);
+let state = null;
+let openPilot = null;
+
+let toastTimer;
+function toast(msg, ok = false) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (ok ? ' ok' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.className = 'toast'), 4000);
+}
+async function act(path, body) {
+  try { return await post(path, body); } catch (e) { toast(e.message); }
+}
+/** Destructive buttons need a second tap within 3 s. */
+function confirmTap(btn, label = 'Sure?') {
+  if (btn.classList.contains('confirm')) return true;
+  const old = btn.textContent;
+  btn.classList.add('confirm', 'danger');
+  btn.textContent = label;
+  setTimeout(() => { btn.classList.remove('confirm', 'danger'); btn.textContent = old; }, 3000);
+  return false;
+}
+
+// ---------- tabs ----------
+const TABS = ['session', 'heats', 'pilots'];
+function showTab(name) {
+  for (const t of TABS) $('tab-' + t).hidden = t !== name;
+  document.querySelectorAll('.m-nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  try { sessionStorage.setItem('flyday.mtab', name); } catch {}
+  window.scrollTo(0, 0);
+}
+document.querySelector('.m-nav').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
+try { const t = sessionStorage.getItem('flyday.mtab'); if (TABS.includes(t)) showTab(t); } catch {}
+
+// ---------- session ----------
+const quiet = (c) => c.phase === 'stopped' || c.phase === 'waiting';
+function renderStatus() {
+  const c = state.clock;
+  const ph = phaseOf(c);
+  $('phase').textContent = ph.label;
+  $('phase').className = 'pill ' + ph.cls;
+  $('navDot').className = 'dot ' + ph.cls;
+  $('heatLabel').textContent = quiet(c) ? '' : (c.phase === 'running' || c.phase === 'freeflight' ? `Heat ${c.heat + 1}` : `Next: heat ${c.heat + 1}`);
+  $('meta').textContent = c.phase === 'stopped' ? 'Not running.'
+    : c.phase === 'freeflight' ? 'Only one heat has pilots: no heat timer. Timed heats come back when another heat gets pilots.'
+    : c.phase === 'waiting' ? 'Every heat is empty. Carries on when a pilot joins.'
+    : `Round ${c.round} · ${c.heatsRun} heat${c.heatsRun === 1 ? '' : 's'} flown`;
+
+  const b = (label, action, cls = '') => `<button class="btn ${cls}" data-act="${action}">${label}</button>`;
+  let html = '';
+  if (c.phase === 'stopped') html = b('Start session', 'start', 'primary wide');
+  else if (c.phase === 'waiting' || c.phase === 'freeflight') html = b('Stop session', 'stop', 'danger wide');
+  else {
+    html += c.paused ? b('Resume', 'resume', 'primary') : b('Pause', 'pause');
+    if (c.phase === 'changeover') html += b('20 s to start', 'to20', 'primary') + b('Start now', 'startNow');
+    else if (c.phase === 'running') html += b('End heat now', 'endHeat');
+    else html += '<span></span>';
+    html += b('Skip to next heat', 'skip');
+    html += b('Stop session', 'stop', c.phase === 'changeover' ? 'danger wide' : 'danger');
+  }
+  const ctl = $('controls');
+  if (ctl.dataset.html !== html) { ctl.innerHTML = html; ctl.dataset.html = html; }
+
+  // Line-up of the heat that is on (or next), so the RD can read it out or check channels.
+  const pm = pilotMap(state);
+  const h = quiet(c) ? null : state.heats[c.heat];
+  $('lineupTitle').textContent = h ? `Heat ${h.index + 1}` : 'Line-up';
+  $('lineup').innerHTML = h
+    ? h.slots.map((s, i) => `<div class="m-row"><span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</span>
+        <span class="${s.pilotId ? '' : 'muted'}">${s.pilotId ? esc(NAME(pm.get(s.pilotId)?.callsign)) : 'empty'}</span></div>`).join('')
+    : `<p class="muted">Shows the heat that's on once the session runs.</p>`;
+}
+$('controls').onclick = (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const a = btn.dataset.act;
+  if (a === 'stop' && !confirmTap(btn, 'Tap again to stop')) return;
+  act('/api/action', { type: a });
+};
+setInterval(() => {
+  if (!state) return;
+  // The start BEEP comes at a random moment: never show a countdown to it.
+  const arming = state.clock.phase === 'arming' && !state.clock.paused;
+  $('clock').textContent = arming ? 'ARM' : quiet(state.clock) ? fmt(state.config.heatSeconds * 1000) : fmt(clockMs(state.clock));
+  $('clock').style.color = arming ? 'var(--arming)' : '';
+  $('clock').classList.toggle('idle', quiet(state.clock));
+  $('wallclock').textContent = wallClock(state);
+}, 200);
+
+// ---------- heats ----------
+const heatChOptions = (h, s) => channelOptions(state, h.slots[s].channel,
+  h.slots.filter((_, j) => j !== s).map((x) => x.channel),
+  h.slots.filter((x, j) => j !== s && x.pilotId).map((x) => x.channel));
+function renderHeats() {
+  const board = $('heats');
+  if (board.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
+  const c = state.clock;
+  const pm = pilotMap(state);
+  const inUse = state.heats.filter((h) => h.slots.some((s) => s.pilotId)).length;
+  $('heatsInfo').textContent = `${inUse} of ${state.heats.length} heats have pilots`;
+  const options = (sel) => `<option value="">— empty —</option>` +
+    state.pilots.map((p) => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(NAME(p.callsign))}</option>`).join('');
+  board.innerHTML = state.heats.map((h) => {
+    const current = !quiet(c) && c.heat === h.index;
+    const empty = h.slots.every((s) => !s.pilotId);
+    const tag = empty ? 'Skipped' : current ? (c.phase === 'running' ? 'Flying' : c.phase === 'freeflight' ? 'Free flight' : 'Up next') : (state.nextHeat === h.index ? 'After this' : '');
+    return `<div class="card m-heat ${current ? 'current ' + c.phase : ''} ${empty ? 'empty' : ''}">
+      <header><b>Heat ${h.index + 1}</b><span class="tag">${tag}</span>
+        ${empty ? '' : `<button class="btn small" data-empty="${h.index}">Empty</button>`}</header>
+      ${h.slots.map((s, i) => `<div class="m-slot">
+        <select class="chip-select ${s.own ? 'own' : ''}" data-heat-ch="${h.index}" data-slot="${i}" style="background:${SLOT_COLORS[i]}" aria-label="Channel">${heatChOptions(h, i)}</select>
+        <select class="input" data-heat="${h.index}" data-slot="${i}" aria-label="Pilot">${options(s.pilotId)}</select>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+$('heats').onchange = (e) => {
+  const ch = e.target.closest('select[data-heat-ch]');
+  if (ch) { ch.blur(); act('/api/heat-channel', { heat: Number(ch.dataset.heatCh), slot: Number(ch.dataset.slot), channel: ch.value }); return; }
+  const sel = e.target.closest('select[data-heat]');
+  if (!sel) return;
+  sel.blur();
+  act('/api/slot', { heat: Number(sel.dataset.heat), slot: Number(sel.dataset.slot), pilotId: sel.value || null });
+};
+$('heats').onclick = async (e) => {
+  const btn = e.target.closest('[data-empty]');
+  if (!btn || !confirmTap(btn)) return;
+  const res = await act('/api/empty-heat', { heat: Number(btn.dataset.empty) });
+  if (!res) return;
+  const moved = res.moved.map((m) => `${NAME(m.pilot.callsign)} → heat ${m.heat + 1} ${m.channel}`).join(' · ');
+  if (res.unplaced.length) toast(`${moved ? moved + '. ' : ''}No room for ${res.unplaced.map((p) => NAME(p.callsign)).join(', ')}: see Pilots.`);
+  else toast(moved || 'Heat emptied.', true);
+};
+$('compact').onclick = async () => {
+  const res = await act('/api/compact');
+  if (!res) return;
+  if (!res.moved) { toast(`Already compact: ${res.heatsInUse} heat${res.heatsInUse === 1 ? '' : 's'} fly.`, true); return; }
+  const changes = res.channelChanges.map((x) => `${NAME(x.pilot.callsign)} to ${x.channel} (heat ${x.heat + 1})`).join(', ');
+  toast(`${res.heatsInUse} heat${res.heatsInUse === 1 ? '' : 's'} fly now.${changes ? ' New channels: ' + changes + '.' : ' Everyone kept their channel.'}`, true);
+};
+
+// ---------- pilots ----------
+function seatOf(id) {
+  for (const h of state.heats) {
+    const i = h.slots.findIndex((s) => s.pilotId === id);
+    if (i >= 0) return { heat: h.index, slot: i, channel: h.slots[i].channel };
+  }
+  return null;
+}
+function renderPilots() {
+  $('pilotCount').textContent = state.pilots.length || '';
+  const seated = new Set(state.heats.flatMap((h) => h.slots.map((s) => s.pilotId)).filter(Boolean));
+  const waiting = state.pilots.filter((p) => !seated.has(p.id)).length;
+  $('waitingCount').textContent = waiting ? `+${waiting}` : '';
+  const ae = document.activeElement;
+  const editing = ($('pilots').contains(ae) || $('unseated').contains(ae)) && ae.matches('input:not([type=file])');
+  if (editing) return;
+
+  const unseated = state.pilots.filter((p) => !seatOf(p.id));
+  $('unseated').innerHTML = unseated.length ? `<div class="card m-unseated">
+      <div class="m-bar"><b>${unseated.length} not in a heat</b><button class="btn small primary" data-place-all>Put all in heats</button></div>
+      ${unseated.map((p) => `<div class="m-row"><span>${esc(NAME(p.callsign))}</span><button class="btn small" data-place="${p.id}">Put in a heat</button></div>`).join('')}
+    </div>` : '';
+
+  const q = $('filter').value.trim().toLowerCase();
+  const list = state.pilots.filter((p) => !q || p.callsign.toLowerCase().includes(q))
+    .sort((a, b) => a.callsign.localeCompare(b.callsign));
+  $('pilots').innerHTML = list.map((p) => {
+    const s = seatOf(p.id);
+    const where = s ? `<span class="chip sm" style="background:${SLOT_COLORS[s.slot]}">${esc(s.channel)}</span> heat ${s.heat + 1}` : '<span class="muted">not in a heat</span>';
+    return `<details class="m-pilot" data-id="${p.id}" ${openPilot === p.id ? 'open' : ''}>
+      <summary><b>${esc(NAME(p.callsign))}</b>${p.quad ? `<span class="muted"> · ${esc(p.quad)}</span>` : ''}<span class="where">${where}</span></summary>
+      <div class="m-edit">
+        <label>Callsign<input class="input" data-field="callsign" value="${esc(p.callsign)}" autocomplete="off"></label>
+        <label>Spoken name<input class="input" data-field="spokenName" value="${esc(p.spokenName)}" autocomplete="off"></label>
+        <div class="m-photo">${photoUrl(p) ? `<img class="thumb" src="${photoUrl(p)}" alt="">` : '<span class="thumb none">No photo</span>'}
+          <label class="btn small">${photoUrl(p) ? 'New photo' : 'Take or pick a photo'}<input type="file" accept="image/*" data-photo hidden></label>
+          ${photoUrl(p) ? '<button class="btn small" data-photo-del>Remove</button>' : ''}</div>
+        <div class="m-bar">
+          ${s ? `<button class="btn small" data-unseat>Take out of heat</button>` : `<button class="btn small" data-place="${p.id}">Put in a heat</button>`}
+          <button class="btn small danger" data-delete>Remove pilot</button>
+        </div>
+      </div>
+    </details>`;
+  }).join('') || `<p class="muted">${q ? 'Nobody by that name.' : 'No pilots yet.'}</p>`;
+}
+$('filter').oninput = () => renderPilots();
+$('pilots').addEventListener('toggle', (e) => {
+  const d = e.target.closest('details');
+  if (d) openPilot = d.open ? d.dataset.id : (openPilot === d.dataset.id ? null : openPilot);
+}, true);
+$('pilots').addEventListener('change', async (e) => {
+  const pic = e.target.closest('input[data-photo]');
+  if (pic?.files?.[0]) {
+    const id = pic.closest('[data-id]').dataset.id;
+    toast('Saving photo…', true);
+    try { await uploadPhoto(id, pic.files[0]); toast('Photo saved. It shows on the big screen.', true); } catch (err) { toast(err.message); }
+    return;
+  }
+  const input = e.target.closest('[data-field]');
+  if (!input) return;
+  const id = input.closest('[data-id]').dataset.id;
+  act('/api/pilot/update', { id, [input.dataset.field]: input.value }).then(() => { input.blur(); });
+});
+async function place(ids) {
+  const res = await act('/api/distribute', { pilotIds: ids });
+  if (!res) return;
+  const pm = pilotMap(state);
+  const done = res.placed.map((x) => `${NAME(x.pilot?.callsign ?? pm.get(x.pilotId)?.callsign)} → heat ${x.heat + 1}${x.channel ? ' ' + x.channel : ''}`).join(' · ');
+  const added = res.addedHeats ? ` ${res.addedHeats} heat${res.addedHeats === 1 ? '' : 's'} added.` : '';
+  if (res.unplaced?.length) toast(`${done}. Couldn't place ${res.unplaced.length}.`);
+  else toast((done || 'Done.') + added, true);
+}
+document.body.addEventListener('click', async (e) => {
+  const one = e.target.closest('[data-place]');
+  if (one) return place([one.dataset.place]);
+  if (e.target.closest('[data-place-all]')) return place(state.pilots.filter((p) => !seatOf(p.id)).map((p) => p.id));
+  const row = e.target.closest('.m-pilot');
+  if (!row) return;
+  const id = row.dataset.id;
+  if (e.target.closest('[data-unseat]')) { const s = seatOf(id); if (s) act('/api/slot', { heat: s.heat, slot: s.slot, pilotId: null }); }
+  if (e.target.closest('[data-photo-del]')) return act('/api/pilot/photo', { id, data: null });
+  const del = e.target.closest('[data-delete]');
+  if (del && confirmTap(del, 'Tap again to remove')) { openPilot = null; act('/api/pilot/delete', { id }); }
+});
+$('addForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $('addName').value.trim();
+  if (!name) return;
+  const p = await act('/api/pilot/add', { callsign: name });
+  if (!p) return;
+  $('addName').value = '';
+  // Straight into a heat, like on the console (unless they're in one already).
+  if (seatOf(p.id)) return toast(`${NAME(p.callsign)} is already in a heat.`, true);
+  const res = await act('/api/distribute', { pilotIds: [p.id] });
+  const x = res?.placed?.[0];
+  toast(x ? `${NAME(p.callsign)} → heat ${x.heat + 1} · ${x.channel}` : `${NAME(p.callsign)} added.`, true);
+};
+
+// ---------- live ----------
+function render() {
+  renderStatus();
+  renderHeats();
+  renderPilots();
+}
+connect({
+  canReload: () => !document.activeElement?.matches?.('input, textarea, select'),
+  onState: (s) => { state = s; render(); },
+  onStatus: (online) => document.body.classList.toggle('offline', !online),
+});
+</script>
+</body>
+</html>

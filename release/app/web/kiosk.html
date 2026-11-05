@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TGI FlyDay · Pilot kiosk</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="offline-banner">Lost connection to the race PC. Reconnecting…</div>
+<div class="kiosk">
+  <div class="bar">
+    <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+    <span id="phase" class="pill">–</span>
+    <span id="status"></span>
+    <div class="spacer"></div>
+    <span id="wallclock" class="wallclock num"></span>
+    <span id="clock" class="clock num"></span>
+  </div>
+  <div id="view" class="view"></div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl } from '/assets/common.js';
+setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
+
+const $ = (id) => document.getElementById(id);
+let state = null;
+let view = 'home';
+// Opened inside the big screen's sign-in panel: no top bar, and back at the start means done.
+const EMBED = new URLSearchParams(location.search).has('embed');
+if (EMBED) document.body.classList.add('embedded');
+let name = '';
+let leaving = null; // pilot id
+let flow = 'join';  // 'join': signing in; 'move': changing channel
+let mover = null;   // the pilot changing channel
+let usual = null;   // the channel this pilot flew last time
+let doneMsg = null;
+let idleTimer;
+let me = null;      // the pilot who just signed in, for the photo step
+let shot = null;    // the photo just taken, as a JPEG data URL
+let stream = null;  // the webcam, while the camera screen is open
+let counting = false;
+// The camera only works when the browser allows it on this page (kiosk.sh sets that up).
+let camOK = !!navigator.mediaDevices?.getUserMedia;
+let camError = camOK ? '' : 'This browser is not allowed to use the camera on this page.';
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show';
+  setTimeout(() => (t.className = 'toast'), 3500);
+}
+
+function go(v) {
+  if (v !== 'camera') stopCamera();
+  if (EMBED && v === 'home' && view !== 'home') {
+    stopCamera();
+    parent.postMessage({ flyday: 'kiosk-done' }, location.origin);
+  }
+  view = v;
+  render();
+  clearTimeout(idleTimer);
+  if (v !== 'home') idleTimer = setTimeout(() => { name = ''; go('home'); }, 45000);
+}
+
+// ---------- views ----------
+
+const KEYS = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM-_'];
+
+function homeView() {
+  return `<div class="big-actions three">
+      <button class="big primary" data-flow="join">Fly today<small>Type your name, get your heat and channel</small></button>
+      <button class="big" data-flow="move">Change channel<small>Move to another channel or heat</small></button>
+      <button class="big" data-go="leave">Going home<small>Free up your slot</small></button>
+    </div>
+    <h1 style="margin-top:6vh">Heats</h1>
+    ${board(false)}`;
+}
+
+function nameView() {
+  const known = state.pilots
+    .filter((p) => !name || p.callsign.toLowerCase().includes(name.toLowerCase()))
+    .slice(0, 8);
+  return `<div class="name-view"><button class="btn back" data-go="home">← Back</button>
+    <h1>Your pilot name</h1>
+    <input class="input name-input" id="nameInput" value="${esc(name)}" maxlength="24" autocomplete="off" inputmode="none" placeholder="Callsign">
+    <div class="suggest">${known.map((p) => `<button data-pick="${esc(p.callsign)}">${esc(NAME(p.callsign))}</button>`).join('')}</div>
+    <div class="keyboard">
+      ${KEYS.map((row) => `<div class="krow">${[...row].map((k) => `<button data-key="${k}">${k}</button>`).join('')}</div>`).join('')}
+      <div class="krow">
+        <button class="wide" data-shift>⇧ Shift</button>
+        <button class="wide" data-key="⌫">⌫ Delete</button>
+        <button class="wide" data-key=" ">Space</button>
+        <button class="go" data-next>Next →</button>
+      </div>
+    </div></div>`;
+}
+
+// Phone-style capitals: the first letter of each word is a capital unless Shift says otherwise.
+let shiftManual = null;
+const shiftOn = () => shiftManual ?? (name === '' || name.endsWith(' '));
+function updateKeys() {
+  const up = shiftOn();
+  document.querySelectorAll('.keyboard [data-key]').forEach((b) => {
+    const k = b.dataset.key;
+    if (/^[A-Z]$/.test(k)) b.textContent = up ? k : k.toLowerCase();
+  });
+  document.querySelector('[data-shift]')?.classList.toggle('on', up);
+}
+
+// ---------- channels: "what channel is your quad on?" ----------
+
+/** Heats in the order they'll fly from now: the one up next first, the one flying now last. */
+function heatOrder() {
+  const c = state.clock, n = state.heats.length;
+  const start = c.phase === 'changeover' ? c.heat
+    : ['arming', 'running', 'freeflight'].includes(c.phase) ? c.heat + 1 : 0;
+  return Array.from({ length: n }, (_, k) => (start + k) % n);
+}
+
+/** How many heats with pilots fly before heat h. */
+function heatsBefore(h, exceptId) {
+  let ahead = 0;
+  for (const i of heatOrder()) {
+    if (i === h) break;
+    if (state.heats[i].slots.some((s) => s.pilotId && s.pilotId !== exceptId)) ahead++;
+  }
+  return ahead;
+}
+
+function whenText(h, pilotId) {
+  const c = state.clock;
+  if (c.phase === 'stopped') return 'Practice starts when the race director starts it.';
+  if (h === c.heat && ['running', 'freeflight'].includes(c.phase)) return 'Your heat is flying right now: get ready to join in.';
+  const n = heatsBefore(h, pilotId);
+  if (n === 0) return '<b>Your heat is next.</b> Get your quad ready.';
+  const min = Math.max(1, Math.round((n * (state.config.heatSeconds + state.config.changeoverSeconds)) / 60));
+  return `${n} heat${n === 1 ? '' : 's'} before yours, about ${min} min.`;
+}
+
+/** Where a pilot is now, if anywhere. */
+function seatOf(pilotId) {
+  for (const h of state.heats) {
+    const i = h.slots.findIndex((s) => s.pilotId === pilotId);
+    if (i >= 0) return { heat: h.index, slot: i, channel: h.slots[i].channel };
+  }
+  return null;
+}
+
+/** Every channel flown today, each with the free seat that flies soonest (or none). */
+function channelChoices(pilotId) {
+  const order = heatOrder();
+  const byCh = new Map();
+  for (const h of state.heats) h.slots.forEach((s, i) => {
+    if (!byCh.has(s.channel)) byCh.set(s.channel, { channel: s.channel, color: SLOT_COLORS[i], best: null, rank: Infinity });
+    if (s.pilotId) return;
+    const c = byCh.get(s.channel);
+    const rank = order.indexOf(h.index);
+    if (rank < c.rank) { c.rank = rank; c.best = { heat: h.index, slot: i }; c.color = SLOT_COLORS[i]; }
+  });
+  return [...byCh.values()];
+}
+
+const pilotNamed = (n) => state.pilots.find((p) => p.callsign.toLowerCase() === n.trim().toLowerCase());
+
+function channelView() {
+  const who = flow === 'move' ? mover : pilotNamed(name);
+  const seat = who ? seatOf(who.id) : null;
+  const choices = channelChoices(who?.id);
+  const callsign = who?.callsign ?? name;
+  return `<button class="btn back" data-go="${flow === 'move' ? 'move' : 'name'}">← Back</button>
+    <h1>${esc(NAME(callsign))}, what channel is your quad on?</h1>
+    ${seat ? `<p class="hint ch-now">You're in heat ${seat.heat + 1} on <b>${esc(seat.channel)}</b>. Tap another channel to move.</p>` : ''}
+    <div class="ch-grid">${choices.map((c) => {
+      const mine = seat?.channel === c.channel;
+      const tag = mine ? "You're on this" : usual === c.channel ? 'Your usual' : '';
+      const ahead = c.best ? heatsBefore(c.best.heat, who?.id) : 0;
+      const where = mine ? `Heat ${seat.heat + 1}<small>your seat</small>`
+        : c.best ? `Heat ${c.best.heat + 1}<small>${ahead === 0 ? 'next up' : `${ahead} heat${ahead === 1 ? '' : 's'} before`}</small>`
+        : 'Full<small>no free seat</small>';
+      const ok = mine || c.best;
+      return `<button class="chbtn ${tag ? 'mark' : ''}" ${ok ? `data-ch="${esc(c.channel)}"` : 'disabled'}>
+        <span class="chip" style="background:${c.color}">${esc(c.channel)}</span>
+        <span class="where">${where}</span>${tag ? `<em>${tag}</em>` : ''}
+      </button>`;
+    }).join('')}</div>
+    <div class="checkin">
+      <span>Your channel isn't here? Switch your quad to one of these.</span>
+      <button class="btn" data-go="slot">Pick a slot myself</button>
+      ${flow === 'join' && !seat ? '<button class="btn" data-checkin>Sign in without a heat</button>' : ''}
+    </div>`;
+}
+
+/** Change channel: tap your name first. */
+function moveView() {
+  const list = state.pilots.map((p) => ({ p, seat: seatOf(p.id) }))
+    .sort((a, b) => a.p.callsign.localeCompare(b.p.callsign));
+  return `<button class="btn back" data-go="home">← Back</button>
+    <h1>Tap your name</h1>
+    <div class="leave-list">${list.length ? list.map(({ p, seat }) => `<button data-mover="${p.id}">
+        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}</span>` : '<span class="chip none">–</span>'}
+        <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
+      </button>`).join('') : '<p class="hint" style="font-size:22px">Nobody has signed in yet.</p>'}</div>`;
+}
+
+function slotView() {
+  const free = state.heats.some((h) => h.slots.some((s) => !s.pilotId));
+  // All heats full: sign in anyway, the RD puts the pilot in a heat (or adds one).
+  const checkin = free
+    ? `<div class="checkin"><span>No slot that suits you?</span><button class="btn" data-checkin>Sign in without a heat</button></div>`
+    : `<div class="checkin full"><span>All heats are full. Sign in and the race director will find you a place.</span><button class="big primary" data-checkin>Sign me in</button></div>`;
+  return `<button class="btn back" data-go="channel">← Back</button>
+    <h1>${esc(NAME(flow === 'move' ? mover.callsign : name))}, ${free ? 'pick a free slot' : 'every heat is full'}</h1>
+    ${free || flow === 'move' ? '' : checkin}
+    ${board(true)}
+    ${free && flow === 'join' ? checkin : ''}`;
+}
+
+function board(pickable) {
+  const c = state.clock;
+  const pm = pilotMap(state);
+  return `<div class="board">${state.heats.map((h) => {
+    const current = c.phase !== 'stopped' && c.phase !== 'waiting' && c.heat === h.index;
+    const tag = current ? (c.phase === 'running' || c.phase === 'freeflight' ? 'Flying now' : 'Up next') : '';
+    return `<div class="heat-col ${current ? 'current' : ''}">
+      <h3><span>Heat ${h.index + 1}</span><span class="pill ${current ? phaseOf(c).cls : ''}" style="${tag ? '' : 'visibility:hidden'}">${tag || '-'}</span></h3>
+      ${h.slots.map((s, i) => {
+        const p = s.pilotId ? pm.get(s.pilotId) : null;
+        const free = !p;
+        const attrs = pickable && free ? `data-heat="${h.index}" data-slot="${i}"` : 'disabled';
+        return `<button class="slotbtn ${free ? 'free' : 'taken'}" ${attrs}>
+          <span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</span>
+          <span>${p ? esc(NAME(p.callsign)) : 'Free'}</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function leaveView() {
+  const pm = pilotMap(state);
+  const seated = [];
+  for (const h of state.heats) h.slots.forEach((s, i) => {
+    if (s.pilotId && pm.get(s.pilotId)) seated.push({ p: pm.get(s.pilotId), heat: h.index, slot: i, ch: s.channel });
+  });
+  seated.sort((a, b) => a.p.callsign.localeCompare(b.p.callsign));
+  if (leaving) {
+    const who = seated.find((x) => x.p.id === leaving);
+    return `<div class="done"><div class="big-msg">Leave, ${esc(NAME(who?.p.callsign))}?</div>
+      <p>Your slot in heat ${who ? who.heat + 1 : ''} will be free for someone else.</p>
+      <div class="confirm-row">
+        <button class="big" data-cancel>Cancel</button>
+        <button class="big primary" data-confirm-leave>Yes, leave</button>
+      </div></div>`;
+  }
+  return `<button class="btn back" data-go="home">← Back</button>
+    <h1>Tap your name</h1>
+    <div class="leave-list">${seated.length ? seated.map((x) => `<button data-leave="${x.p.id}">
+        <span class="chip" style="background:${SLOT_COLORS[x.slot]}">${esc(x.ch)}</span>
+        <span>${esc(NAME(x.p.callsign))}</span><small>Heat ${x.heat + 1}</small>
+      </button>`).join('') : '<p class="hint" style="font-size:22px">Nobody is in a heat right now.</p>'}</div>`;
+}
+
+function doneView() {
+  return `<div class="done"><div class="big-msg">${doneMsg.title}</div><p>${doneMsg.text}</p>
+    <div class="confirm-row"><button class="big primary" data-go="home">OK</button></div></div>`;
+}
+
+// ---------- photo step: remembered photo, or a new one from the webcam ----------
+
+function isYouView() {
+  return `<div class="done photo-step"><div class="big-msg">Is this you, ${esc(NAME(me.callsign))}?</div>
+    <img class="me-photo" src="${photoUrl(me)}" alt="">
+    <div class="confirm-row">
+      ${camOK ? '<button class="big" data-retake>No, take a new photo</button>' : '<button class="big" data-not-me>No, remove it</button>'}
+      <button class="big primary" data-photo-ok>Yes, that's me</button>
+    </div></div>`;
+}
+
+// Where the face goes: in the middle, a little above centre, with the shoulders below.
+const FACE_GUIDE = `<svg class="face-guide" viewBox="0 0 160 90" aria-hidden="true">
+  <path class="dim" fill-rule="evenodd" d="M0 0H160V90H0Z M80 18a14 18 0 1 0 0.01 0Z"/>
+  <ellipse class="line" cx="80" cy="36" rx="14" ry="18"/>
+  <path class="line" d="M48 90C48 72 60 62 80 62C100 62 112 72 112 90"/>
+  <text x="80" y="10">FACE IN THE OVAL</text>
+</svg>`;
+
+function cameraView() {
+  return `<div class="done photo-step"><div class="big-msg">${shot ? 'Happy with it?' : 'Photo for the big screen'}</div>
+    <div class="cam-frame">
+      ${shot ? `<img src="${shot}" alt="">` : `<video id="cam" autoplay playsinline muted></video>${FACE_GUIDE}<div id="count" class="cam-count"></div>`}
+    </div>
+    <div class="confirm-row">${shot
+      ? '<button class="big" data-again>Take it again</button><button class="big primary" data-use>Use this photo</button>'
+      : `${me?.photo ? '<button class="big" data-go="isyou">Keep the old one</button>' : ''}<button class="big primary" data-snap ${counting ? 'disabled' : ''}>Take photo</button>`}
+    </div></div>`;
+}
+
+async function startCamera() {
+  try {
+    if (!stream) {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: 'user' }, audio: false });
+      // Webcams that can zoom: all the way out, so the whole pilot fits.
+      const track = stream.getVideoTracks()[0];
+      const zoom = track?.getCapabilities?.().zoom;
+      if (zoom?.min !== undefined) track.applyConstraints({ advanced: [{ zoom: zoom.min }] }).catch(() => {});
+    }
+    const v = $('cam');
+    if (v && view === 'camera') v.srcObject = stream;
+    else stopCamera();
+  } catch (err) {
+    // No camera, or the browser won't allow it here: say so on screen.
+    camOK = false;
+    camError = err?.name === 'NotFoundError' ? 'No webcam was found on this PC.'
+      : err?.name === 'NotAllowedError' ? 'The browser blocked the webcam on this page.'
+      : err?.name === 'NotReadableError' ? 'The webcam is in use by another program.'
+      : 'The webcam could not be started.';
+    stopCamera();
+    console.warn('TGI FlyDay kiosk: no photo,', camError);
+    if (view === 'camera') { if (me?.photo) go('isyou'); else finish(); }
+  }
+}
+
+function stopCamera() {
+  stream?.getTracks().forEach((t) => t.stop());
+  stream = null;
+}
+
+/** The whole webcam picture, landscape, uncropped, longest side 1280 px. */
+function snap() {
+  const v = $('cam');
+  if (!v?.videoWidth) return null;
+  const vw = v.videoWidth, vh = v.videoHeight;
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, 1280 / Math.max(vw, vh));
+  canvas.width = Math.round(vw * scale);
+  canvas.height = Math.round(vh * scale);
+  canvas.getContext('2d').drawImage(v, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
+/** After joining or signing in: the photo step, then the "you're in" screen. */
+function signedIn(pilot, msg) {
+  doneMsg = msg;
+  name = '';
+  me = pilot;
+  shot = null;
+  // Every pilot either confirms last time's photo or takes one, no skipping.
+  // Only when the camera doesn't work does the photo step quietly drop out.
+  if (pilot.photo) return go('isyou');
+  if (camOK) return go('camera');
+  finish();
+}
+
+function finish() {
+  me = null;
+  shot = null;
+  go('done');
+  setTimeout(() => { if (view === 'done') go('home'); }, 8000);
+}
+
+function render() {
+  if (!state) return;
+  const v = $('view');
+  v.innerHTML = { home: homeView, name: nameView, channel: channelView, move: moveView, slot: slotView, leave: leaveView, done: doneView, isyou: isYouView, camera: cameraView }[view]();
+  if (view === 'camera' && !shot) startCamera();
+  if (view === 'name') {
+    const input = $('nameInput');
+    input.focus();
+    input.setSelectionRange(name.length, name.length);
+    updateKeys();
+  }
+}
+
+function renderBar() {
+  if (!state) return;
+  const c = state.clock;
+  const ph = phaseOf(c);
+  $('phase').textContent = ph.label;
+  $('phase').className = 'pill ' + ph.cls;
+  $('status').textContent = c.phase === 'stopped' ? 'Practice not running'
+    : c.phase === 'waiting' ? 'Pick a heat to get it going'
+    : c.phase === 'freeflight' ? `Free flight in heat ${c.heat + 1}`
+    : c.phase === 'running' ? `Heat ${c.heat + 1} flying` : `Heat ${c.heat + 1} next`;
+}
+setInterval(() => {
+  if (state) $('clock').textContent = state.clock.phase === 'stopped' || state.clock.phase === 'waiting' || state.clock.phase === 'arming' ? '' : fmt(clockMs(state.clock));
+}, 200);
+
+// ---------- input ----------
+
+$('view').addEventListener('input', (e) => {
+  if (e.target.id === 'nameInput') { name = e.target.value; refreshSuggestions(); updateKeys(); }
+});
+$('view').addEventListener('keydown', (e) => {
+  if (e.target.id === 'nameInput' && e.key === 'Enter') toSlots();
+});
+
+function refreshSuggestions() {
+  const box = document.querySelector('.suggest');
+  if (!box) return;
+  const known = state.pilots.filter((p) => !name || p.callsign.toLowerCase().includes(name.toLowerCase())).slice(0, 8);
+  box.innerHTML = known.map((p) => `<button data-pick="${esc(p.callsign)}">${esc(NAME(p.callsign))}</button>`).join('');
+}
+
+let busy = false;
+/** Fly today: the name is all it takes. FlyDay picks the heat and the channel. */
+async function toSlots() {
+  name = name.replace(/\s+/g, ' ').trim();
+  if (!name) return toast('Type your pilot name first.');
+  if (busy) return;
+  busy = true;
+  try {
+    const r = await post('/api/walkin', { name });
+    const ch = esc(r.channel);
+    signedIn(r.pilot, {
+      title: r.already ? `You're already in heat ${r.heat + 1}` : `Heat ${r.heat + 1} · ${ch}`,
+      text: `${esc(NAME(r.pilot.callsign))}, set your video to <b>${ch}</b>.${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}<br><small>Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.</small>`,
+    });
+  } catch (err) { toast(err.message); }
+  finally { busy = false; }
+}
+
+/** Put the pilot in this heat and slot: a new sign-in, or a move. */
+async function seat(heat, slot) {
+  const callsign = flow === 'move' ? mover.callsign : name;
+  const pilot = await post('/api/join', { name: callsign, heat, slot });
+  const ch = state.heats[heat]?.slots[slot]?.channel ?? state.config.channels[slot];
+  const msg = { title: `Heat ${heat + 1} · ${esc(ch)}`, text: `${esc(NAME(pilot.callsign))}, set your video to <b>${esc(ch)}</b>.<br>${whenText(heat, pilot.id)}` };
+  if (flow === 'move') { doneMsg = msg; mover = null; return finish(); }
+  signedIn(pilot, msg);
+}
+
+$('view').addEventListener('click', async (e) => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { name = ''; go('home'); }, 45000);
+
+  if (t.dataset.go) { if (t.dataset.go === 'home') { name = ''; mover = null; } leaving = null; return go(t.dataset.go); }
+  if (t.dataset.flow) { flow = t.dataset.flow; name = ''; mover = null; usual = null; return go(flow === 'move' ? 'move' : 'name'); }
+  if (t.dataset.mover) {
+    mover = state.pilots.find((p) => p.id === t.dataset.mover);
+    usual = null;
+    if (mover) try { usual = (await (await fetch(`/api/known?name=${encodeURIComponent(mover.callsign)}`)).json()).channel ?? null; } catch {}
+    return go('channel');
+  }
+  if (t.dataset.ch !== undefined) {
+    const who = flow === 'move' ? mover : pilotNamed(name);
+    const cur = who && seatOf(who.id);
+    if (cur && cur.channel === t.dataset.ch) {
+      // Staying put.
+      const msg = { title: `Heat ${cur.heat + 1} · ${esc(cur.channel)}`, text: `${esc(NAME(who.callsign))}, you're already on <b>${esc(cur.channel)}</b>.<br>${whenText(cur.heat, who.id)}` };
+      if (flow === 'move') { doneMsg = msg; mover = null; return finish(); }
+      return signedIn(who, msg);
+    }
+    const c = channelChoices(who?.id).find((x) => x.channel === t.dataset.ch);
+    if (!c?.best) return toast('That channel just filled up. Pick another one.');
+    try { await seat(c.best.heat, c.best.slot); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (t.hasAttribute('data-shift')) { shiftManual = !shiftOn(); return updateKeys(); }
+  if (t.dataset.key !== undefined) {
+    const k = t.dataset.key;
+    const ch = /^[A-Z]$/.test(k) && !shiftOn() ? k.toLowerCase() : k;
+    name = k === '⌫' ? name.slice(0, -1) : (name + ch).slice(0, 24);
+    shiftManual = null;
+    const input = $('nameInput');
+    input.value = name;
+    input.focus();
+    refreshSuggestions();
+    updateKeys();
+    return;
+  }
+  if (t.dataset.pick !== undefined) { name = t.dataset.pick; return toSlots(); }
+  if (t.hasAttribute('data-next')) return toSlots();
+  if (t.dataset.heat !== undefined) {
+    try { await seat(Number(t.dataset.heat), Number(t.dataset.slot)); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (t.hasAttribute('data-checkin')) {
+    try {
+      const pilot = await post('/api/pilot/add', { callsign: name });
+      const seat = state.heats.flatMap((h) => h.slots.map((s, i) => ({ heat: h.index, slot: i, s }))).find((x) => x.s.pilotId === pilot.id);
+      signedIn(pilot, seat
+        ? { title: `You're already in heat ${seat.heat + 1}`, text: `${esc(NAME(pilot.callsign))}, your channel is <b>${esc(seat.s.channel)}</b>.` }
+        : { title: "You're signed in", text: `${esc(NAME(pilot.callsign))}, the race director will put you in a heat. Watch the big screen for your name.` });
+    } catch (err) { toast(err.message); }
+    return;
+  }
+  if (t.hasAttribute('data-photo-ok') || t.hasAttribute('data-skip')) return finish();
+  if (t.hasAttribute('data-retake') || t.hasAttribute('data-again')) { shot = null; return go('camera'); }
+  if (t.hasAttribute('data-not-me')) {
+    try { await post('/api/pilot/photo', { id: me.id, data: null }); } catch {}
+    return finish();
+  }
+  if (t.hasAttribute('data-snap')) {
+    // 3, 2, 1, then the picture.
+    counting = true;
+    t.disabled = true;
+    for (const n of [3, 2, 1]) {
+      const c = $('count');
+      if (!c || view !== 'camera') { counting = false; return; }
+      c.textContent = n;
+      await new Promise((r) => setTimeout(r, 900));
+    }
+    counting = false;
+    if (view !== 'camera') return;
+    shot = snap();
+    if (!shot) { toast('The camera is not ready yet. Try again.'); return render(); }
+    stopCamera();
+    return render();
+  }
+  if (t.hasAttribute('data-use')) {
+    try { await post('/api/pilot/photo', { id: me.id, data: shot }); } catch (err) { toast(err.message); }
+    return finish();
+  }
+  if (t.dataset.leave) { leaving = t.dataset.leave; return render(); }
+  if (t.hasAttribute('data-cancel')) { leaving = null; return go('home'); }
+  if (t.hasAttribute('data-confirm-leave')) {
+    try {
+      await post('/api/leave', { pilotId: leaving });
+      leaving = null;
+      doneMsg = { title: 'See you next time', text: 'Your slot is free again.' };
+      go('done');
+      setTimeout(() => { if (view === 'done') go('home'); }, 5000);
+    } catch (err) { toast(err.message); }
+  }
+});
+
+connect({
+  canReload: () => view === 'home',
+  onState(s) {
+    state = s;
+    renderBar();
+    // Don't redraw the name screen while someone is typing.
+    // nor the photo step (the camera would restart).
+    if (!['name', 'done', 'isyou', 'camera'].includes(view)) render();
+  },
+  onStatus(online) { document.body.classList.toggle('offline', !online); },
+});
+</script>
+</body>
+</html>

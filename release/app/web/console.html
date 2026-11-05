@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TGI FlyDay · RD console</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="offline-banner">Lost connection to the TGI FlyDay server. Reconnecting…</div>
+<div class="console">
+  <div class="topbar">
+    <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+    <div class="sub">Practice · RD console</div>
+    <div class="spacer"></div>
+    <span id="wallclock" class="wallclock num"></span>
+    <button id="soundBtn" class="btn small"></button>
+    <button id="openPilots" class="btn small">Pilots <span id="pilotCount" class="count"></span><span id="waitingCount" class="count waiting" title="Signed in, not in a heat"></span></button>
+    <button id="openDrawer" class="btn small">Callouts and sound</button>
+  </div>
+
+  <div class="grid">
+    <div>
+      <section class="card status">
+        <div class="row"><span id="phase" class="pill">–</span><span id="heatLabel" class="heat"></span></div>
+        <div id="clock" class="clock num">–:––</div>
+        <div id="meta" class="meta"></div>
+        <div id="controls" class="controls"></div>
+      </section>
+
+      <section class="card">
+        <h2>Session setup</h2>
+        <div class="setup">
+          <div class="field"><label for="heatSeconds">Heat length</label>
+            <select id="heatSeconds" class="input">
+              <option value="120">2:00</option><option value="150">2:30</option><option value="180">3:00</option>
+              <option value="240">4:00</option><option value="300">5:00</option>
+            </select></div>
+          <div class="field"><label for="changeoverSeconds">Changeover</label>
+            <select id="changeoverSeconds" class="input">
+              <option value="60">1:00</option><option value="90">1:30</option><option value="120">2:00</option>
+              <option value="150">2:30</option><option value="180">3:00</option><option value="240">4:00</option>
+            </select></div>
+          <div class="field"><label for="heatCount">Heats in the loop</label>
+            <input id="heatCount" class="input num" type="number" min="1" max="40"></div>
+          <div class="field"><label for="perHeat">Pilots per heat</label>
+            <select id="perHeat" class="input"></select></div>
+          <div class="field wide"><label>Channels in every heat</label>
+            <div id="slotChannels" class="slot-channels"></div></div>
+          <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
+          <div class="wide presets">
+            <button class="btn small" data-preset="R1 R2 F2 F4 R7 R8">IMD6C · 6 pilots</button>
+            <button class="btn small" data-preset="R1 R2 R3 R4 R5 R6 R7 R8">Raceband · 8 pilots</button>
+          </div>
+          <p class="hint wide" id="setupHint">All of this can change during a session. To change a channel in one heat only, click the channel on that heat's card.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Kiosk on another PC</h2>
+        <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
+      </section>
+    </div>
+
+    <div>
+      <section class="card">
+        <div class="card-head">
+          <h2>Heats</h2>
+          <button id="compact" class="btn small primary" title="Pack pilots into as few heats as possible">Compact heats</button>
+        </div>
+        <div id="heats" class="heats"></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+<aside id="drawer" class="drawer" hidden aria-label="Callouts and sound">
+  <div class="drawer-head">
+    <h2>Callouts and sound</h2>
+    <button id="closeDrawer" class="btn small">Close</button>
+  </div>
+
+  <section class="drawer-sec">
+    <h3>Voice</h3>
+    <div class="field"><label for="dVoice">Voice</label><select id="dVoice" class="input"></select></div>
+    <div class="field"><label for="dRate">Speed <span id="dRateVal" class="val"></span></label><input id="dRate" type="range" min="0.5" max="2" step="0.05"></div>
+    <div class="field"><label for="dVVol">Volume <span id="dVVolVal" class="val"></span></label><input id="dVVol" type="range" min="0" max="1" step="0.05"></div>
+    <div><button id="dTestVoice" class="btn small">Hear the voice</button></div>
+  </section>
+
+  <section class="drawer-sec">
+    <h3>Beep</h3>
+    <div id="dBeeps" class="beeps"></div>
+    <div class="field"><label for="dBVol">Beep volume <span id="dBVolVal" class="val"></span></label><input id="dBVol" type="range" min="0" max="1" step="0.05"></div>
+    <p class="hint">The loudest these get is set by the PC: for a packed hall, also turn up Windows and the amplifier.</p>
+  </section>
+
+  <section class="drawer-sec">
+    <h3>Callouts, in race order</h3>
+    <p class="hint">Edit what the voice says under each one. Words in braces are filled in: {heat} heat number, {pilots} the line-up, {name} and {channel} each pilot, {time} time left.</p>
+    <div id="dCallouts" class="callouts"></div>
+    <p class="hint">The start BEEP and the end BEEP always play.</p>
+  </section>
+</aside>
+<aside id="pilotsDrawer" class="drawer" hidden aria-label="Pilots">
+  <div class="drawer-head">
+    <h2>Pilots</h2>
+    <button class="btn small" data-close>Close</button>
+  </div>
+  <section class="drawer-sec">
+    <div class="add-row">
+      <input id="newPilot" class="input" placeholder="Pilot name, then Enter: straight into a heat" maxlength="24" autocomplete="off">
+      <button id="addPilot" class="btn">Add</button>
+    </div>
+    <input id="pilotFilter" class="input" type="search" placeholder="Find a pilot">
+    <div id="placeBar" class="place-bar" hidden></div>
+    <div id="pilotList" class="plist"></div>
+  </section>
+  <section class="drawer-sec">
+    <h3>Shared quads</h3>
+    <p class="hint" style="margin:0">Pilots who share one quad fly on the same channel, each in a different heat, and are called by their own names.</p>
+    <div id="quadList" class="plist"></div>
+  </section>
+</aside>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME } from '/assets/common.js';
+setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
+
+const $ = (id) => document.getElementById(id);
+// The RD console is the screen that plays callouts and tones (on by default).
+const sound = new Sound('flyday.sound', true);
+setInterval(() => renderSound(), 1000);
+let state = null;
+
+// ---------- feedback ----------
+let toastTimer;
+/** A message at the bottom. With an action (e.g. Undo) it gets a button and stays a bit longer. */
+function toast(msg, ok = false, action = null) {
+  const t = $('toast');
+  t.textContent = msg;
+  if (action) {
+    const b = document.createElement('button');
+    b.className = 'btn small';
+    b.textContent = action.label;
+    b.onclick = () => { t.className = 'toast'; action.run(); };
+    t.append(' ', b);
+  }
+  t.className = 'toast show' + (ok ? ' ok' : '') + (action ? ' action' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.className = 'toast'), action ? 7000 : 3500);
+}
+async function act(path, body) {
+  try { return await post(path, body); } catch (e) { toast(e.message); }
+}
+
+// ---------- sound ----------
+function renderSound() {
+  const b = $('soundBtn');
+  if (!sound.enabled) { b.textContent = 'Sound off on this screen'; b.className = 'btn small'; }
+  else if (sound.blocked) { b.textContent = 'Click to allow sound'; b.className = 'btn small danger confirm'; }
+  else { b.textContent = 'Sound on'; b.className = 'btn small primary'; }
+}
+$('soundBtn').onclick = () => {
+  sound.enabled = sound.blocked ? true : !sound.enabled;
+  renderSound();
+};
+document.addEventListener('click', () => { if (sound.enabled) { sound.unlock(); renderSound(); } }, { once: true });
+// ---------- callouts and sound panel ----------
+const BEEPS = [
+  { id: 'standard', name: 'Standard', text: 'Clean beeps. Fine for a quiet hall.' },
+  { id: 'loud', name: 'Loud', text: 'Piercing high tones that cut through noise.' },
+  { id: 'horn', name: 'Air horn', text: 'Low, brassy and very loud. For a packed hall.' },
+  { id: 'whistle', name: 'Whistle', text: 'A referee-style trill.' },
+];
+/**
+ * Every callout in race order: its on/off switch, and under it the wording.
+ * texts: [textKey, label]; at: which countdown moments it can be called at.
+ */
+const CALLOUTS = [
+  { key: 'sessionStartStop', label: 'Session start and stop', texts: [['sessionStart', 'When it starts'], ['sessionStop', 'When it stops']] },
+  { key: 'lineup', label: 'Next heat line-up when the changeover starts', texts: [['lineup', 'Line-up'], ['lineupPilot', 'Each pilot in {pilots}']] },
+  { at: 'changeoverAt', choices: 'changeover', label: 'Changeover countdown', texts: [['changeover', '']] },
+  { key: 'arm', label: 'Arm call before the start', texts: [['arm', '']], extra: '<button class="btn small" id="dHearStart">Hear the start sequence</button>' },
+  { key: 'readyBeeps', label: 'Two short beeps after the arm call (off: just the call, then the start BEEP 2–4 s later)' },
+  { at: 'heatAt', choices: 'heat', label: 'Countdown during the heat', texts: [['heat', '']] },
+  { key: 'finalBeeps', label: 'Countdown beeps on the last 4 seconds of a heat, then the end BEEP' },
+  { key: 'timeUp', label: 'After the end BEEP', texts: [['timeUp', '']] },
+  { key: 'pauseResume', label: 'Pause and resume', texts: [['paused', 'When paused'], ['resumed', 'When resumed']] },
+  { key: 'freeFlight', label: 'Free flight starts and ends', texts: [['freeFlight', 'When it starts'], ['freeFlightEnd', 'When it ends']] },
+];
+
+/** Same filling as the server, for the Hear buttons. */
+function fillText(t, vars) {
+  const out = t.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)).replace(/\s+/g, ' ').trim();
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
+/** What a callout sounds like with example values. */
+function sampleText(textKey) {
+  const t = (k) => $('dt-' + k)?.value || state.config.callouts.texts[k];
+  const pilot = (name, ch) => fillText(t('lineupPilot'), { name, channel: ch });
+  const vars = { heat: 2, time: '30 seconds', name: 'Chirp', channel: 'R, 1', pilots: `${pilot('Chirp', 'R, 1')} ${pilot('Bewoo', 'F, 4')}` };
+  return fillText(t(textKey), vars);
+}
+const panelVoice = () => ({ voice: $('dVoice').value, voiceRate: Number($('dRate').value), voiceVolume: Number($('dVVol').value) });
+
+function renderCallouts() {
+  const box = $('dCallouts');
+  // Don't redraw under someone who is typing a wording.
+  if (box.contains(document.activeElement) && document.activeElement.matches('input[type=text]')) return;
+  const co = state.config.callouts;
+  box.innerHTML = CALLOUTS.map((c) => {
+    let head;
+    if (c.key) {
+      head = `<label class="toggle"><input type="checkbox" data-co="${c.key}" ${co[c.key] ? 'checked' : ''}><span>${c.label}</span></label>`;
+    } else {
+      const on = co[c.at];
+      head = `<div class="callout-title">${c.label}</div><div class="chips">${state.calloutChoices[c.choices].map((sec) =>
+        `<button class="chip-btn ${on.includes(sec) ? 'on' : ''}" data-at="${c.at}" data-sec="${sec}" aria-pressed="${on.includes(sec)}">${fmt(sec * 1000)}</button>`).join('')}<span class="chip-note">left</span></div>`;
+    }
+    const off = c.key ? !co[c.key] : co[c.at].length === 0;
+    const texts = (c.texts ?? []).map(([k, label]) => `<div class="wording">
+        ${label ? `<label for="dt-${k}">${esc(label)}</label>` : ''}
+        <div class="wording-row"><input type="text" id="dt-${k}" class="input" data-text="${k}" value="${esc(co.texts[k])}" maxlength="200" ${label ? '' : `aria-label="${esc(c.label)} wording"`}>
+        <button class="btn small" data-say="${k}" aria-label="Hear it">Hear</button></div>
+      </div>`).join('');
+    return `<div class="callout ${off ? 'off' : ''}">${head}${texts}${c.extra ?? ''}</div>`;
+  }).join('');
+}
+
+const drawer = $('drawer');
+const pilotsDrawer = $('pilotsDrawer');
+// Side panels start just under the top bar, so its buttons stay usable (switch panels, close).
+const placePanels = () => {
+  const top = Math.max(0, document.querySelector('.topbar').getBoundingClientRect().bottom + 8);
+  for (const el of [drawer, pilotsDrawer]) el.style.top = top + 'px';
+};
+window.addEventListener('resize', placePanels);
+window.addEventListener('scroll', placePanels, { passive: true });
+const openDrawer = () => { placePanels(); pilotsDrawer.hidden = true; drawer.hidden = false; renderDrawer(true); };
+const closeDrawer = () => { drawer.hidden = true; pilotsDrawer.hidden = true; };
+$('openDrawer').onclick = () => (drawer.hidden ? openDrawer() : closeDrawer());
+$('openPilots').onclick = () => {
+  if (!pilotsDrawer.hidden) return closeDrawer();
+  placePanels(); drawer.hidden = true; pilotsDrawer.hidden = false; renderPilotsPanel(true);
+};
+$('closeDrawer').onclick = closeDrawer;
+pilotsDrawer.querySelector('[data-close]').onclick = closeDrawer;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+
+const saveSound = (patch) => act('/api/config', { sound: patch });
+const saveCallouts = (patch) => act('/api/config', { callouts: patch });
+const pct = (v) => `${Math.round(v * 100)}%`;
+
+function renderDrawer(force = false) {
+  if (!state || drawer.hidden) return;
+  const snd = state.config.sound, co = state.config.callouts;
+  // Voice list (from this PC's voices)
+  const sel = $('dVoice');
+  const opts = '<option value="">Automatic (offline English voice)</option>' + sound.voices.map((v) =>
+    `<option value="${esc(v.name)}">${esc(v.name.replace(/^Microsoft /, ''))}${v.localService ? '' : ' (online: needs internet)'}</option>`).join('');
+  if (sel.dataset.opts !== opts) { sel.innerHTML = opts; sel.dataset.opts = opts; }
+  if (document.activeElement !== sel) sel.value = snd.voice;
+  for (const [id, key, fmtv] of [['dRate', 'voiceRate', (v) => `${Number(v).toFixed(2)}×`], ['dVVol', 'voiceVolume', pct], ['dBVol', 'beepVolume', pct]]) {
+    const el = $(id);
+    if (force || document.activeElement !== el) el.value = snd[key];
+    $(id + 'Val').textContent = fmtv(el.value);
+  }
+  $('dBeeps').innerHTML = BEEPS.map((b) => `<div class="beep ${b.id === snd.beep ? 'on' : ''}">
+      <button class="beep-pick" data-beep="${b.id}" aria-pressed="${b.id === snd.beep}"><b>${b.name}</b><span>${b.text}</span></button>
+      <div class="beep-test"><button class="btn small" data-hear="${b.id}" data-kind="startseq">Start</button><button class="btn small" data-hear="${b.id}" data-kind="endseq">End</button></div>
+    </div>`).join('');
+  renderCallouts();
+}
+$('dVoice').onchange = async (e) => { await saveSound({ voice: e.target.value }); sound.say('This is the race voice.', { voice: e.target.value }); };
+for (const [id, key, fmtv] of [['dRate', 'voiceRate', (v) => `${Number(v).toFixed(2)}×`], ['dVVol', 'voiceVolume', pct], ['dBVol', 'beepVolume', pct]]) {
+  $(id).oninput = (e) => { $(id + 'Val').textContent = fmtv(e.target.value); };
+  $(id).onchange = async (e) => {
+    await saveSound({ [key]: Number(e.target.value) });
+    // Let the RD hear the change straight away.
+    if (key === 'voiceRate' || key === 'voiceVolume') { sound.unlock(); speechSynthesis.cancel(); sound.say('Heat 2. Chirp on R, 1. Bewoo on F, 4.', panelVoice()); }
+  };
+}
+$('dTestVoice').onclick = () => {
+  sound.unlock();
+  sound.say(sampleText('lineup'), panelVoice());
+};
+$('dBeeps').onclick = (e) => {
+  const hear = e.target.closest('[data-hear]');
+  if (hear) { hearSequence(hear.dataset.kind, hear.dataset.hear); return; }
+  const pick = e.target.closest('[data-beep]');
+  if (pick) { saveSound({ beep: pick.dataset.beep }); hearSequence('startseq', pick.dataset.beep); }
+};
+
+/** Play the beeps of a start (beep beep … BEEP) or an end (beep beep beep beep BEEP). */
+function hearSequence(which, style) {
+  const vol = Number($('dBVol').value);
+  const at = (ms, kind) => setTimeout(() => sound.tone(kind, style, vol), ms);
+  if (which === 'startseq') {
+    // As in a real start: ready beeps only when they're switched on, then the BEEP 2–4 s after the call.
+    if (state.config.callouts.readyBeeps) { at(0, 'ready'); at(3000, 'start'); } else at(3000, 'start');
+  }
+  else { for (const ms of [0, 1000, 2000, 3000]) at(ms, 'tick'); at(4000, 'end'); }
+}
+
+const calloutsBox = $('dCallouts');
+calloutsBox.addEventListener('change', (e) => {
+  const cb = e.target.closest('[data-co]');
+  if (cb) { cb.blur(); saveCallouts({ [cb.dataset.co]: cb.checked }); }
+  const txt = e.target.closest('[data-text]');
+  if (txt) { const k = txt.dataset.text; txt.blur(); saveCallouts({ texts: { [k]: txt.value } }); }
+});
+calloutsBox.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('[data-text]')) e.target.blur(); });
+calloutsBox.addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-at]');
+  if (chip) {
+    const key = chip.dataset.at, sec = Number(chip.dataset.sec);
+    const cur = state.config.callouts[key];
+    saveCallouts({ [key]: cur.includes(sec) ? cur.filter((x) => x !== sec) : [...cur, sec] });
+    return;
+  }
+  const hear = e.target.closest('[data-say]');
+  if (hear) { sound.unlock(); sound.say(sampleText(hear.dataset.say), panelVoice()); return; }
+  if (e.target.closest('#dHearStart')) {
+    sound.unlock();
+    const voice = panelVoice();
+    const text = sampleText('arm');
+    sound.say(text, voice);
+    setTimeout(() => hearSequence('startseq', state.config.sound.beep), (400 + text.split(/\s+/).length * 330) / voice.voiceRate);
+  }
+});
+speechSynthesis.addEventListener?.('voiceschanged', () => setTimeout(() => renderDrawer(), 0));
+
+// ---------- status and controls ----------
+function renderStatus() {
+  if (!state) return;
+  const c = state.clock;
+  const ph = phaseOf(c);
+  $('phase').textContent = ph.label;
+  $('phase').className = 'pill ' + ph.cls;
+  $('heatLabel').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? '' :
+    (c.phase === 'running' || c.phase === 'freeflight' ? `Heat ${c.heat + 1}` : `Next: heat ${c.heat + 1}`);
+  $('meta').textContent = c.phase === 'stopped'
+    ? 'Press Start session to begin the practice loop.'
+    : c.phase === 'freeflight'
+    ? `Only heat ${c.heat + 1} has pilots, so it flies with no heat timer. Timed heats come back by themselves when another heat gets pilots.`
+    : c.phase === 'waiting'
+    ? 'Every heat is empty. The session carries on by itself when a pilot joins.'
+    : `Round ${c.round} · ${c.heatsRun} heat${c.heatsRun === 1 ? '' : 's'} flown this session`;
+
+  const b = (label, action, cls = '') => `<button class="btn ${cls}" data-act="${action}">${label}</button>`;
+  let html = '';
+  if (c.phase === 'stopped') html = b('Start session', 'start', 'primary wide');
+  else if (c.phase === 'waiting' || c.phase === 'freeflight') html = b('Stop session', 'stop', 'danger wide');
+  else {
+    html += c.paused ? b('Resume', 'resume', 'primary') : b('Pause', 'pause');
+    if (c.phase === 'changeover') html += b('20 s to start', 'to20', 'primary') + b('Start now', 'startNow');
+    else if (c.phase === 'running') html += b('End heat now', 'endHeat');
+    else html += '<span></span>';
+    html += b('Skip to next heat', 'skip');
+    html += b('Stop session', 'stop', c.phase === 'changeover' ? 'danger wide' : 'danger');
+  }
+  const ctl = $('controls');
+  if (ctl.dataset.html !== html) { ctl.innerHTML = html; ctl.dataset.html = html; }
+}
+$('controls').onclick = (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const a = btn.dataset.act;
+  if (a === 'stop' && !btn.classList.contains('confirm')) {
+    btn.classList.add('confirm');
+    btn.textContent = 'Click again to stop';
+    setTimeout(() => { btn.classList.remove('confirm'); btn.textContent = 'Stop session'; }, 3000);
+    return;
+  }
+  sound.unlock(); renderSound();
+  act('/api/action', { type: a });
+};
+
+function tickClock() {
+  if (state) {
+    const stopped = state.clock.phase === 'stopped' || state.clock.phase === 'waiting';
+    const free = state.clock.phase === 'freeflight';
+    const ms = stopped ? state.config.heatSeconds * 1000 : clockMs(state.clock);
+    // The start BEEP comes at a random moment: never show a countdown to it.
+    const arming = state.clock.phase === 'arming' && !state.clock.paused;
+    $('clock').textContent = arming ? 'ARM' : fmt(ms);
+    $('clock').style.color = arming ? 'var(--arming)' : stopped ? 'var(--stopped)' : free ? 'var(--running)' : ms != null && ms <= 10000 ? 'var(--arming)' : '';
+  }
+  requestAnimationFrame(tickClock);
+}
+requestAnimationFrame(tickClock);
+
+// ---------- setup ----------
+/** Channel options for slot s of heat h: the other slots' channels can't be picked; the occupied ones set the gaps. */
+const heatChOptions = (h, s) => channelOptions(state, h.slots[s].channel,
+  h.slots.filter((_, j) => j !== s).map((x) => x.channel),
+  h.slots.filter((x, j) => j !== s && x.pilotId).map((x) => x.channel));
+$('perHeat').innerHTML = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `<option value="${n}">${n}</option>`).join('');
+function renderSetup() {
+  const cfg = state.config;
+  for (const id of ['heatSeconds', 'changeoverSeconds']) {
+    const el = $(id);
+    if (document.activeElement === el) continue;
+    if (![...el.options].some((o) => o.value == cfg[id])) el.add(new Option(fmt(cfg[id] * 1000), cfg[id]));
+    el.value = cfg[id];
+  }
+  if (document.activeElement !== $('heatCount')) $('heatCount').value = cfg.heatCount;
+  if (document.activeElement !== $('perHeat')) $('perHeat').value = cfg.channels.length;
+  $('freeFlight').checked = cfg.freeFlight;
+  const box = $('slotChannels');
+  if (!box.contains(document.activeElement)) {
+    box.innerHTML = cfg.channels.map((ch, i) =>
+      `<select class="chip-select" data-slot="${i}" style="background:${SLOT_COLORS[i]}" aria-label="Channel for slot ${i + 1}">${channelOptions(state, ch, cfg.channels.filter((_, j) => j !== i))}</select>`).join('');
+  }
+}
+for (const id of ['heatSeconds', 'changeoverSeconds']) {
+  $(id).onchange = (e) => act('/api/config', { [id]: Number(e.target.value) });
+}
+$('freeFlight').onchange = (e) => act('/api/config', { freeFlight: e.target.checked });
+$('heatCount').onchange = (e) => act('/api/config', { heatCount: Number(e.target.value) }).then(() => renderSetup());
+const placedNote = (res) => res?.placed?.length ? ' ' + res.placed.map((x) => `${NAME(x.pilot.callsign)} moved to heat ${x.heat + 1} ${x.channel}`).join(' · ') : '';
+$('perHeat').onchange = async (e) => {
+  const res = await act('/api/pilots-per-heat', { count: Number(e.target.value) });
+  e.target.blur();
+  if (res) toast(`${e.target.value} pilots per heat.${placedNote(res)}`, true);
+};
+$('slotChannels').onchange = async (e) => {
+  const sel = e.target.closest('[data-slot]');
+  if (!sel) return;
+  sel.blur();
+  if (await act('/api/slot-channel', { slot: Number(sel.dataset.slot), channel: sel.value }) !== undefined) toast(`${sel.value} in every heat.`, true);
+};
+document.querySelectorAll('[data-preset]').forEach((b) => (b.onclick = async () => {
+  const res = await act('/api/config', { channels: b.dataset.preset.split(' ') });
+  if (res !== undefined) toast(`Channels: ${b.dataset.preset}.${placedNote(res)}`, true);
+}));
+
+// ---------- heats board ----------
+function renderHeats() {
+  const c = state.clock;
+  const board = $('heats');
+  if (board.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return; // a menu is open
+  const options = (sel) => `<option value="">— empty —</option>` +
+    state.pilots.map((p) => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(NAME(p.callsign))}</option>`).join('');
+  board.innerHTML = state.heats.map((h) => {
+    const current = c.phase !== 'stopped' && c.phase !== 'waiting' && c.heat === h.index;
+    const empty = h.slots.every((s) => !s.pilotId);
+    const tag = empty ? 'Empty: skipped' : current ? (c.phase === 'running' ? 'Flying' : c.phase === 'freeflight' ? 'Free flight' : 'Up next') :
+      (state.nextHeat === h.index ? 'After this' : '');
+    return `<div class="heat-card ${current ? 'current ' + c.phase : ''} ${empty ? 'empty' : ''}">
+      <header><span>Heat ${h.index + 1}</span><span class="tag">${tag}</span>
+        ${empty ? '' : `<button class="btn small" data-empty="${h.index}" title="Move this heat's pilots into other heats">Empty</button>`}</header>
+      ${h.slots.map((s, i) => `<div class="slot">
+        <select class="chip-select ${s.own ? 'own' : ''}" data-heat-ch="${h.index}" data-slot="${i}" style="background:${SLOT_COLORS[i]}"
+          title="${s.own ? 'Channel changed for this heat only' : 'Change the channel for this heat only'}" aria-label="Heat ${h.index + 1} channel">${heatChOptions(h, i)}</select>
+        <select class="input" data-heat="${h.index}" data-slot="${i}">${options(s.pilotId)}</select>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+$('heats').onchange = (e) => {
+  const ch = e.target.closest('select[data-heat-ch]');
+  if (ch) {
+    ch.blur();
+    act('/api/heat-channel', { heat: Number(ch.dataset.heatCh), slot: Number(ch.dataset.slot), channel: ch.value });
+    return;
+  }
+  const sel = e.target.closest('select[data-heat]');
+  if (!sel) return;
+  sel.blur();
+  act('/api/slot', { heat: Number(sel.dataset.heat), slot: Number(sel.dataset.slot), pilotId: sel.value || null });
+};
+$('heats').onclick = async (e) => {
+  const btn = e.target.closest('[data-empty]');
+  if (!btn) return;
+  if (!btn.classList.contains('confirm')) {
+    btn.classList.add('confirm', 'danger'); btn.textContent = 'Sure?';
+    setTimeout(() => { btn.classList.remove('confirm', 'danger'); btn.textContent = 'Empty'; }, 3000);
+    return;
+  }
+  const res = await act('/api/empty-heat', { heat: Number(btn.dataset.empty) });
+  if (!res) return;
+  const moved = res.moved.map((m) => `${NAME(m.pilot.callsign)} → heat ${m.heat + 1} ${m.channel}${m.changed ? ' (new channel)' : ''}`).join(' · ');
+  if (res.unplaced.length) toast(`${moved ? moved + '. ' : ''}No room for ${res.unplaced.map((p) => NAME(p.callsign)).join(', ')}: they're waiting in the Pilots panel.`);
+  else toast(moved || 'Heat emptied.', true);
+};
+$('compact').onclick = async () => {
+  const res = await act('/api/compact');
+  if (!res) return;
+  if (!res.moved) { toast(`Already as compact as it gets: ${res.heatsInUse} heat${res.heatsInUse === 1 ? '' : 's'} fly.`, true); return; }
+  const changes = res.channelChanges.map((x) => `${NAME(x.pilot.callsign)} to ${x.channel} (heat ${x.heat + 1})`).join(', ');
+  toast(`Compacted: ${res.heatsInUse} heat${res.heatsInUse === 1 ? '' : 's'} fly now.${changes ? ' New channels: ' + changes + '.' : ' Everyone kept their channel.'}`, true);
+};
+
+// ---------- pilots panel ----------
+const openPilotIds = new Set();   // which pilot rows are expanded
+const pickIds = new Set();        // pilots ticked to be put in heats (ones added here start ticked)
+const openQuads = new Set();      // which shared quads are expanded
+let lastPilotsKey = '';
+
+/** Where a pilot flies: "Heat 2 · F4", or null. */
+function seatOf(id) {
+  for (const h of state.heats) {
+    const i = h.slots.findIndex((s) => s.pilotId === id);
+    if (i >= 0) return { heat: h.index, slot: i, channel: h.slots[i].channel };
+  }
+  return null;
+}
+
+/** Shared quads, from the pilots who have one: name, channel, members. */
+function sharedQuads() {
+  const groups = new Map();
+  for (const p of state.pilots) {
+    if (!p.quad) continue;
+    const k = p.quad.toLowerCase();
+    if (!groups.has(k)) groups.set(k, { name: p.quad, members: [] });
+    groups.get(k).members.push(p);
+  }
+  return [...groups.values()].map((g) => {
+    const seat = g.members.map((m) => seatOf(m.id)).find(Boolean);
+    return { ...g, slot: seat?.slot ?? 0, channel: seat?.channel ?? state.config.channels[0] };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderPilotsPanel(force = false) {
+  $('pilotCount').textContent = state.pilots.length ? String(state.pilots.length) : '';
+  // Pilots signed in without a heat (e.g. at the kiosk when every heat was full).
+  const seated = new Set(state.heats.flatMap((h) => h.slots.map((s) => s.pilotId)).filter(Boolean));
+  const waiting = state.pilots.filter((p) => !seated.has(p.id)).length;
+  $('waitingCount').textContent = waiting ? `${waiting} without a heat` : '';
+  if (pilotsDrawer.hidden) return;
+  // Don't redraw under someone who is typing.
+  const typing = pilotsDrawer.contains(document.activeElement) && document.activeElement.matches('input:not([type=search]):not([type=file]), textarea');
+  const key = JSON.stringify([state.pilots, state.heats, state.config.channels, $('pilotFilter').value]);
+  if (!force && (typing || key === lastPilotsKey)) return;
+  lastPilotsKey = key;
+
+  const q = $('pilotFilter').value.trim().toLowerCase();
+  const list = state.pilots.filter((p) => !q || p.callsign.toLowerCase().includes(q));
+  $('pilotList').innerHTML = list.length ? list.map((p) => {
+    const seat = seatOf(p.id);
+    const where = seat ? `Heat ${seat.heat + 1} · ${esc(seat.channel)}` : 'Not in a heat';
+    return `<div class="prow">${seat ? '<span></span>' : `<input type="checkbox" class="pick" data-pick="${p.id}" ${pickIds.has(p.id) ? 'checked' : ''} aria-label="Put ${esc(NAME(p.callsign))} in a heat">`}<details class="pitem" data-id="${p.id}" ${openPilotIds.has(p.id) ? 'open' : ''}>
+      <summary><span class="pname">${esc(NAME(p.callsign))}</span><span class="pwhere ${seat ? '' : 'none'}">${where}${p.quad ? ` · ${esc(p.quad)}` : ''}</span></summary>
+      <div class="pbody">
+        <div class="field"><label>Callsign, on screens</label><input class="input" data-field="callsign" value="${esc(p.callsign)}" maxlength="24"></div>
+        <div class="field"><label>Spoken name, what the voice says</label>
+          <div class="wording-row"><input class="input" data-field="spokenName" value="${esc(p.spokenName)}" maxlength="60"><button class="btn small" data-say>Hear</button></div></div>
+        <div class="field"><label>Photo, shown on the pilot's plate on the big screen</label>
+          <div class="photo-row">${photoUrl(p) ? `<img class="thumb" src="${photoUrl(p)}" alt="">` : '<span class="thumb none">No photo</span>'}
+            <label class="btn small">${photoUrl(p) ? 'Change photo' : 'Add photo'}<input type="file" accept="image/*" data-photo hidden></label>
+            ${photoUrl(p) ? '<button class="btn small" data-photo-del>Remove photo</button>' : ''}</div></div>
+        <div class="pactions">
+          ${seat ? `<button class="btn small" data-unseat>Take out of heat ${seat.heat + 1}</button>` : ''}
+        </div>
+      </div>
+    </details><button class="btn small remove" data-remove="${p.id}" title="Remove ${esc(NAME(p.callsign))}" aria-label="Remove ${esc(NAME(p.callsign))}">Remove</button></div>`;
+  }).join('') : `<p class="hint">${state.pilots.length ? 'No pilot matches.' : 'No pilots yet. They appear here when they join at the kiosk, or add them above.'}</p>`;
+  renderPlaceBar();
+
+  const chOptions = (sel) => state.config.channels.map((c, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  const quadForm = (q, i) => `
+    <div class="pbody">
+      ${q ? '' : `<div class="field"><label for="qn-${i}">Quad name</label><input id="qn-${i}" class="input" data-qname maxlength="30" placeholder="Club quad 1"></div>`}
+      <div class="field"><label for="qc-${i}">Channel</label><select id="qc-${i}" class="input" data-qslot>${chOptions(q ? q.slot : 0)}</select></div>
+      <div class="field"><label for="qp-${i}">Pilots, one per line</label><textarea id="qp-${i}" class="input" data-qpilots rows="4" placeholder="Mia&#10;Leo&#10;Kristjan">${q ? esc(q.members.map((m) => NAME(m.callsign)).join('\n')) : ''}</textarea></div>
+      <div class="pactions">
+        <button class="btn small primary" data-qsave>${q ? 'Save and place in heats' : 'Place in heats'}</button>
+        ${q ? '<button class="btn small danger" data-qstop>Stop sharing</button>' : ''}
+      </div>
+    </div>`;
+  const quads = sharedQuads();
+  $('quadList').innerHTML = quads.map((qd, i) => `<details class="pitem" data-quad="${esc(qd.name)}" ${openQuads.has(qd.name.toLowerCase()) ? 'open' : ''}>
+      <summary><span class="pname">${esc(qd.name)}</span><span class="pwhere">${esc(qd.channel)} · ${esc(qd.members.map((m) => NAME(m.callsign)).join(', '))}</span></summary>
+      ${quadForm(qd, i)}
+    </details>`).join('') + `<details class="pitem new" data-quad="" ${openQuads.has('') ? 'open' : ''}>
+      <summary><span class="pname">+ New shared quad</span></summary>
+      ${quadForm(null, 'new')}
+    </details>`;
+}
+
+/** "3 not in a heat · Put 2 ticked pilots in heats" */
+function renderPlaceBar() {
+  const unseated = state.pilots.filter((p) => !seatOf(p.id));
+  // Forget ticks for pilots now in a heat. (A pilot just added may not be in this state yet: keep it.)
+  for (const id of [...pickIds]) if (state.pilots.some((p) => p.id === id) && seatOf(id)) pickIds.delete(id);
+  const bar = $('placeBar');
+  bar.hidden = unseated.length === 0;
+  if (bar.hidden) return;
+  const n = unseated.filter((p) => pickIds.has(p.id)).length;
+  bar.innerHTML = `<span>${unseated.length} not in a heat</span>
+    <button class="btn small" data-pickall>${n === unseated.length ? 'Untick all' : 'Tick all'}</button>
+    <button class="btn small primary" data-place ${n ? '' : 'disabled'}>Put ${n || ''} ticked in heats</button>`;
+}
+$('placeBar').addEventListener('click', async (e) => {
+  const unseated = state.pilots.filter((p) => !seatOf(p.id));
+  if (e.target.closest('[data-pickall]')) {
+    if (unseated.every((p) => pickIds.has(p.id))) pickIds.clear(); else unseated.forEach((p) => pickIds.add(p.id));
+    renderPilotsPanel(true);
+    return;
+  }
+  if (!e.target.closest('[data-place]')) return;
+  const res = await act('/api/distribute', { pilotIds: [...pickIds] });
+  if (!res) return;
+  const msg = res.placed.map((x) => `${NAME(x.pilot.callsign)}: heat ${x.heat + 1} ${x.channel}`).join(' · ');
+  const added = res.addedHeats ? ` Added ${res.addedHeats} heat${res.addedHeats === 1 ? '' : 's'}.` : '';
+  if (res.unplaced.length) toast(`${msg ? msg + '.' : ''}${added} No room for ${res.unplaced.map((p) => NAME(p.callsign)).join(', ')}: the 40-heat limit is reached.`);
+  else toast(msg + '.' + added, true);
+});
+$('pilotList').addEventListener('change', (e) => {
+  const cb = e.target.closest('[data-pick]');
+  if (!cb) return;
+  cb.checked ? pickIds.add(cb.dataset.pick) : pickIds.delete(cb.dataset.pick);
+  renderPlaceBar();
+});
+$('pilotFilter').oninput = () => renderPilotsPanel(true);
+pilotsDrawer.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!(d instanceof HTMLDetailsElement)) return;
+  if (d.dataset.id) d.open ? openPilotIds.add(d.dataset.id) : openPilotIds.delete(d.dataset.id);
+  if (d.dataset.quad !== undefined) { const k = d.dataset.quad.toLowerCase(); d.open ? openQuads.add(k) : openQuads.delete(k); }
+}, true);
+$('pilotList').addEventListener('change', (e) => {
+  const input = e.target.closest('input[data-field]');
+  if (!input) return;
+  const id = input.closest('[data-id]').dataset.id;
+  input.blur();
+  act('/api/pilot/update', { id, [input.dataset.field]: input.value });
+});
+$('pilotList').addEventListener('change', async (e) => {
+  const input = e.target.closest('input[data-photo]');
+  if (!input?.files?.[0]) return;
+  const id = input.closest('[data-id]').dataset.id;
+  try { await uploadPhoto(id, input.files[0]); toast('Photo saved.', true); } catch (err) { toast(err.message); }
+});
+$('pilotList').addEventListener('click', (e) => {
+  const del = e.target.closest('[data-photo-del]');
+  if (del) act('/api/pilot/photo', { id: del.closest('[data-id]').dataset.id, data: null });
+});
+$('pilotList').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input[data-field]')) e.target.blur(); });
+$('pilotList').addEventListener('click', (e) => {
+  const item = e.target.closest('[data-id]');
+  if (!item) return;
+  const id = item.dataset.id;
+  if (e.target.closest('[data-say]')) { sound.unlock(); sound.say(item.querySelector('[data-field=spokenName]').value); }
+  if (e.target.closest('[data-unseat]')) { const s = seatOf(id); if (s) act('/api/slot', { heat: s.heat, slot: s.slot, pilotId: null }); }
+});
+// One click removes a pilot; Undo brings them back with their names, shared quad and heat slot.
+$('pilotList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-remove]');
+  if (!btn) return;
+  const id = btn.dataset.remove;
+  const p = state.pilots.find((x) => x.id === id);
+  if (!p) return;
+  const seat = seatOf(id);
+  openPilotIds.delete(id);
+  if (await act('/api/pilot/delete', { id }) === undefined) return;
+  toast(`${NAME(p.callsign)} removed.`, true, { label: 'Undo', run: async () => {
+    const back = await act('/api/pilot/add', { callsign: p.callsign });
+    if (!back) return;
+    await act('/api/pilot/update', { id: back.id, spokenName: p.spokenName, ...(p.quad ? { quad: p.quad } : {}) });
+    if (seat) {
+      const free = !state.heats[seat.heat]?.slots[seat.slot]?.pilotId;
+      if (free) await act('/api/slot', { heat: seat.heat, slot: seat.slot, pilotId: back.id });
+      else await act('/api/distribute', { pilotIds: [back.id] });
+    }
+    toast(`${NAME(p.callsign)} is back.`, true);
+  } });
+});
+$('quadList').addEventListener('click', async (e) => {
+  const item = e.target.closest('[data-quad]');
+  if (!item) return;
+  const existing = item.dataset.quad;
+  if (e.target.closest('[data-qstop]')) {
+    openQuads.delete(existing.toLowerCase());
+    if (await act('/api/shared-quad/remove', { quad: existing }) !== undefined) toast(`${existing}: pilots no longer share it. They keep their heats.`, true);
+    return;
+  }
+  if (!e.target.closest('[data-qsave]')) return;
+  const name = existing || item.querySelector('[data-qname]').value;
+  const names = item.querySelector('[data-qpilots]').value.split('\n').map((n) => n.trim()).filter(Boolean);
+  const placed = await act('/api/shared-quad', { quad: name, slot: Number(item.querySelector('[data-qslot]').value), names });
+  if (placed) {
+    if (!existing) openQuads.delete('');
+    toast(placed.map((x) => `${NAME(x.pilot.callsign)}: heat ${x.heat + 1}`).join(' · '), true);
+    renderPilotsPanel(true);
+  }
+});
+async function addPilot() {
+  const name = $('newPilot').value.trim();
+  if (!name) return;
+  const p = await act('/api/pilot/add', { callsign: name });
+  if (!p) return;
+  $('newPilot').value = '';
+  $('newPilot').focus();
+  // Straight into a heat (a new heat is added if all are full). Already flying? Just say where.
+  const seat = seatOf(p.id);
+  if (seat) { toast(`${NAME(p.callsign)} is already in heat ${seat.heat + 1} · ${seat.channel}.`, true); return; }
+  const res = await act('/api/distribute', { pilotIds: [p.id] });
+  const x = res?.placed?.[0];
+  if (x) toast(`${NAME(p.callsign)} → heat ${x.heat + 1} · ${x.channel}${res.addedHeats ? ' (new heat)' : ''}`, true);
+  else { pickIds.add(p.id); toast(`${NAME(p.callsign)} added, but there was no room in a heat.`); }
+  renderPilotsPanel(true);
+}
+$('addPilot').onclick = addPilot;
+$('newPilot').onkeydown = (e) => { if (e.key === 'Enter') addPilot(); };
+
+// ---------- kiosk address ----------
+fetch('/api/info').then((r) => r.json()).then((info) => {
+  const urls = [`http://${info.hostname}:${info.port}/kiosk`, ...info.addresses.map((a) => `http://${a}:${info.port}/kiosk`)];
+  $('kioskInfo').innerHTML = `
+    <p class="hint" style="margin:0">On the kiosk PC, run <b>kiosk.bat</b> with this PC's name, <b>${esc(info.hostname)}</b>. Or open one of these addresses in Edge:</p>
+    ${urls.map((u) => `<code>${esc(u)}</code>`).join('')}
+    <p class="hint" style="margin:0">Both PCs must be on the same wired network.</p>`;
+}).catch(() => {});
+
+// ---------- live ----------
+connect({
+  // The console plays the sound: never reload in the middle of a start sequence or a callout.
+  // (Edge sometimes reports the voice as speaking forever: after 30 s we stop waiting for it.)
+  canReload: (waited) => !document.activeElement?.matches?.('input, textarea, select') && state?.clock.phase !== 'arming' &&
+    (!speechSynthesis.speaking || waited > 30_000),
+  onState(s) {
+    state = s;
+    renderStatus();
+    renderSetup();
+    renderHeats();
+    renderPilotsPanel();
+    sound.apply(state.config.sound);
+    renderDrawer();
+  },
+  onAudio(a) {
+    if (a.kind === 'say' && sound.enabled && a.text === state?.config.callouts.texts.arm) {
+      // The arm call never waits behind other callouts, and we tell the server how long it
+      // really takes, so the random 2–4 s before the start BEEP starts when the voice stops.
+      speechSynthesis.cancel();
+      const u = sound.say(a.text);
+      if (u) {
+        let t0 = 0;
+        u.onstart = () => (t0 = performance.now());
+        u.onend = () => { if (t0) post('/api/arm-measured', { text: a.text, ms: performance.now() - t0 }).catch(() => {}); };
+      }
+      return;
+    }
+    sound.play(a);
+  },
+  onStatus(online) { document.body.classList.toggle('offline', !online); },
+});
+renderSound();
+</script>
+</body>
+</html>

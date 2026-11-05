@@ -1,0 +1,89 @@
+{
+ "version": "2026.11.05-1920",
+ "files": [
+  {
+   "path": "flyday.cjs",
+   "sha256": "57218f4b8051cd31f6d174cb76e9220e97e446777fedb6443d42625460cff503"
+  },
+  {
+   "path": "web/assets/common.js",
+   "sha256": "ecebca038a92ffca8a82f4c5e5d4ef7858ed0dfe99aa98926e112c21e5f0b7d0"
+  },
+  {
+   "path": "web/assets/favicon.svg",
+   "sha256": "dac1eb13a73ae67a46dc5d1a0ec031c73dbce5a36691074cd20cacd8904760cd"
+  },
+  {
+   "path": "web/assets/fonts/OFL-Archivo.txt",
+   "sha256": "c3c8402eec0e31dc9a76851235b1c02a0bb821488b2db8e35bcc2ab60ca8fc2b"
+  },
+  {
+   "path": "web/assets/fonts/OFL-BigShoulders.txt",
+   "sha256": "18aabf190848725e2576eefb5c29ba06aac1029d02132252a7f312eac2e50cf3"
+  },
+  {
+   "path": "web/assets/fonts/archivo-latin-ext-standard-italic.woff2",
+   "sha256": "745260b77ac6f20bea3b92bbba59c3ac7e71324387cfbde076f8901e56b8fd9e"
+  },
+  {
+   "path": "web/assets/fonts/archivo-latin-ext-standard-normal.woff2",
+   "sha256": "5717f37059660ca5c899bad6c48ee22c3ac55cb3c484055241689d0f905a1a86"
+  },
+  {
+   "path": "web/assets/fonts/archivo-latin-standard-italic.woff2",
+   "sha256": "d63de74ee5ad92cd506c8dd0f795e84bd084aea8eef90173b5d2464096c5fa4a"
+  },
+  {
+   "path": "web/assets/fonts/archivo-latin-standard-normal.woff2",
+   "sha256": "e3a28eade21a900c7155a247757f4b2834c07bb7ef07ad7efa55cebaac1e8f5e"
+  },
+  {
+   "path": "web/assets/fonts/big-shoulders-display-latin-ext-wght-normal.woff2",
+   "sha256": "4671cb6e9e9036e92a4a4e8c9506c6bcfbfb4a10687f0033fae3c2abc37ad916"
+  },
+  {
+   "path": "web/assets/fonts/big-shoulders-display-latin-wght-normal.woff2",
+   "sha256": "075292b13a638821b34726b33e49b3b711c4b9bee9b42f2bb68fa3b6ec888f2b"
+  },
+  {
+   "path": "web/assets/fonts/big-shoulders-stencil-display-latin-900-normal.woff2",
+   "sha256": "d071c3ae576a9d0e149af9f8dea74a5cee7a403b53d543b2f4d984cd65ebcb8b"
+  },
+  {
+   "path": "web/assets/fonts/big-shoulders-stencil-display-latin-ext-900-normal.woff2",
+   "sha256": "2a832664d136037daeb00e01fda9e84354a32aa6bd6568c90202137a92ec61e8"
+  },
+  {
+   "path": "web/assets/mark-small.svg",
+   "sha256": "071d4b6f186f21ffbc7316609dc00ee0810f94f948be548859035e189e4ed908"
+  },
+  {
+   "path": "web/assets/mark.svg",
+   "sha256": "9f903208668dd866ad800d2ab10d5907b260a87f0cf8bcfc79c7ec2fe6373c56"
+  },
+  {
+   "path": "web/assets/style.css",
+   "sha256": "ce136509df4ca48c4deaa0ea9d365ef52bb6967c90a4004f5ecd9905894d4336"
+  },
+  {
+   "path": "web/console.html",
+   "sha256": "de479d94843c1e630ba3e334a57dc9906d14b05bd9cc4372884e5c96b3e6ad47"
+  },
+  {
+   "path": "web/index.html",
+   "sha256": "7e90ef6d48883fba384a33ed6797bda71d44fa60dc82da7b073655b0b340d7b6"
+  },
+  {
+   "path": "web/kiosk.html",
+   "sha256": "229242021b5db14e4a39c4b9192d6cb808df381274177ea928cce7d53fb28741"
+  },
+  {
+   "path": "web/mobile.html",
+   "sha256": "bae0f76884c9b2ceb2310548cfc983eb741f2721fb65fe488f50e757f2916810"
+  },
+  {
+   "path": "web/screen.html",
+   "sha256": "84cffb373d8a2f5309e73e04d5cd193896a6ef4ec8907df421c246fbd987780c"
+  }
+ ]
+}

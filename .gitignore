@@ -1,0 +1,10 @@
+# Never in the repo: the venue's own data (pilots, photos, settings) and local build output.
+data/
+app/
+app.new/
+app.old/
+kiosk.json
+node_modules/
+build/
+dist/
+*.tmp
