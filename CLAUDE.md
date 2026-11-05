@@ -56,7 +56,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 ## RD console status icons
 
-- The console's top bar is a row of icons (`.status-icons` in console.html): time of day, session time, sound + callouts (one pair: the speaker toggles sound on this screen, the voice opens Callouts and sound), lap timer (`state.timing.timer`), video (`state.video`, not built yet), spectrum analyser (`state.spectrum`, not built yet), pilots with their count. Green = connected / on, red = not, orange = connecting or sound blocked by the browser. Details in each icon's tooltip.
+- The console's top bar is a row of icons (`.status-icons` in console.html): time of day, session time, sound + callouts (one pair: the speaker toggles sound on this screen, the voice opens Callouts and sound), lap timer (`state.timing.timer`), video (`state.video`, not built yet), spectrum analyser (`state.spectrum`, not built yet), pilots with their count. Green = connected / on, red = not, orange = connecting or sound blocked by the browser. Details in each icon's tooltip. Clicking an icon opens its page in the main area in place of Heats/Times (`showView` in console.html: sound, pilots, timer, video, spectrum); clicking it again, Back to heats or Escape returns. No flyouts. The Lap timer page sets RotorHazard's address and login and the gate-pass beep/voice; Video and Spectrum pages are status plus what's coming until those are built.
 
 ## End of the day
 

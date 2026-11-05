@@ -20,9 +20,9 @@
       <span class="si-pair" id="soundPair">
         <button class="si" id="soundBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9l5 6M21 9l-5 6"/></svg></button><button class="si" id="openDrawer" type="button" title="Callouts and sound settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4a6 6 0 0 1 6 6c0 2-1 3-1 4v2h-3v3H8v-3H6v-3l-2-1 2-3a6 6 0 0 1 3-5z"/><path d="M18 8a5 5 0 0 1 0 6M20.5 6a8 8 0 0 1 0 10"/></svg></button>
       </span>
-      <span class="si" id="timerSi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 20v-9h8v9"/><path d="M12 14l1.5 2"/><circle cx="12" cy="14" r="0.6"/></svg></span>
-      <span class="si" id="videoSi"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></span>
-      <span class="si" id="spectrumSi"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 17v-3M8 17V9M11 17v-6M14 17V5M17 17v-8M20 17v-4"/></svg></span>
+      <button class="si" id="timerSi" type="button" data-view="timer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 20v-9h8v9"/><path d="M12 14l1.5 2"/><circle cx="12" cy="14" r="0.6"/></svg></button>
+      <button class="si" id="videoSi" type="button" data-view="video"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></button>
+      <button class="si" id="spectrumSi" type="button" data-view="spectrum"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 17v-3M8 17V9M11 17v-6M14 17V5M17 17v-8M20 17v-4"/></svg></button>
       <button class="si" id="openPilots" type="button" title="Pilots"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M7 7h10"/></svg><span id="pilotCount" class="num">0</span><span id="waitingCount" class="count waiting" title="Signed in, not in a heat"></span></button>
     </div>
   </div>
@@ -73,7 +73,7 @@
     </div>
 
     <div>
-      <section class="card">
+      <section class="card" id="heatsCard">
         <div class="card-head">
           <div class="tabs" id="rightTabs"><button data-tab="heats" class="on">Heats</button><button data-tab="times">Times</button></div>
           <button id="compact" class="btn small primary" title="Pack pilots into as few heats as possible">Compact heats</button>
@@ -82,13 +82,10 @@
         <div id="times" class="times" hidden></div>
       </section>
 
-    </div>
-  </div>
-</div>
-<aside id="drawer" class="drawer" hidden aria-label="Callouts and sound">
+<section id="drawer" class="card drawer view" hidden aria-label="Callouts and sound">
   <div class="drawer-head">
     <h2>Callouts and sound</h2>
-    <button id="closeDrawer" class="btn small">Close</button>
+    <button id="closeDrawer" class="btn small">Back to heats</button>
   </div>
 
   <section class="drawer-sec">
@@ -112,11 +109,11 @@
     <div id="dCallouts" class="callouts"></div>
     <p class="hint">The start BEEP and the end BEEP always play.</p>
   </section>
-</aside>
-<aside id="pilotsDrawer" class="drawer" hidden aria-label="Pilots">
+</section>
+<section id="pilotsDrawer" class="card drawer view" hidden aria-label="Pilots">
   <div class="drawer-head">
     <h2>Pilots</h2>
-    <button class="btn small" data-close>Close</button>
+    <button class="btn small" data-close>Back to heats</button>
   </div>
   <section class="drawer-sec">
     <div class="add-row">
@@ -132,7 +129,54 @@
     <p class="hint" style="margin:0">Pilots who share one quad fly on the same channel, each in a different heat, and are called by their own names.</p>
     <div id="quadList" class="plist"></div>
   </section>
-</aside>
+</section>
+<section id="timerView" class="card drawer view" hidden aria-label="Lap timer">
+  <div class="drawer-head"><h2>Lap timer</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec">
+    <div id="tStatus" class="dev-status"></div>
+  </section>
+  <section class="drawer-sec">
+    <h3>RotorHazard</h3>
+    <label class="toggle"><input type="checkbox" id="tEnabled"><span><b>Use the lap timer</b></span></label>
+    <div class="field"><label for="tHost">Address on the venue network</label><input id="tHost" class="input" placeholder="192.168.1.50 or rotorhazard.local:5000" autocomplete="off"></div>
+    <div class="dev-row">
+      <div class="field"><label for="tUser">Admin user</label><input id="tUser" class="input" autocomplete="off"></div>
+      <div class="field"><label for="tPass">Admin password</label><input id="tPass" class="input" type="password" autocomplete="new-password"></div>
+    </div>
+    <div><button id="tSave" class="btn primary">Save and connect</button></div>
+    <p class="hint">The timer's defaults are admin / rotorhazard. Give it a fixed address on the router so this never changes. FlyDay keeps trying to reconnect by itself, and practice carries on without laps if the timer drops out.</p>
+  </section>
+  <section class="drawer-sec">
+    <h3>On every gate pass</h3>
+    <label class="toggle"><input type="checkbox" id="tBeep"><span><b>Short beep</b></span></label>
+    <label class="toggle"><input type="checkbox" id="tVoice"><span><b>Say the lap</b></span></label>
+    <div class="field"><label for="tVoiceText">What the voice says</label><input id="tVoiceText" class="input" autocomplete="off"></div>
+    <p class="hint">{name} the pilot, {lap} lap number, {laptime} lap time.</p>
+  </section>
+</section>
+<section id="videoView" class="card drawer view" hidden aria-label="Video">
+  <div class="drawer-head"><h2>Video</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec"><div id="vStatus" class="dev-status"></div></section>
+  <section class="drawer-sec">
+    <h3>What it will do</h3>
+    <p>Each pilot's FPV feed plays in their plate on the big screen while they fly, and every heat is recorded, so you can watch any heat again from the Times page, lined up with the laps.</p>
+    <p class="hint">Not built yet. It needs the capture hardware first: one USB grabber per receiver, or a quad splitter into one capture card. Once it's here, its settings (which input is which channel, recording on or off, where recordings go) live on this page.</p>
+  </section>
+</section>
+<section id="spectrumView" class="card drawer view" hidden aria-label="Spectrum analyser">
+  <div class="drawer-head"><h2>Spectrum analyser</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
+  <section class="drawer-sec">
+    <h3>What it will do</h3>
+    <p>Listens to the 5.8 GHz band and shows which channels are noisy, so FlyDay can steer pilots away from them when it hands out channels.</p>
+    <p class="hint">Not built yet. It runs on the Waveshare ESP32-C5 with a receiver module, cabled to this PC. Its settings (which port, how often it scans) will live on this page.</p>
+  </section>
+</section>
+
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script type="module">
@@ -185,6 +229,9 @@ function renderDevices() {
   const sp = state.spectrum ?? { state: 'off' };
   $('spectrumSi').className = `si ${sp.state === 'connected' ? 'ok' : 'bad'}`;
   $('spectrumSi').title = sp.state === 'connected' ? 'Spectrum analyser connected' : 'Spectrum analyser not connected';
+  devStatus($('vStatus'), v.state === 'online' ? 'ok' : 'bad', v.state === 'online' ? 'Online' : 'Not online', v.state === 'online' ? '' : 'No video inputs yet.');
+  devStatus($('sStatus'), sp.state === 'connected' ? 'ok' : 'bad', sp.state === 'connected' ? 'Connected' : 'Not connected', sp.state === 'connected' ? '' : 'No analyser cabled to this PC yet.');
+  renderTimerView();
 }
 
 // ---------- sound ----------
@@ -264,23 +311,59 @@ function renderCallouts() {
 
 const drawer = $('drawer');
 const pilotsDrawer = $('pilotsDrawer');
-// Side panels start just under the top bar, so its buttons stay usable (switch panels, close).
-const placePanels = () => {
-  const top = Math.max(0, document.querySelector('.topbar').getBoundingClientRect().bottom + 8);
-  for (const el of [drawer, pilotsDrawer]) el.style.top = top + 'px';
-};
-window.addEventListener('resize', placePanels);
-window.addEventListener('scroll', placePanels, { passive: true });
-const openDrawer = () => { placePanels(); pilotsDrawer.hidden = true; drawer.hidden = false; renderDrawer(true); };
-const closeDrawer = () => { drawer.hidden = true; pilotsDrawer.hidden = true; };
-$('openDrawer').onclick = () => (drawer.hidden ? openDrawer() : closeDrawer());
-$('openPilots').onclick = () => {
-  if (!pilotsDrawer.hidden) return closeDrawer();
-  placePanels(); drawer.hidden = true; pilotsDrawer.hidden = false; renderPilotsPanel(true);
-};
+// Pages in the main area: Heats and Times, or one opened from the status icons (no flyouts).
+const VIEWS = { sound: drawer, pilots: pilotsDrawer, timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
+const ICONS = { sound: $('openDrawer'), pilots: $('openPilots'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
+let view = 'heats';
+function showView(v) {
+  view = VIEWS[v] ? v : 'heats';
+  for (const [k, el] of Object.entries(VIEWS)) el.hidden = k !== view;
+  for (const [k, el] of Object.entries(ICONS)) el.classList.toggle('active', k === view);
+  $('heatsCard').hidden = view !== 'heats';
+  if (view === 'sound') renderDrawer(true);
+  if (view === 'pilots') renderPilotsPanel(true);
+  if (view === 'timer') renderTimerView(true);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+const toggleView = (v) => showView(view === v ? 'heats' : v);
+const closeDrawer = () => showView('heats');
+$('openDrawer').onclick = () => toggleView('sound');
+$('openPilots').onclick = () => toggleView('pilots');
+for (const id of ['timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
 $('closeDrawer').onclick = closeDrawer;
-pilotsDrawer.querySelector('[data-close]').onclick = closeDrawer;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+for (const b of document.querySelectorAll('.view [data-close]')) b.onclick = closeDrawer;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.matches('input, textarea, select')) closeDrawer(); });
+
+// ---------- lap timer page ----------
+function devStatus(el, kind, head, text) {
+  el.className = `dev-status ${kind}`;
+  el.innerHTML = `<b>${esc(head)}</b>${text ? `<span>${esc(text)}</span>` : ''}`;
+}
+function renderTimerView(force = false) {
+  if (!state || $('timerView').hidden) return;
+  const cfg = state.config.timer, t = state.timing?.timer ?? { state: 'off', nodes: 0, message: '' };
+  if (t.state === 'connected') devStatus($('tStatus'), 'ok', 'Connected', `${t.nodes} receivers: the first ${state.timing?.timedSlots ?? t.nodes} channels in every heat are timed.`);
+  else if (t.state === 'connecting') devStatus($('tStatus'), 'warn', 'Connecting…', t.message);
+  else devStatus($('tStatus'), 'bad', 'Not connected', !cfg.enabled ? 'The lap timer is switched off.' : !cfg.host ? 'Fill in its address.' : t.message);
+  const co = state.config.callouts;
+  for (const [id, v] of [['tHost', cfg.host], ['tUser', cfg.user], ['tVoiceText', co.texts.gatePass]]) {
+    if (force || document.activeElement !== $(id)) $(id).value = v ?? '';
+  }
+  if (force) $('tPass').value = '';
+  $('tPass').placeholder = cfg.passwordSet ? 'Saved (type to change)' : '';
+  $('tEnabled').checked = !!cfg.enabled;
+  $('tBeep').checked = !!co.gatePassBeep;
+  $('tVoice').checked = !!co.gatePassVoice;
+}
+$('tEnabled').onchange = (e) => act('/api/config', { timer: { enabled: e.target.checked } });
+$('tSave').onclick = async () => {
+  const r = await act('/api/config', { timer: { enabled: true, host: $('tHost').value, user: $('tUser').value, password: $('tPass').value } });
+  if (r) { $('tPass').value = ''; toast('Saved. Connecting to the timer…', true); }
+};
+$('tHost').onkeydown = $('tUser').onkeydown = $('tPass').onkeydown = (e) => { if (e.key === 'Enter') $('tSave').click(); };
+$('tBeep').onchange = (e) => saveCallouts({ gatePassBeep: e.target.checked });
+$('tVoice').onchange = (e) => saveCallouts({ gatePassVoice: e.target.checked });
+$('tVoiceText').onchange = (e) => saveCallouts({ texts: { gatePass: e.target.value } });
 
 const saveSound = (patch) => act('/api/config', { sound: patch });
 const saveCallouts = (patch) => act('/api/config', { callouts: patch });
