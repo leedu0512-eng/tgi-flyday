@@ -894,6 +894,7 @@ export class Engine {
     this.checkSlot(heat, slot);
     if (this.heats[heat][slot] !== null) throw new EngineError('That slot was just taken. Pick another one.');
     const pilot = this.findOrCreatePilot(callsign);
+    this.assertNotClub(pilot);
     this.assertNoQuadClash(pilot, heat);
     this.removeFromSlots(pilot.id);
     this.heats[heat][slot] = pilot.id;
@@ -951,6 +952,12 @@ export class Engine {
   }
 
   // ---------- club quads ----------
+
+  /** Club-quad pilots fly their quad's channel: nobody moves them by hand. */
+  private assertNotClub(p: Pilot | undefined, what = 'moved by hand') {
+    const q = p && this.clubQuadOf(p);
+    if (q) throw new EngineError(`${p!.callsign} flies club quad ${q.name} on ${q.channel} and can't be ${what}. Change the quad on the Club quads page.`);
+  }
 
   /** The club quad a pilot is flying, if any. */
   clubQuadOf(p: Pilot): ClubQuad | undefined {
@@ -1048,6 +1055,87 @@ export class Engine {
     return { moved: moved.map((p) => ({ pilot: p, ...this.clubInfo(p), heat: this.heatOf(p.id) })) };
   }
 
+  // ---------- RD: drag and drop ----------
+
+  /**
+   * RD, drag and drop on the heat board: put a pilot in heat h, slot s. An empty slot: they
+   * move there. Someone sitting there: the two swap places. A pilot on a club quad keeps its
+   * channel: they take the heat's empty slot already on it, else the slot switches to it (for
+   * that heat). Quad-mates never end up in one heat. All or nothing.
+   */
+  movePilot(pilotId: string, heat: number, slot: number): { heat: number; slot: number } {
+    this.checkSlot(heat, slot);
+    const p = this.pilots.get(pilotId);
+    if (!p) throw new EngineError('Unknown pilot.');
+    const fromHeat = this.heatOf(p.id);
+    const fromSlot = fromHeat >= 0 ? this.heats[fromHeat].indexOf(p.id) : -1;
+    if (fromHeat === heat && fromSlot === slot) return { heat, slot };
+    const otherId = this.heats[heat][slot];
+    const other = otherId ? this.pilots.get(otherId) : undefined;
+    this.assertNotClub(p);
+    this.assertNotClub(other);
+    const restore = this.backup();
+    try {
+      this.removeFromSlots(p.id);
+      if (other) this.removeFromSlots(other.id);
+      const at = this.placeAt(p, heat, slot);
+      if (other) {
+        if (fromHeat < 0) throw new EngineError(`${p.callsign} has no seat to swap with ${other.callsign}. Drop on an empty slot.`);
+        this.placeAt(other, fromHeat, fromSlot);
+      }
+      this.onChange();
+      return at;
+    } catch (err) {
+      restore();
+      throw err;
+    }
+  }
+
+  /** Seat p at heat h, slot s (or, on a club quad, wherever its channel is in that heat). */
+  private placeAt(p: Pilot, h: number, s: number): { heat: number; slot: number } {
+    this.assertNoQuadClash(p, h);
+    const q = this.clubQuadOf(p);
+    if (q && this.channelOf(h, s) !== q.channel) {
+      const onIt = this.heats[h].findIndex((id, i) => id === null && this.channelOf(h, i) === q.channel);
+      if (onIt >= 0) s = onIt;
+      else if (this.heats[h].some((id, i) => i !== s && (id || this.heatChannels[h][i]) && sameFrequency(this.channelOf(h, i), q.channel))) {
+        throw new EngineError(`${p.callsign} flies ${q.name} on ${q.channel}, and that channel is already in use in heat ${h + 1}.`);
+      }
+    }
+    if (this.heats[h][s] !== null) throw new EngineError('That slot was just taken.');
+    this.seat(p, h, s, q?.channel);
+    return { heat: h, slot: s };
+  }
+
+  /**
+   * RD, drag and drop on the Club quads page: put a pilot on club quad `name` (on its channel,
+   * in the first heat it fits, shared if others are on it), or with null, off the club quads
+   * (their own quad from now on; their seat stays).
+   */
+  assignClubQuad(pilotId: string, name: string | null) {
+    const p = this.pilots.get(pilotId);
+    if (!p) throw new EngineError('Unknown pilot.');
+    if (name === null || name === '') {
+      if (this.clubQuadOf(p)) p.quad = undefined;
+      this.onChange();
+      return { quad: null, heat: this.heatOf(p.id) };
+    }
+    const q = this.config.clubQuads.find((c) => c.name.toLowerCase() === String(name).toLowerCase());
+    if (!q) throw new EngineError('No such club quad.');
+    if (q.broken) throw new EngineError(`${q.name} is broken. Mark it Working first.`);
+    if (p.quad?.toLowerCase() === q.name.toLowerCase()) return { quad: q.name, heat: this.heatOf(p.id) };
+    const restore = this.backup();
+    try {
+      this.removeFromSlots(p.id);
+      const r = this.seatOnQuad(p, q);
+      this.onChange();
+      return { quad: q.name, heat: r.heat };
+    } catch (err) {
+      restore();
+      throw err;
+    }
+  }
+
   /** Kiosk: a pilot goes home. They're gone from the session, also from the Pilots list. */
   leave(pilotId: string) {
     this.deletePilot(pilotId);
@@ -1056,9 +1144,12 @@ export class Engine {
   /** RD: put any pilot in any slot (or clear it with null). */
   setSlot(heat: number, slot: number, pilotId: string | null) {
     this.checkSlot(heat, slot);
+    const sitting = this.heats[heat][slot];
+    if (sitting && sitting !== pilotId) this.assertNotClub(this.pilots.get(sitting));
     if (pilotId !== null) {
       const pilot = this.pilots.get(pilotId);
       if (!pilot) throw new EngineError('Unknown pilot.');
+      if (this.heats[heat][slot] !== pilotId) this.assertNotClub(pilot);
       this.assertNoQuadClash(pilot, heat);
       this.removeFromSlots(pilotId);
     }
@@ -1210,7 +1301,7 @@ export class Engine {
     for (const p of todo) if (p.quad) groups.set(p.quad.toLowerCase(), [...(groups.get(p.quad.toLowerCase()) ?? []), p]);
     for (const [key, members] of groups) {
       // The quad's channel: where its other pilots already fly, else the one most heats can take.
-      let ch: string | undefined;
+      let ch: string | undefined = this.clubQuadOf(members[0])?.channel; // a club quad flies its own channel
       this.heats.forEach((row, h) => row.forEach((id, s) => { if (id && this.pilots.get(id)?.quad?.toLowerCase() === key) ch ??= this.channelOf(h, s); }));
       if (!ch) {
         const room = (c: string) => all().filter((h) => this.slotKeeping(members[0], h, c) >= 0).length;
@@ -1265,6 +1356,10 @@ export class Engine {
       {
         const still: typeof pending = [];
         for (const x of left) {
+          // A club quad's pilot keeps its channel, whatever it costs.
+          const club = this.clubQuadOf(x.p);
+          if (club) x.ch = club.channel;
+          if (club && !keep) { still.push(x); continue; }
           const fits = (hh: number) => this.count(hh) < limit && (keep ? this.slotKeeping(x.p, hh, x.ch) : this.slotAny(x.p, hh)) >= 0;
           const h = heats.includes(x.from) && fits(x.from) ? x.from : this.byEmptiest(heats).find(fits);
           if (h === undefined) { still.push(x); continue; }
@@ -1315,7 +1410,10 @@ export class Engine {
     const need = Math.max(Math.ceil(pending.length / this.config.channels.length), ...quadSizes.values(), 0);
     const targets = order.filter((h) => keepOrder.slice(0, need).includes(h)); // in loop order
     const { out, left } = this.placeKeeping(pending, targets, order.filter((h) => !targets.includes(h)), Math.ceil(pending.length / Math.max(need, 1)));
-    for (const x of left) this.seat(x.p, x.from, this.heats[x.from].indexOf(null)); // can't happen: its heat is empty again
+    for (const x of left) {
+      if (this.clubQuadOf(x.p)) { this.seatOnQuad(x.p, this.clubQuadOf(x.p)!); continue; } // its channel was full everywhere: wherever it fits
+      this.seat(x.p, x.from, this.heats[x.from].indexOf(null)); // can't happen: its heat is empty again
+    }
     const before = new Map(pending.map((x) => [x.p.id, x]));
     const moved = out.filter((o) => o.heat !== o.from || o.channel !== before.get(o.pilot.id)!.ch).length;
     // Empty heats in between go: the heats with pilots become heat 1, 2, 3… in the order they
@@ -1355,8 +1453,16 @@ export class Engine {
       .filter((x): x is { p: Pilot; ch: string; from: number } => !!x.p);
     this.heats[heat] = this.heats[heat].map(() => null);
     const { out, left } = this.placeKeeping(pending, others, []);
+    // Club-quad pilots go wherever their quad's channel fits (a new heat if need be).
+    const unplaced: Pilot[] = [];
+    for (const x of left) {
+      const q = this.clubQuadOf(x.p);
+      if (!q) { unplaced.push(x.p); continue; }
+      this.removeFromSlots(x.p.id);
+      try { const r = this.seatOnQuad(x.p, q); out.push({ pilot: x.p, heat: r.heat, channel: q.channel, from: heat, changed: false }); } catch { unplaced.push(x.p); }
+    }
     this.onChange();
-    return { moved: out.map(({ pilot, heat, channel, changed }) => ({ pilot, heat, channel, changed })), unplaced: left.map((x) => x.p) };
+    return { moved: out.map(({ pilot, heat, channel, changed }) => ({ pilot, heat, channel, changed })), unplaced };
   }
 
   /** RD: the pilots stop sharing this quad. They keep their heats and channels. */
@@ -1543,6 +1649,8 @@ export class Engine {
   /** RD: change one slot's channel in one heat only; null goes back to the session's channel. */
   setHeatChannel(heat: number, slot: number, channel: string | null) {
     this.checkSlot(heat, slot);
+    const sitting = this.heats[heat][slot];
+    if (sitting) this.assertNotClub(this.pilots.get(sitting), 'put on another channel');
     const ch = channel ? cleanChannel(channel) : this.config.channels[slot];
     this.heats[heat].forEach((_, s) => {
       const other = this.channelOf(heat, s);

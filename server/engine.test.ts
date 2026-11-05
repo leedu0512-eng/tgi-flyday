@@ -976,3 +976,39 @@ test('club quad breaks: its pilots get another one and are told; none left: they
   assert.equal(e.config.clubQuads.length, 8);
   assert.throws(() => e.setClubQuads([...eight, { name: 'Q9', channel: 'F1', broken: false }]), /Up to 8/);
 });
+
+test('drag and drop on the heat board: move to an empty slot, swap; club-quad pilots stay put', () => {
+  const { e } = setup(0); // R1 R2 F2 F4, 3 heats
+  const a = e.join('A', 0, 0);  // heat 1 R1
+  const b = e.join('B', 1, 1);  // heat 2 R2
+  e.movePilot(a.id, 2, 3);       // to heat 3 F4
+  assert.equal(e.heats[2][3], a.id);
+  assert.ok(!e.heats[0].includes(a.id));
+  e.movePilot(a.id, 1, 1);       // onto B: swap
+  assert.equal(e.heats[1][1], a.id);
+  assert.equal(e.heats[2][3], b.id);
+  // Club-quad pilots fly their quad's channel: no moving them by hand, anywhere.
+  e.setClubQuads([{ name: 'Club 1', channel: 'R1', broken: false }, { name: 'Club 2', channel: 'R5', broken: false }]);
+  const c = e.walkIn('Cid', undefined, true); // Club 1, R1
+  const hc = e.heats.findIndex((r) => r.includes(c.pilot.id)), sc = e.heats[hc].indexOf(c.pilot.id);
+  assert.throws(() => e.movePilot(c.pilot.id, 2, 2), /club quad Club 1/);
+  assert.throws(() => e.movePilot(a.id, hc, sc), /club quad Club 1/, 'nobody swaps with them either');
+  assert.throws(() => e.setSlot(hc, sc, null), /club quad/);
+  assert.throws(() => e.setSlot(2, 0, c.pilot.id), /club quad/);
+  assert.throws(() => e.setHeatChannel(hc, sc, 'R3'), /another channel/);
+  assert.throws(() => e.join('Cid', 2, 0), /club quad/);
+  // They move when their quad changes channel, or on the Club quads page.
+  e.assignClubQuad(c.pilot.id, 'Club 2');
+  const h2 = e.heats.findIndex((r) => r.includes(c.pilot.id));
+  assert.equal(e.channelOf(h2, e.heats[h2].indexOf(c.pilot.id)), 'R5');
+  // Compact keeps a club pilot on its channel.
+  e.compact();
+  const h3 = e.heats.findIndex((r) => r.includes(c.pilot.id));
+  assert.equal(e.channelOf(h3, e.heats[h3].indexOf(c.pilot.id)), 'R5');
+  // Off the club quads: own quad, same seat; then they can be moved again.
+  e.assignClubQuad(c.pilot.id, null);
+  assert.equal(e.pilots.get(c.pilot.id)!.quad, undefined);
+  assert.equal(e.heats.findIndex((r) => r.includes(c.pilot.id)), h3);
+  e.setClubQuads([{ name: 'Club 1', channel: 'R1', broken: true }]);
+  assert.throws(() => e.assignClubQuad(c.pilot.id, 'Club 1'), /broken/);
+});
