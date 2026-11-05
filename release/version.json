@@ -1,13 +1,17 @@
 {
- "version": "2026.11.05-2305",
+ "version": "2026.11.05-2316",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "61add67318459a12ed889289eac090023dd2098d8386c0b7664e2ebf9812a89a"
+   "sha256": "674a7e735843be6193f43a0b8785d460c5e39dba4843fe30230ddc6eb3d9c401"
+  },
+  {
+   "path": "web/assets/avatars.js",
+   "sha256": "4186cafa4a0f03a50d547e5e3f565ddb2242a05230c9421eb1bba465b53a3d26"
   },
   {
    "path": "web/assets/common.js",
-   "sha256": "8193d5f2fd17ad00f43371db735fd1fd8bca15233ba1fb889cf948e34ba0d274"
+   "sha256": "561a85a17f5199c32d2189c973f70e3ee90b111b1301e3163d9c308d920e63be"
   },
   {
    "path": "web/assets/favicon.svg",
@@ -83,7 +87,7 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "6483b94a8a78954a0f394637a3f22d000ccb1c1dea3a3cc9e4acb80abe0e2ebc"
+   "sha256": "1e40baea57aa0156cd5b232cb3d97776a1be181c67be729f5cce829429126d56"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
@@ -91,7 +95,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "addeaafbe0ee89ada5f00b685be29aad1c261213e2b83854a683806e26052a7a"
+   "sha256": "f20d481763b2c068aead5e5b194e9f8a325419ff810f3af9f0ae217e869ed22b"
   },
   {
    "path": "web/index.html",
@@ -103,15 +107,15 @@
   },
   {
    "path": "web/me.html",
-   "sha256": "93bd6707e379e5823d4348a8ff7814b3e386620819a82be1f85e97f68f690a4c"
+   "sha256": "50bbe4fc51b18a15fcaa4055234288bb8ec9502ae698e67387bd8c5487339d35"
   },
   {
    "path": "web/mobile.html",
-   "sha256": "c17d20761be86b6f59fe4488ff587186b53c4af2298ad094cd8acab880da4918"
+   "sha256": "57c97871f83007e593c3b65e83cd134238f256b48fc15c238f4b4e011177d9ea"
   },
   {
    "path": "web/screen.html",
-   "sha256": "ce3e5758bca8c4bd31c7d9775e327e0dd93566b16dd0e5d732406d1c3d389578"
+   "sha256": "d965bbab4847678f42ccec76222634dc829f854ce6f36b89937ca9bfdb47470e"
   }
  ]
 }

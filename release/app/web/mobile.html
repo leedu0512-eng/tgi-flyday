@@ -68,7 +68,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME, timerMark } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME, timerMark, faceOf } from '/assets/common.js';
 
 // RD remote for a phone. Controls the same session as the console, but makes no sound:
 // callouts always come from the RD PC.
@@ -249,7 +249,7 @@ function renderPilots() {
       <div class="m-edit">
         <label>Callsign<input class="input" data-field="callsign" value="${esc(p.callsign)}" autocomplete="off"></label>
         <label>Spoken name<input class="input" data-field="spokenName" value="${esc(p.spokenName)}" autocomplete="off"></label>
-        <div class="m-photo">${photoUrl(p) ? `<img class="thumb" src="${photoUrl(p)}" alt="">` : '<span class="thumb none">No photo</span>'}
+        <div class="m-photo"><img class="thumb ${p.photo ? '' : 'avatar'}" src="${faceOf(state, p).src}" alt="">
           <label class="btn small">${photoUrl(p) ? 'New photo' : 'Take or pick a photo'}<input type="file" accept="image/*" data-photo hidden></label>
           ${photoUrl(p) ? '<button class="btn small" data-photo-del>Remove</button>' : ''}</div>
         <div class="m-bar">

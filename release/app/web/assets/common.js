@@ -566,3 +566,21 @@ export function timerMark(state, slot) {
   if (slot >= n) return '';
   return `<i class="timed ${live ? '' : 'down'}" title="${live ? 'Lap timed' : 'Lap timer not connected'}">${STOPWATCH}</i>`;
 }
+
+// ---------- default avatars ----------
+
+import { assignAnimals, avatarDataUrl } from './avatars.js';
+let animals = { key: '', map: new Map() };
+/**
+ * A pilot's picture: their photo, or else their own goggled animal (no two the same in a
+ * session while there are animals left). { src, avatar } — avatars are shown darkened.
+ */
+export function faceOf(state, p, wide = false) {
+  if (!p) return { src: '', avatar: false };
+  if (p.photo) return { src: photoUrl(p), avatar: false };
+  const names = (state?.pilots ?? []).map((x) => x.callsign);
+  const key = names.join('|');
+  if (key !== animals.key) animals = { key, map: assignAnimals(names.length ? names : [p.callsign]) };
+  const animal = animals.map.get(p.callsign.toLowerCase()) ?? assignAnimals([p.callsign]).get(p.callsign.toLowerCase());
+  return { src: avatarDataUrl(p.callsign, animal, wide), avatar: true };
+}
