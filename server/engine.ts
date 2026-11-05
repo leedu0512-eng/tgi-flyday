@@ -54,6 +54,8 @@ interface LiveTiming {
 
 /** End of the day: how long the "still flying?" question waits, and how long "yes" holds it off. */
 const NIGHT_GRACE_MS = 5 * 60_000;
+/** Warnings before the session's end time, in minutes. */
+const FINISH_WARN_MIN = [30, 20, 10];
 const NIGHT_SNOOZE_MS = 60 * 60_000;
 
 export class EngineError extends Error {}
@@ -141,7 +143,11 @@ export class Engine {
     startedAt: null,
     freeSince: null,
     pauseAfter: false,
+    finishAt: null,
+    lastRound: false,
   };
+  /** End-time warnings already given (minutes before). */
+  private finishWarned = new Set<number>();
   /** The next heat's line-up still has to be said (it was paused straight away, or compacted while paused). */
   private lineupPending = false;
   /** Heats in a row each pilot has not started (only counted when a timer is connected). */
@@ -474,6 +480,63 @@ export class Engine {
     this.onChange();
   }
 
+  /**
+   * RD: when this session ends (epoch ms, the next time the clock shows the time asked for), or
+   * null for no end time. Warnings at 30, 20 and 10 minutes before (only those still ahead).
+   */
+  setFinish(at: number | null, now: number) {
+    const c = this.clock;
+    c.finishAt = at === null || !Number.isFinite(Number(at)) ? null : Number(at);
+    c.lastRound = false;
+    this.finishWarned.clear();
+    if (c.finishAt !== null) for (const m of FINISH_WARN_MIN) if (c.finishAt - now <= m * 60_000) this.finishWarned.add(m);
+    this.onChange();
+  }
+
+  /**
+   * The end time, called every second. Before it: the warnings. When it comes: in a heat loop,
+   * the round being flown is finished first (lastRound; goToNextHeat ends it when the loop
+   * would start over); still in the changeover before the round's first heat, or in free
+   * flight, or with nobody in a heat: practice ends now.
+   */
+  finishTick(now: number) {
+    const c = this.clock;
+    if (c.finishAt === null || c.phase === 'stopped') return; // set before the start: it waits
+    const co = this.config.callouts;
+    if (c.lastRound) {
+      if (c.phase === 'freeflight' || c.phase === 'waiting') this.finishSession(co.texts.finishNow);
+      return;
+    }
+    const left = c.finishAt - now;
+    if (left > 0) {
+      const due = FINISH_WARN_MIN.filter((m) => left <= m * 60_000 && !this.finishWarned.has(m));
+      if (!due.length) return;
+      for (const m of FINISH_WARN_MIN) if (left <= m * 60_000) this.finishWarned.add(m);
+      if (co.sessionEnd) this.say(fillText(co.texts.finishWarn, { minutes: Math.ceil(left / 60_000) }));
+      this.onChange();
+      return;
+    }
+    const roundNotStarted = c.phase === 'changeover' && c.heat === this.nextHeat(0);
+    if (c.phase === 'freeflight' || c.phase === 'waiting' || roundNotStarted) return this.finishSession(co.texts.finishNow);
+    c.lastRound = true;
+    if (co.sessionEnd) this.say(co.texts.finishLastRound);
+    this.onChange();
+  }
+
+  /** The end time's done: practice stops (everyone stays signed in). */
+  private finishSession(text: string) {
+    const c = this.clock;
+    this.closeTiming(true);
+    c.startedAt = null;
+    c.finishAt = null;
+    c.lastRound = false;
+    c.pauseAfter = false;
+    this.finishWarned.clear();
+    this.setPhase('stopped', null);
+    if (this.config.callouts.sessionEnd) this.say(text);
+    this.onChange();
+  }
+
   /** Someone tapped "Still flying": carry on, ask again in an hour. */
   stillFlying(now: number) {
     if (!this.night) return;
@@ -489,6 +552,8 @@ export class Engine {
     this.nightSnoozeUntil = 0;
     this.closeTiming(true);
     this.clock.startedAt = null;
+    this.clock.finishAt = null;
+    this.clock.lastRound = false;
     this.setPhase('stopped', null);
     for (const id of [...this.pilots.keys()]) this.deletePilot(id);
     this.say(this.config.callouts.texts.nightEnd);
@@ -565,6 +630,8 @@ export class Engine {
       this.enterWaiting(from % this.config.heatCount);
       return;
     }
+    // The last round (end time passed) is flown: no new round, practice is over.
+    if (next <= this.clock.heat && this.clock.lastRound) return this.finishSession(this.config.callouts.texts.finishDone);
     if (next <= this.clock.heat) this.clock.round++;
     this.enterChangeover(now, next);
   }
@@ -812,6 +879,8 @@ export class Engine {
         this.closeTiming(true);
         c.startedAt = null;
         c.pauseAfter = false;
+        c.finishAt = null;
+        c.lastRound = false;
         this.setPhase('stopped', null);
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStop);
         return;
@@ -1726,7 +1795,7 @@ function cleanTimer(patch: Partial<TimerConfig>, current: TimerConfig): TimerCon
 
 function cleanCallouts(patch: Partial<Config['callouts']>, current: Config['callouts']): Config['callouts'] {
   const out = { ...current };
-  for (const k of ['sessionStartStop', 'lineup', 'arm', 'readyBeeps', 'finalBeeps', 'timeUp', 'pauseResume', 'freeFlight', 'heatsChanged', 'gatePassBeep', 'gatePassVoice'] as const) {
+  for (const k of ['sessionStartStop', 'lineup', 'arm', 'readyBeeps', 'finalBeeps', 'timeUp', 'pauseResume', 'freeFlight', 'heatsChanged', 'sessionEnd', 'gatePassBeep', 'gatePassVoice'] as const) {
     if (patch[k] !== undefined) out[k] = Boolean(patch[k]);
   }
   if (patch.texts && typeof patch.texts === 'object') {

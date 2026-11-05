@@ -1012,3 +1012,58 @@ test('drag and drop on the heat board: move to an empty slot, swap; club-quad pi
   e.setClubQuads([{ name: 'Club 1', channel: 'R1', broken: true }]);
   assert.throws(() => e.assignClubQuad(c.pilot.id, 'Club 1'), /broken/);
 });
+
+test('session end time: warnings at 30, 20, 10 min, the round being flown finishes, then practice stops', () => {
+  const { e, said } = setup(0.5); // heat 3:00, changeover 2:00, 3 heats
+  e.join('A', 0, 0); e.join('B', 1, 1); e.join('C', 2, 2);
+  assert.equal(e.clock.finishAt, null, 'no end time by default');
+  e.action('start', 0);
+  const M = 60_000;
+  e.setFinish(35 * M, 0);
+  e.finishTick(4 * M);
+  assert.ok(!said().some((x) => /Practice ends in/.test(x)));
+  e.finishTick(5 * M);
+  assert.equal(said().at(-1), 'Practice ends in 30 minutes.');
+  e.finishTick(5 * M + 1000);
+  assert.equal(said().filter((x) => x === 'Practice ends in 30 minutes.').length, 1, 'once');
+  e.finishTick(15 * M); e.finishTick(25 * M);
+  assert.ok(said().includes('Practice ends in 20 minutes.') && said().includes('Practice ends in 10 minutes.'));
+  // Fly the loop until the end time comes in the middle of a round.
+  let t = 0;
+  while (t < 35 * M) { t += 100; e.tick(t); }
+  while (!(e.clock.phase === 'running' && e.clock.heat === 1)) { t += 100; e.tick(t); }
+  e.finishTick(t);
+  assert.equal(e.clock.lastRound, true);
+  assert.match(said().at(-1)!, /This round will be flown to the end/);
+  const round = e.clock.round;
+  while (e.clock.phase !== 'stopped') { t += 100; e.tick(t); e.finishTick(t); }
+  assert.equal(e.clock.round, round, 'no new round started');
+  assert.equal(e.clock.heatsRun % 3, 0, 'heats 2 and 3 were flown to finish the round');
+  assert.match(said().at(-1)!, /That was the last round/);
+  assert.equal(e.clock.finishAt, null, 'cleared for the next session');
+  assert.equal(e.pilots.size, 3, 'everyone stays signed in');
+});
+
+test('session end time: in the changeover before a round starts, or in free flight, it ends now', () => {
+  const { e, said } = setup(0.5);
+  e.join('A', 0, 0); e.join('B', 1, 1);
+  e.action('start', 0);              // changeover for heat 1: the round hasn't started
+  e.setFinish(1000, 0);
+  e.finishTick(1000);
+  assert.equal(e.clock.phase, 'stopped');
+  assert.match(said().at(-1)!, /Please land/);
+  const f = setup(0.5).e;
+  f.setConfig({ freeFlight: true });
+  f.walkIn('Solo');
+  f.tick(0);
+  assert.equal(f.clock.phase, 'freeflight');
+  f.setFinish(5000, 0);
+  f.finishTick(5000);
+  assert.equal(f.clock.phase, 'stopped');
+  // Set while stopped: waits for the session; Stop clears it.
+  f.setFinish(10 * 60_000, 6000);
+  f.finishTick(20 * 60_000);
+  assert.equal(f.clock.finishAt, 10 * 60_000);
+  f.walkIn('Solo'); f.action('start', 20 * 60_000); f.action('stop', 20 * 60_000 + 1);
+  assert.equal(f.clock.finishAt, null);
+});

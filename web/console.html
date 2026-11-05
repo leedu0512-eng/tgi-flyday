@@ -15,8 +15,8 @@
     <div class="sub">Practice · RD console</div>
     <div class="spacer"></div>
     <div class="status-icons">
-      <span class="si" title="Time of day"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="wallclock" class="num"></span></span>
-      <span class="si" id="sessionSi" title="Session time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M12 14V10M10 3h4M12 3v4M18 7l1.5-1.5"/></svg><span id="sessionTime" class="num"></span></span>
+      <button class="si" id="timeSi" type="button" data-view="time" title="Time of day. Click: when this session ends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="wallclock" class="num"></span><span id="finishTag" class="finish-tag"></span></button>
+      <button class="si" id="sessionSi" type="button" title="Session time. Click: the heats"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M12 14V10M10 3h4M12 3v4M18 7l1.5-1.5"/></svg><span id="sessionTime" class="num"></span></button>
       <span class="si-pair" id="soundPair">
         <button class="si" id="soundBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9l5 6M21 9l-5 6"/></svg></button><button class="si" id="openDrawer" type="button" title="Callouts and sound settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4a6 6 0 0 1 6 6c0 2-1 3-1 4v2h-3v3H8v-3H6v-3l-2-1 2-3a6 6 0 0 1 3-5z"/><path d="M18 8a5 5 0 0 1 0 6M20.5 6a8 8 0 0 1 0 10"/></svg></button>
       </span>
@@ -91,7 +91,6 @@
 <section id="drawer" class="card drawer view" hidden aria-label="Callouts and sound">
   <div class="drawer-head">
     <h2>Callouts and sound</h2>
-    <button id="closeDrawer" class="btn small">Back to heats</button>
   </div>
 
   <section class="drawer-sec">
@@ -119,7 +118,6 @@
 <section id="pilotsDrawer" class="card drawer view" hidden aria-label="Pilots">
   <div class="drawer-head">
     <h2>Pilots</h2>
-    <button class="btn small" data-close>Back to heats</button>
   </div>
   <section class="drawer-sec">
     <div class="add-row">
@@ -137,7 +135,7 @@
   </section>
 </section>
 <section id="timerView" class="card drawer view" hidden aria-label="Lap timer">
-  <div class="drawer-head"><h2>Lap timer</h2><button class="btn small" data-close>Back to heats</button></div>
+  <div class="drawer-head"><h2>Lap timer</h2></div>
   <section class="drawer-sec">
     <div id="tStatus" class="dev-status"></div>
   </section>
@@ -160,8 +158,22 @@
     <p class="hint">{name} the pilot, {lap} lap number, {laptime} lap time.</p>
   </section>
 </section>
+<section id="timeView" class="card drawer view" hidden aria-label="Session end">
+  <div class="drawer-head"><h2>Session end</h2></div>
+  <section class="drawer-sec"><div id="finishStatus" class="dev-status"></div></section>
+  <section class="drawer-sec">
+    <h3>Practice ends at</h3>
+    <div class="finish-row">
+      <input id="finishTime" class="input finish-time" type="time" step="300" aria-label="End time">
+      <button id="finishSet" class="btn primary">Set end time</button>
+      <button id="finishClear" class="btn">No end time</button>
+    </div>
+    <div class="finish-quick" id="finishQuick"></div>
+    <p class="hint">The voice warns 30, 20 and 10 minutes before. When the time comes, the round being flown is finished first (every heat in it gets its turn), then practice stops and everyone stays signed in. In free flight, or before a round has started, it stops right away. The end time is for this session only: it's cleared when practice stops.</p>
+  </section>
+</section>
 <section id="clubView" class="card drawer view" hidden aria-label="Club quads">
-  <div class="drawer-head"><h2>Club quads</h2><button class="btn small" data-close>Back to heats</button></div>
+  <div class="drawer-head"><h2>Club quads</h2></div>
   <section class="drawer-sec">
     <p class="hint">For pilots without their own quad. At the kiosk they tap <b>I don't have my own quad</b> and get the first free club quad that isn't broken, on its channel. When every working one is taken, the one with the fewest pilots is shared: each of them flies a different heat, on that quad's channel. FlyDay remembers who flew a club quad and offers it again next time.</p>
     <div id="clubList" class="club-list"></div>
@@ -170,7 +182,7 @@
   </section>
 </section>
 <section id="videoView" class="card drawer view" hidden aria-label="Video">
-  <div class="drawer-head"><h2>Video</h2><button class="btn small" data-close>Back to heats</button></div>
+  <div class="drawer-head"><h2>Video</h2></div>
   <section class="drawer-sec"><div id="vStatus" class="dev-status"></div></section>
   <section class="drawer-sec">
     <h3>What it will do</h3>
@@ -179,7 +191,7 @@
   </section>
 </section>
 <section id="spectrumView" class="card drawer view" hidden aria-label="Spectrum analyser">
-  <div class="drawer-head"><h2>Spectrum analyser</h2><button class="btn small" data-close>Back to heats</button></div>
+  <div class="drawer-head"><h2>Spectrum analyser</h2></div>
   <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
   <section class="drawer-sec">
     <h3>What it will do</h3>
@@ -195,7 +207,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt, qrSvg } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt, qrSvg, now } from '/assets/common.js';
 setInterval(() => {
   const [time, session] = wallClock(state).split(' · session ');
   $('wallclock').textContent = time;
@@ -285,6 +297,7 @@ const CALLOUTS = [
   { key: 'finalBeeps', label: 'Countdown beeps on the last 4 seconds of a heat, then the end BEEP' },
   { key: 'timeUp', label: 'After the end BEEP', texts: [['timeUp', '']] },
   { key: 'pauseResume', label: 'Pause and resume', texts: [['paused', 'When paused'], ['resumed', 'When resumed']] },
+  { key: 'sessionEnd', label: 'Session end time: warnings, last round, the end', texts: [['finishWarn', 'Before the end: 30, 20, 10 min. {minutes}'], ['finishLastRound', 'The time has come: last round'], ['finishDone', 'After the last round'], ['finishNow', 'In free flight, or before a round starts']] },
   { key: 'heatsChanged', label: 'Compact heats moved pilots or renumbered heats', texts: [['heatsChanged', '']] },
   { key: 'freeFlight', label: 'Free flight starts and ends', texts: [['freeFlightOpen', 'First sign-in starts practice'], ['freeFlight', 'When only one heat is left'], ['heatsForm', 'When a second heat forms. {heats} {next}'], ['freeFlightEnd', 'When it is switched off']] },
 ];
@@ -330,8 +343,8 @@ function renderCallouts() {
 const drawer = $('drawer');
 const pilotsDrawer = $('pilotsDrawer');
 // Pages in the main area: Heats and Times, or one opened from the status icons (no flyouts).
-const VIEWS = { sound: drawer, pilots: pilotsDrawer, club: $('clubView'), timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
-const ICONS = { sound: $('openDrawer'), pilots: $('openPilots'), club: $('clubSi'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
+const VIEWS = { time: $('timeView'), sound: drawer, pilots: pilotsDrawer, club: $('clubView'), timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
+const ICONS = { time: $('timeSi'), heats: $('sessionSi'), sound: $('openDrawer'), pilots: $('openPilots'), club: $('clubSi'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
 let view = 'heats';
 function showView(v) {
   view = VIEWS[v] ? v : 'heats';
@@ -342,15 +355,15 @@ function showView(v) {
   if (view === 'pilots') renderPilotsPanel(true);
   if (view === 'timer') renderTimerView(true);
   if (view === 'club') renderClubView(true);
+  if (view === 'time') renderTimeView(true);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 const toggleView = (v) => showView(view === v ? 'heats' : v);
 const closeDrawer = () => showView('heats');
 $('openDrawer').onclick = () => toggleView('sound');
 $('openPilots').onclick = () => toggleView('pilots');
-for (const id of ['clubSi', 'timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
-$('closeDrawer').onclick = closeDrawer;
-for (const b of document.querySelectorAll('.view [data-close]')) b.onclick = closeDrawer;
+for (const id of ['timeSi', 'clubSi', 'timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
+$('sessionSi').onclick = closeDrawer; // the session time: back to the heats
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.matches('input, textarea, select')) closeDrawer(); });
 
 // ---------- club quads page ----------
@@ -442,6 +455,38 @@ $('clubAdd').onclick = () => {
   while (quads.some((q) => q.name.toLowerCase() === `club ${n}`)) n++;
   saveClub([...quads, { name: `Club ${n}`, channel, broken: false }]);
 };
+
+// ---------- session end page ----------
+const hhmm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const inWords = (ms) => { const m = Math.max(0, Math.ceil(ms / 60_000)); return m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`; };
+function renderFinishTag() {
+  const c = state.clock;
+  $('finishTag').textContent = c.lastRound ? 'last round' : c.finishAt ? `→ ${hhmm(c.finishAt)}` : '';
+  $('timeSi').classList.toggle('warn', !!c.lastRound);
+}
+function renderTimeView(force = false) {
+  if (!state || $('timeView').hidden) return;
+  const c = state.clock;
+  if (c.lastRound) devStatus($('finishStatus'), 'warn', 'Last round', `Practice time is up. This round is flown to the end, then practice stops.`);
+  else if (c.finishAt) devStatus($('finishStatus'), 'ok', `Ends at ${hhmm(c.finishAt)}`, c.phase === 'stopped' ? 'Counts once practice starts.' : `In ${inWords(c.finishAt - now())}. Then the round being flown is finished first.`);
+  else devStatus($('finishStatus'), 'idle', 'No end time', 'Practice runs until you stop it (or nobody answers "Still flying?" at night).');
+  if (force || document.activeElement !== $('finishTime')) $('finishTime').value = c.finishAt ? hhmm(c.finishAt) : '';
+  $('finishClear').disabled = !c.finishAt && !c.lastRound;
+  // Quick picks: the next round half hours.
+  const d = new Date(now()); d.setSeconds(0, 0); d.setMinutes(d.getMinutes() < 30 ? 30 : 60);
+  const picks = Array.from({ length: 6 }, (_, i) => hhmm(d.getTime() + i * 30 * 60_000));
+  const html = picks.map((t) => `<button class="btn small" data-finish="${t}">${t}</button>`).join('');
+  if ($('finishQuick').dataset.html !== html) { $('finishQuick').innerHTML = html; $('finishQuick').dataset.html = html; }
+}
+async function setFinish(time) {
+  const r = await act('/api/finish', { time });
+  if (r !== undefined) toast(time ? `Practice ends at ${time}.` : 'No end time.', true);
+}
+$('finishSet').onclick = () => { if (!$('finishTime').value) return toast('Pick a time first.'); setFinish($('finishTime').value); };
+$('finishTime').onkeydown = (e) => { if (e.key === 'Enter') $('finishSet').click(); };
+$('finishClear').onclick = () => setFinish(null);
+$('finishQuick').onclick = (e) => { const b = e.target.closest('[data-finish]'); if (b) setFinish(b.dataset.finish); };
+setInterval(() => { if (state) { renderFinishTag(); renderTimeView(); } }, 1000);
 
 // ---------- lap timer page ----------
 function devStatus(el, kind, head, text) {

@@ -167,6 +167,7 @@ setInterval(() => {
   engine.tick(Date.now());
   const d = new Date();
   engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
+  engine.finishTick(Date.now());
   if (stateDirty) {
     stateDirty = false;
     broadcast('state', engine.snapshot(Date.now()));
@@ -253,6 +254,16 @@ const API: Record<string, Handler> = {
   '/api/config': (b) => engine.setConfig(b),
   '/api/compact': () => engine.compact(),
   '/api/club-quads': (b) => engine.setClubQuads(b.quads),
+  // RD: the session's end time as "HH:MM" local time (the next time the clock shows it), or null.
+  '/api/finish': (b) => {
+    if (b.time == null || b.time === '') return engine.setFinish(null, Date.now());
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(b.time));
+    if (!m || +m[1] > 23 || +m[2] > 59) throw new EngineError('End time looks like 20:30.');
+    const at = new Date();
+    at.setHours(+m[1], +m[2], 0, 0);
+    if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+    return engine.setFinish(at.getTime(), Date.now());
+  },
   '/api/move': (b) => engine.movePilot(String(b.pilotId), Number(b.heat), Number(b.slot)),
   '/api/club-quad/assign': (b) => engine.assignClubQuad(String(b.pilotId), b.quad ?? null),
   '/api/arm-measured': (b) => engine.setArmMeasured(b.text, b.ms),

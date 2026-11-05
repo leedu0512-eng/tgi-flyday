@@ -200,7 +200,10 @@ function render() {
   // TrackDay is for the RC cars: no drone bits in the header (sign in, the phone QR).
   screen.classList.toggle('car-day', view === 'pay');
   document.title = view === 'pay' ? 'TGI TrackDay' : 'TGI FlyDay · Spectator view';
-  $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}`;
+  // The end time, if the RD set one: "until 20:00", then "last round".
+  const hm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const ends = c.lastRound ? ' · Last round' : c.finishAt ? ` · until ${hm(c.finishAt)}` : '';
+  $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}${ends}`;
 
   if (c.phase === 'stopped' || c.phase === 'waiting') {
     screen.classList.add('no-next');

@@ -90,6 +90,8 @@ export interface CalloutSettings {
   freeFlight: boolean;
   /** Compact heats moved pilots or renumbered heats: tell everyone to check. */
   heatsChanged: boolean;
+  /** The session's end time: warnings, last round, the end. */
+  sessionEnd: boolean;
   /** Lap timer: a short beep on every gate pass. */
   gatePassBeep: boolean;
   /** Lap timer: say the lap on every gate pass (wording: texts.gatePass). */
@@ -121,6 +123,14 @@ export interface CalloutTexts {
   heatsChanged: string;
   /** A club quad was marked broken; its pilots got another one. {quad} {pilots} */
   clubQuadBroken: string;
+  /** Before the end time. {minutes} */
+  finishWarn: string;
+  /** The end time came: this round is flown to the end. */
+  finishLastRound: string;
+  /** The last round is over: practice stops. */
+  finishDone: string;
+  /** The end time came in free flight (or with nobody in a heat): practice stops. */
+  finishNow: string;
   /** The first sign-in started the session, straight into free flight. {heat} */
   freeFlightOpen: string;
   /** Free flight ends because another heat has pilots: what happens now. {heats} {next} */
@@ -187,6 +197,10 @@ export interface ClockState {
   freeSince: number | null;
   /** RD asked to pause when the heat that is on now ends (changeover starts paused). */
   pauseAfter: boolean;
+  /** When this session ends (epoch ms), set by the RD; null = no end time. Cleared when it stops. */
+  finishAt: number | null;
+  /** The end time has come: this round is the last one; practice stops when it's flown. */
+  lastRound: boolean;
 }
 
 export type AudioEvent =
@@ -250,6 +264,7 @@ export const DEFAULT_CONFIG: Config = {
     pauseResume: true,
     freeFlight: true,
     heatsChanged: true,
+    sessionEnd: true,
     gatePassBeep: false,
     gatePassVoice: true,
     texts: {
@@ -266,6 +281,10 @@ export const DEFAULT_CONFIG: Config = {
       freeFlightEnd: 'Free flight is over. Please land.',
       heatsChanged: 'Attention pilots, your heats and channels may have changed. Check the big screen.',
       clubQuadBroken: '{quad} is out of action. {pilots}, check the big screen for your new quad and heat.',
+      finishWarn: 'Practice ends in {minutes} minutes.',
+      finishLastRound: 'Practice time is up. This round will be flown to the end, then practice is over.',
+      finishDone: 'That was the last round. Practice is over, thanks for flying!',
+      finishNow: 'Practice time is up. Please land. Thanks for flying!',
       freeFlightOpen: 'Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.',
       heatsForm: 'More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.',
       nightAsk: 'Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.',
