@@ -131,11 +131,17 @@ function renderStatus() {
     if (c.phase === 'changeover') html += b('20 s to start', 'to20', 'primary') + b('Start now', 'startNow');
     else if (c.phase === 'running') html += b('End heat now', 'endHeat');
     else html += '<span></span>';
+    if (c.phase === 'running' || c.phase === 'arming') {
+      html += c.pauseAfter
+        ? b('Pausing after this heat · Cancel', 'pauseAfter', 'wide pause-after on')
+        : b('Pause after this heat', 'pauseAfter', 'wide pause-after');
+    }
     html += b('Skip to next heat', 'skip');
     html += b('Stop session', 'stop', c.phase === 'changeover' ? 'danger wide' : 'danger');
   }
   const ctl = $('controls');
   if (ctl.dataset.html !== html) { ctl.innerHTML = html; ctl.dataset.html = html; }
+  $('compact').disabled = c.phase === 'arming' || c.phase === 'running' || c.phase === 'freeflight';
 
   // Line-up of the heat that is on (or next), so the RD can read it out or check channels.
   const pm = pilotMap(state);

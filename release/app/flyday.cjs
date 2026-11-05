@@ -259,7 +259,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2353" : "dev";
+var VERSION = true ? "2026.11.06-0005" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -307,6 +307,7 @@ var DEFAULT_CONFIG = {
       nightEnd: "Practice is over for today. Thanks for flying, good night.",
       gatePass: "{name}, {laptime}",
       paused: "Paused.",
+      pausedAfterHeat: "Paused after this heat. Hold on, the heats are being sorted out.",
       resumed: "Resumed."
     }
   },
@@ -454,8 +455,11 @@ var Engine = class {
     round: 0,
     heatsRun: 0,
     startedAt: null,
-    freeSince: null
+    freeSince: null,
+    pauseAfter: false
   };
+  /** The next heat's line-up still has to be said (it was paused straight away, or compacted while paused). */
+  lineupPending = false;
   /** Heats in a row each pilot has not started (only counted when a timer is connected). */
   missed = /* @__PURE__ */ new Map();
   random;
@@ -663,7 +667,8 @@ var Engine = class {
   enterChangeover(now, heat) {
     this.clock.heat = heat;
     this.setPhase("changeover", now + this.config.changeoverSeconds * 1e3);
-    this.announceLineup(heat);
+    this.lineupPending = false;
+    if (!this.holdLineup) this.announceLineup(heat);
   }
   /**
    * The start sequence: the arm call ("Pilots, arm your quads. Race will start in
@@ -805,9 +810,23 @@ var Engine = class {
     const flew = live && live.heat === this.clock.heat && !live.unreliable && this.timer.state === "connected" ? { started: /* @__PURE__ */ new Set([...live.passes.keys()]), slots: live.timed.filter((t) => t.pilotId && row[t.slot] === t.pilotId).map((t) => t.slot) } : null;
     this.recordHeatResult(this.clock.heat, flew?.started ?? null, flew?.slots);
     this.endTiming(now);
-    if (this.onlyHeatLeft(this.clock.heat)) this.enterFreeFlight(now);
-    else this.goToNextHeat(now, this.clock.heat + 1);
+    const pauseAfter = this.clock.pauseAfter;
+    this.clock.pauseAfter = false;
+    if (this.onlyHeatLeft(this.clock.heat)) return this.enterFreeFlight(now);
+    this.holdLineup = pauseAfter;
+    this.goToNextHeat(now, this.clock.heat + 1);
+    this.holdLineup = false;
+    if (pauseAfter && this.clock.phase === "changeover") {
+      const c = this.clock;
+      c.pausedRemaining = this.config.changeoverSeconds * 1e3;
+      c.endsAt = null;
+      c.paused = true;
+      this.lineupPending = true;
+      if (this.config.callouts.pauseResume) this.say(this.config.callouts.texts.pausedAfterHeat);
+      this.onChange();
+    }
   }
+  holdLineup = false;
   /** Changeover for the next heat with pilots from `from` on; wait when every heat is empty. */
   goToNextHeat(now, from) {
     const next = this.nextHeat(from);
@@ -850,7 +869,6 @@ var Engine = class {
       }
     }
   }
-  /** The first heat at or after `from` that has a pilot; any heat if all are empty. */
   /** The first heat at or after `from` (looping round) that has pilots; -1 when every heat is empty. */
   nextHeat(from) {
     const n = this.config.heatCount;
@@ -1063,6 +1081,7 @@ var Engine = class {
       case "stop":
         this.closeTiming(true);
         c.startedAt = null;
+        c.pauseAfter = false;
         this.setPhase("stopped", null);
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStop);
         return;
@@ -1085,6 +1104,15 @@ var Engine = class {
         c.paused = false;
         c.pausedRemaining = null;
         if (this.config.callouts.pauseResume) this.say(this.config.callouts.texts.resumed);
+        if (c.phase === "changeover" && this.lineupPending) {
+          this.lineupPending = false;
+          this.announceLineup(c.heat);
+        }
+        this.onChange();
+        return;
+      case "pauseAfter":
+        if (c.phase !== "running" && c.phase !== "arming") throw new EngineError("Pause after this heat works while a heat is on.");
+        c.pauseAfter = !c.pauseAfter;
         this.onChange();
         return;
       case "startNow":
@@ -1093,12 +1121,13 @@ var Engine = class {
         return;
       case "to20": {
         if (c.phase !== "changeover") throw new EngineError("Only works during the changeover.");
-        const left = c.paused ? c.pausedRemaining ?? 0 : (c.endsAt ?? now) - now;
-        if (left <= JUMP_TO_START_MS) return;
         if (c.paused) c.pausedRemaining = JUMP_TO_START_MS;
         else c.endsAt = now + JUMP_TO_START_MS;
         const co = this.config.callouts;
-        for (const s of co.changeoverAt) if (s * 1e3 >= JUMP_TO_START_MS) this.calloutsDone.add(s);
+        for (const s of co.changeoverAt) {
+          if (s * 1e3 >= JUMP_TO_START_MS) this.calloutsDone.add(s);
+          else this.calloutsDone.delete(s);
+        }
         if (co.changeoverAt.length) this.say(fillText(co.texts.changeover, { time: durationWords(JUMP_TO_START_MS / 1e3), heat: c.heat + 1 }));
         this.onChange();
         return;
@@ -1113,6 +1142,7 @@ var Engine = class {
           return;
         }
         if (c.phase !== "changeover" && c.phase !== "arming") throw new EngineError("Nothing to skip.");
+        c.pauseAfter = false;
         if (c.phase === "arming") this.closeTiming(true);
         this.goToNextHeat(now, c.heat + 1);
         return;
@@ -1384,16 +1414,25 @@ var Engine = class {
     }
     return { out, left };
   }
+  /** A heat is on: pilots are arming or flying (paused or not). Heats can't be compacted then. */
+  heatIsLive() {
+    const p = this.clock.phase;
+    return p === "arming" || p === "running" || p === "freeflight";
+  }
   /**
-   * RD: pack everyone into as few heats as possible, so the loop is shorter.
-   * Pilots keep their channel wherever possible; when that would cost an extra
-   * heat, they move to another channel (listed so the RD can tell them).
-   * Shared quads stay apart. The heat flying or up next is left as it is.
-   * Emptied heats are skipped by the loop.
+   * RD, between heats: pack everyone into as few heats as possible, so the loop is shorter.
+   * Every heat counts, also the one up next. Pilots keep their channel wherever possible;
+   * when that would cost an extra heat, they move to another channel (listed so the RD can
+   * tell them). Shared quads stay apart. Emptied heats are skipped by the loop.
+   * While a heat is on it refuses: use "Pause after this heat" first.
    */
   compact() {
-    const locked = this.lockedHeat();
-    const order = this.loopOrder().filter((h) => h !== locked);
+    if (this.heatIsLive()) throw new EngineError("A heat is on. Compact the heats between heats: press Pause after this heat first.");
+    const c = this.clock;
+    const n = this.config.heatCount;
+    const start = c.phase === "changeover" ? c.heat : 0;
+    const order = Array.from({ length: n }, (_, i) => (start + i) % n);
+    const nextBefore = c.phase === "changeover" ? [...this.heats[c.heat]].join() : "";
     const keepOrder = [...order].sort((a, b) => this.count(b) - this.count(a) || order.indexOf(a) - order.indexOf(b));
     const pending = [];
     for (const h of order) {
@@ -1412,6 +1451,16 @@ var Engine = class {
     for (const x of left) this.seat(x.p, x.from, this.heats[x.from].indexOf(null));
     const before = new Map(pending.map((x) => [x.p.id, x]));
     const moved = out.filter((o) => o.heat !== o.from || o.channel !== before.get(o.pilot.id).ch).length;
+    if (c.phase === "changeover") {
+      if (this.heatIsEmpty(c.heat)) {
+        const h = this.nextHeat(c.heat);
+        if (h >= 0) c.heat = h;
+      }
+      if ([...this.heats[c.heat]].join() !== nextBefore) {
+        if (c.paused) this.lineupPending = true;
+        else this.announceLineup(c.heat);
+      }
+    }
     this.onChange();
     return {
       moved,

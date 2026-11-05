@@ -81,7 +81,7 @@
       <section class="card" id="heatsCard">
         <div class="card-head">
           <div class="tabs" id="rightTabs"><button data-tab="heats" class="on">Heats</button><button data-tab="times">Times</button></div>
-          <button id="compact" class="btn small primary" title="Pack pilots into as few heats as possible">Compact heats</button>
+          <button id="compact" class="btn small primary" title="Bring every pilot into as few heats as possible">Compact heats</button>
         </div>
         <div id="heats" class="heats"></div>
         <div id="times" class="times" hidden></div>
@@ -479,11 +479,22 @@ function renderStatus() {
     if (c.phase === 'changeover') html += b('20 s to start', 'to20', 'primary') + b('Start now', 'startNow');
     else if (c.phase === 'running') html += b('End heat now', 'endHeat');
     else html += '<span></span>';
+    if (c.phase === 'running' || c.phase === 'arming') {
+      html += c.pauseAfter
+        ? b('Pausing after this heat · Cancel', 'pauseAfter', 'wide pause-after on')
+        : b('Pause after this heat', 'pauseAfter', 'wide pause-after');
+    }
     html += b('Skip to next heat', 'skip');
     html += b('Stop session', 'stop', c.phase === 'changeover' ? 'danger wide' : 'danger');
   }
   const ctl = $('controls');
   if (ctl.dataset.html !== html) { ctl.innerHTML = html; ctl.dataset.html = html; }
+  // Compact heats only between heats: while pilots are arming or flying it waits.
+  const live = c.phase === 'arming' || c.phase === 'running' || c.phase === 'freeflight';
+  $('compact').disabled = live;
+  $('compact').title = live
+    ? (c.phase === 'freeflight' ? 'Free flight: only one heat flies, nothing to compact.' : 'A heat is on. Press Pause after this heat, then compact.')
+    : 'Bring every pilot into as few heats as possible';
 }
 $('controls').onclick = (e) => {
   const btn = e.target.closest('button[data-act]');
