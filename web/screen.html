@@ -32,7 +32,7 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
@@ -123,6 +123,7 @@ function payCard() {
 
 function render() {
   if (!state) return;
+  nightPrompt(state, 'big');
   const c = state.clock;
   const screen = $('screen');
   screen.classList.toggle('pay-view', view === 'pay');

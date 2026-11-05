@@ -162,6 +162,8 @@ try {
 // The clock: tick often, push state to screens whenever something changed.
 setInterval(() => {
   engine.tick(Date.now());
+  const d = new Date();
+  engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
   if (stateDirty) {
     stateDirty = false;
     broadcast('state', engine.snapshot(Date.now()));
@@ -224,6 +226,7 @@ const API: Record<string, Handler> = {
     rememberChannel(r.pilot.id);
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
+  '/api/still-flying': () => engine.stillFlying(Date.now()),
   '/api/leave': (b) => {
     // Gone from the session; the photo stays remembered under their name for next time.
     rememberPhoto(String(b.pilotId));

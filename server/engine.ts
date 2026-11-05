@@ -51,6 +51,10 @@ interface LiveTiming {
   unreliable?: boolean;
 }
 
+/** End of the day: how long the "still flying?" question waits, and how long "yes" holds it off. */
+const NIGHT_GRACE_MS = 5 * 60_000;
+const NIGHT_SNOOZE_MS = 60 * 60_000;
+
 export class EngineError extends Error {}
 
 const MAX_HEATS = 40;
@@ -122,6 +126,9 @@ export class Engine {
   pilots = new Map<string, Pilot>();
   heats: (string | null)[][] = [];
   private autoStartPending = false;
+  /** End of the day: the "still flying?" question is up until this time (ms), or null. */
+  night: { deadline: number } | null = null;
+  private nightSnoozeUntil = 0;
   clock: ClockState = {
     phase: 'stopped',
     heat: 0,
@@ -435,6 +442,52 @@ export class Engine {
     this.startTiming(now, true);
     const co = this.config.callouts;
     if (co.sessionStartStop || co.freeFlight) this.say(fillText(co.texts.freeFlightOpen, { heat: c.heat + 1 }));
+  }
+
+  /**
+   * End of the day, called with local time (minutes after midnight): from config.nightStopAt
+   * until 05:00 a running session asks once if anyone is still flying. "Still flying" puts the
+   * question off for an hour; no answer for NIGHT_GRACE_MS stops the session and takes
+   * everyone off the list, as if they had all gone home.
+   */
+  nightTick(now: number, localMinutes: number) {
+    const c = this.clock;
+    if (c.phase === 'stopped' || !this.config.nightStop) {
+      if (this.night) { this.night = null; this.onChange(); }
+      return;
+    }
+    if (this.night) {
+      if (now >= this.night.deadline) this.endOfDay();
+      return;
+    }
+    const late = localMinutes >= this.config.nightStopAt || localMinutes < 5 * 60;
+    if (!late || now < this.nightSnoozeUntil) return;
+    // A session started late gets its first hour too: somebody has only just arrived.
+    if (c.startedAt != null && now - c.startedAt < NIGHT_SNOOZE_MS) return;
+    this.night = { deadline: now + NIGHT_GRACE_MS };
+    this.say(this.config.callouts.texts.nightAsk);
+    this.onChange();
+  }
+
+  /** Someone tapped "Still flying": carry on, ask again in an hour. */
+  stillFlying(now: number) {
+    if (!this.night) return;
+    this.night = null;
+    this.nightSnoozeUntil = now + NIGHT_SNOOZE_MS;
+    this.say(this.config.callouts.texts.nightSnooze);
+    this.onChange();
+  }
+
+  /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
+  private endOfDay() {
+    this.night = null;
+    this.nightSnoozeUntil = 0;
+    this.closeTiming(true);
+    this.clock.startedAt = null;
+    this.setPhase('stopped', null);
+    for (const id of [...this.pilots.keys()]) this.deletePilot(id);
+    this.say(this.config.callouts.texts.nightEnd);
+    this.onChange();
   }
 
   /** A new session: lap history and session bests start over. */
@@ -1245,6 +1298,8 @@ export class Engine {
     if (patch.channels !== undefined) this.checkChannels(patch.channels);
     if (patch.freeFlight !== undefined) next.freeFlight = Boolean(patch.freeFlight);
     if (patch.autoStart !== undefined) next.autoStart = Boolean(patch.autoStart);
+    if (patch.nightStop !== undefined) next.nightStop = Boolean(patch.nightStop);
+    if (patch.nightStopAt !== undefined && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== undefined) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.callouts !== undefined) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== undefined) next.sound = cleanSound(patch.sound, next.sound);
@@ -1346,6 +1401,7 @@ export class Engine {
       calloutChoices: { changeover: CHANGEOVER_CALLOUT_CHOICES, heat: HEAT_CALLOUT_CHOICES },
       allChannels: ALL_CHANNELS,
       channelMhz: CHANNEL_MHZ,
+      night: this.night,
       timing: {
         timer: this.timer,
         timedSlots: this.timedSlots(),

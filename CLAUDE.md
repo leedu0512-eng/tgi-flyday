@@ -54,6 +54,10 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 - No photo: a badly drawn animal in FPV goggles (web/assets/avatars.js, SVG drawn in code, 20 animals × goggle/antenna/mouth/hat/background variations, seeded by the pilot's name). `assignAnimals` gives everyone in the session a different animal while there are animals left; `faceOf(state, pilot, wide)` in common.js returns a photo or the avatar. Avatars are always shown darkened (`img.avatar`), so real photos stand out. Images are data: URLs, so the SVG must be strict XML (no duplicate attributes).
 
+## End of the day
+
+- From `config.nightStopAt` (default 20:30 local; practice is usually 17:30–20:00, some fly longer) until 05:00, a running session asks "Still flying?" (`engine.nightTick`, fed local minutes by main.ts each second). The prompt is `nightPrompt(state, kind)` in common.js: big screen, console bar, phone card. "Yes, still flying" (POST /api/still-flying) snoozes it for an hour; no answer for 5 minutes → `endOfDay()`: stop, everyone off the list. A session started late gets its first hour first. `config.nightStop` switches it off.
+
 ## TrackDay (RC cars)
 
 - The big screen has a second view (tap the logo): **TGI TrackDay** (mark: the calendar page with an RC buggy, mark-car.svg / mark-car-small.svg), for the RC car days in the arena. The clock stays (time of day when no drone practice runs), the plates make way for QR cards (`CARDS` in screen.html; first: pay for the track day, 15 EUR, Montonio link). The header's drone bits (Sign in, the phone QR, Practice) never show in TrackDay.

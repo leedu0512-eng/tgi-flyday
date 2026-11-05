@@ -18,6 +18,13 @@ export interface Config {
   freeFlight: boolean;
   /** The first sign-in while the session is stopped starts it (in free flight with one heat). */
   autoStart: boolean;
+  /**
+   * End of the day: from this time (minutes after midnight, local time; 20:30 = 1230) a running
+   * session asks if anyone is still flying, and stops after nightGraceMinutes without an answer,
+   * taking everyone off the list. Off: never.
+   */
+  nightStop: boolean;
+  nightStopAt: number;
   /** Lap timer (RotorHazard) on the venue network. */
   timer: TimerConfig;
   /** Which callouts the voice makes, and when. */
@@ -101,6 +108,12 @@ export interface CalloutTexts {
   freeFlightOpen: string;
   /** Free flight ends because another heat has pilots: what happens now. {heats} {next} */
   heatsForm: string;
+  /** End of the day: anyone still flying? */
+  nightAsk: string;
+  /** Someone is: carry on, ask again later. */
+  nightSnooze: string;
+  /** Nobody answered: practice is over, everyone off the list. */
+  nightEnd: string;
   /** Each lap with a timer. {name} {lap} {laptime} */
   gatePass: string;
   paused: string;
@@ -195,6 +208,8 @@ export const DEFAULT_CONFIG: Config = {
   dropAfterMissed: 2,
   freeFlight: true,
   autoStart: true,
+  nightStop: true,
+  nightStopAt: 20 * 60 + 30,
   timer: { enabled: false, host: '', user: 'admin', password: 'rotorhazard' },
   callouts: {
     sessionStartStop: true,
@@ -223,6 +238,9 @@ export const DEFAULT_CONFIG: Config = {
       freeFlightEnd: 'Free flight is over. Please land.',
       freeFlightOpen: 'Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.',
       heatsForm: 'More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.',
+      nightAsk: 'Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.',
+      nightSnooze: 'OK, carry on. I will ask again in an hour.',
+      nightEnd: 'Practice is over for today. Thanks for flying, good night.',
       gatePass: '{name}, {laptime}',
       paused: 'Paused.',
       resumed: 'Resumed.',

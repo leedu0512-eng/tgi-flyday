@@ -808,3 +808,43 @@ test('times report: leaderboard by best 3 consecutive, every run with everyone',
   assert.equal(t.runs[0].pilots[0].name, 'Chirp');
   assert.equal(t.runs[0].pilots[0].best3At, 1);
 });
+
+test('end of the day: asks at 20:30, "still flying" holds it off an hour, no answer stops and clears everyone', () => {
+  const { e, said } = setup();
+  e.setConfig({ freeFlight: true });
+  e.walkIn('Ghost');
+  e.walkIn('Chirp');
+  e.tick(1000);
+  assert.equal(e.clock.phase, 'freeflight');
+  const at = 20 * 60 + 30;
+  const H = 2 * 60 * 60_000; // the session has been going for two hours
+  e.nightTick(H + 2000, at - 1);
+  assert.equal(e.night, null, 'not yet');
+  e.nightTick(H + 3000, at);
+  assert.ok(e.night, 'asked');
+  assert.match(said().at(-1)!, /Is anyone still flying/);
+  e.stillFlying(H + 4000);
+  assert.equal(e.night, null);
+  e.nightTick(H + 5000 + 59 * 60_000, at + 60);
+  assert.equal(e.night, null, 'held off an hour');
+  e.nightTick(H + 4000 + 60 * 60_000, at + 61);
+  assert.ok(e.night, 'asked again');
+  e.nightTick(H + 4000 + 66 * 60_000, at + 66); // 5 minutes, nobody answered
+  assert.equal(e.clock.phase, 'stopped');
+  assert.equal(e.pilots.size, 0);
+  assert.match(said().at(-1)!, /good night/);
+  // A session started after 20:30 gets its first hour before the question.
+  const T = 10 * H;
+  e.walkIn('Night owl');
+  e.tick(T);
+  assert.equal(e.clock.phase, 'freeflight');
+  e.nightTick(T + 1000, at + 120);
+  assert.equal(e.night, null, 'just arrived');
+  e.nightTick(T + 61 * 60_000, at + 181);
+  assert.ok(e.night, 'asked after an hour');
+  e.stillFlying(T + 62 * 60_000);
+  // Switched off: never asks.
+  e.setConfig({ nightStop: false });
+  e.nightTick(T + 200 * 60_000, at + 300);
+  assert.equal(e.night, null);
+});
