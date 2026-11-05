@@ -188,7 +188,7 @@ function moveView() {
     <h1>Tap your name</h1>
     <div class="leave-list">${list.length ? list.map(({ p, seat }) => `<button data-mover="${p.id}">
         ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}${timerMark(state, seat.slot)}</span>` : '<span class="chip none">–</span>'}
-        <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
+        <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}${(state.config.clubQuads ?? []).some((q) => q.name.toLowerCase() === p.quad?.toLowerCase()) ? ' · club quad' : ''}</small>
       </button>`).join('') : '<p class="hint" style="font-size:22px">Nobody has signed in yet.</p>'}</div>`;
 }
 
@@ -443,7 +443,10 @@ $('view').addEventListener('click', async (e) => {
   if (t.dataset.go) { if (t.dataset.go === 'home') { name = ''; mover = null; } leaving = null; return go(t.dataset.go); }
   if (t.dataset.flow) { flow = t.dataset.flow; name = ''; mover = null; usual = null; club = null; knownClub = false; return go(flow === 'move' ? 'move' : 'name'); }
   if (t.dataset.mover) {
-    mover = state.pilots.find((p) => p.id === t.dataset.mover);
+    const who = state.pilots.find((p) => p.id === t.dataset.mover);
+    const club = (state.config.clubQuads ?? []).find((q) => q.name.toLowerCase() === who?.quad?.toLowerCase());
+    if (club) return toast(`You fly club quad ${club.name} on ${club.channel}. Its channel is set by the race director.`);
+    mover = who;
     return go('slot');
   }
   if (t.hasAttribute('data-shift')) { shiftManual = !shiftOn(); return updateKeys(); }

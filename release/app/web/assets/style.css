@@ -902,3 +902,21 @@ body.embedded .kiosk .club-toggle { font-size: 20px; padding: 12px 16px; }
 .me-club b { font-family: var(--display); font-size: 26px; font-weight: 800; text-transform: uppercase; }
 .me-club span { color: var(--muted); font-size: 15px; }
 .club-row [data-f="broken"] { min-width: 92px; }
+
+/* RD console: drag and drop (heat board slots, club quads). */
+.slot { grid-template-columns: 74px 1fr 18px; }
+.slot .grip { width: 18px; height: 30px; cursor: grab; border-radius: 4px; opacity: .55;
+  background-image: radial-gradient(circle, var(--muted) 1.6px, transparent 1.8px); background-size: 8px 8px; background-position: 1px 3px; }
+.slot .grip:hover { opacity: 1; background-color: var(--line); }
+.slot .grip:active { cursor: grabbing; }
+.slot { border-radius: 8px; transition: background-color .12s, box-shadow .12s; }
+body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-own { box-shadow: inset 0 0 0 1px rgba(255,107,0,.25); }
+.slot.drop-over, .club-row.drop-over, .club-own.drop-over { box-shadow: inset 0 0 0 2px var(--accent) !important; background-color: rgba(255,107,0,.1); }
+.club-pilot[draggable] { cursor: grab; }
+.club-pilot[draggable]:hover { background: #333; }
+.club-own { padding: 14px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); text-align: center; font-size: 14px; }
+.slot.club select:disabled { opacity: 1; cursor: not-allowed; }
+.slot.club .input:disabled { color: var(--text); background: var(--panel-2); }
+.slot .club-mark { width: 18px; height: 18px; border-radius: 4px; background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6'%3E%3Ccircle cx='5.5' cy='5.5' r='3'/%3E%3Ccircle cx='18.5' cy='5.5' r='3'/%3E%3Ccircle cx='5.5' cy='18.5' r='3'/%3E%3Ccircle cx='18.5' cy='18.5' r='3'/%3E%3Cpath d='M8 8l8 8M16 8l-8 8'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6'%3E%3Ccircle cx='5.5' cy='5.5' r='3'/%3E%3Ccircle cx='18.5' cy='5.5' r='3'/%3E%3Ccircle cx='5.5' cy='18.5' r='3'/%3E%3Ccircle cx='18.5' cy='18.5' r='3'/%3E%3Cpath d='M8 8l8 8M16 8l-8 8'/%3E%3C/svg%3E") center / contain no-repeat; }
