@@ -1,10 +1,13 @@
-# Never in the repo: the venue's own data (pilots, photos, settings) and local build output.
-data/
-app/
-app.new/
-app.old/
-kiosk.json
+# Never in the repo: the venue's own data (pilots, photos, settings), installed updates
+# and local build output. Leading slash: only at the top, never release/app.
+/data/
+/app/
+/app.new/
+/app.old/
+/app.json
+/versions/
+/kiosk.json
 node_modules/
-build/
-dist/
+/build/
+/dist/
 *.tmp
