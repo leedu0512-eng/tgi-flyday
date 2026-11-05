@@ -269,7 +269,7 @@ export const DEFAULT_CONFIG: Config = {
     gatePassVoice: true,
     texts: {
       sessionStart: 'Practice session starting.',
-      sessionStop: 'Practice session stopped.',
+      sessionStop: 'Practice is over. Thank you all for flying! Please take your gear and rubbish with you and leave the club cleaner than you found it. See you next time!',
       waiting: 'Waiting for pilots. Join a heat at the kiosk.',
       lineup: 'Heat {heat}. {pilots}',
       lineupPilot: '{name} on {channel}.',

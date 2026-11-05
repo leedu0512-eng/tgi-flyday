@@ -1069,7 +1069,8 @@ test('session end time: in the changeover before a round starts, or in free flig
 });
 
 test('saved callout wording that was the old default follows the new default; edited wording stays', () => {
-  const e = new Engine({ config: { callouts: { texts: { nightEnd: 'Practice is over for today. Thanks for flying, good night.', sessionStart: 'Off we go!' } } } as any }, { random: () => 0.5, newId: () => 'x', onAudio: () => {} });
+  const e = new Engine({ config: { callouts: { texts: { nightEnd: 'Practice is over for today. Thanks for flying, good night.', sessionStop: 'Practice session stopped.', sessionStart: 'Off we go!' } } } as any }, { random: () => 0.5, newId: () => 'x', onAudio: () => {} });
   assert.match(e.config.callouts.texts.nightEnd, /cleaner than you found it/);
+  assert.match(e.config.callouts.texts.sessionStop, /cleaner than you found it/, 'Stop session says goodbye too');
   assert.equal(e.config.callouts.texts.sessionStart, 'Off we go!');
 });

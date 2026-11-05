@@ -57,6 +57,7 @@ const NIGHT_GRACE_MS = 5 * 60_000;
 /** Callout wordings that earlier versions had as defaults; saved unchanged, they follow the new default. */
 const OLD_DEFAULT_TEXTS: Record<string, string> = {
   nightEnd: 'Practice is over for today. Thanks for flying, good night.',
+  sessionStop: 'Practice session stopped.',
 };
 /** Warnings before the session's end time, in minutes. */
 const FINISH_WARN_MIN = [30, 20, 10];
