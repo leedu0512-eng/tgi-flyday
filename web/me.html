@@ -22,6 +22,12 @@
   <span id="wallclock" class="wallclock num"></span>
 </header>
 <main id="view"></main>
+<!-- Not on the venue network: this page only works at HOBIzone. -->
+<div id="away" class="me-away" hidden>
+  <img src="/assets/mark.svg" alt="">
+  <h1>You have to be at HOBIzone to use FlyDay</h1>
+  <p>This page works on the club Wi-Fi at the venue. Connect to it, then come back here.</p>
+</div>
 <div id="toast" class="toast"></div>
 
 <script type="module">
@@ -41,9 +47,18 @@ const store = {
   get() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } },
   set(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} },
 };
+// The name used last time, kept even after Going home, so next week is one tap. Also in a
+// cookie set by the RD PC: iPhones wipe a site's own storage after 7 days without a visit.
+const cookieName = () => decodeURIComponent((document.cookie.match(/(?:^|; )flyday_last=([^;]*)/) || [])[1] || '');
+let last = (() => { try { return localStorage.getItem('flyday.last') || ''; } catch { return ''; } })() || cookieName();
+function remember(name) {
+  last = name;
+  try { name ? localStorage.setItem('flyday.last', name) : localStorage.removeItem('flyday.last'); } catch {}
+  post('/api/remember-me', { name }).catch(() => {});
+}
 let me = store.get();
 const fromQr = new URLSearchParams(location.search).get('name');
-if (fromQr) { me = fromQr; store.set(me); history.replaceState(null, '', '/me'); }
+if (fromQr) { me = fromQr; store.set(me); remember(me); history.replaceState(null, '', '/me'); }
 
 setInterval(() => { if (state) $('wallclock').textContent = wallClock(state); }, 1000);
 
@@ -59,7 +74,10 @@ const pilot = () => me && state?.pilots.find((p) => p.callsign.toLowerCase() ===
 // ---------- who are you? ----------
 
 function pickView() {
-  return `<h1>Who are you?</h1>
+  const back = last && (state.pilots.find((p) => p.callsign.toLowerCase() === last.toLowerCase()) ?? null);
+  const welcome = last ? `<div class="me-welcome"><span>Welcome back</span>
+      <button class="big primary" data-last>${esc(NAME(back?.callsign ?? last))}, that's me<small>${back ? 'Show my heat' : 'Sign me in: FlyDay picks my heat and channel'}</small></button></div>` : '';
+  return `${welcome}<h1>${last ? 'Or' : 'Who are you?'}</h1>
     <input id="search" class="input" placeholder="Your pilot name" value="${esc(search)}" autocomplete="off" autocapitalize="words" enterkeyhint="go">
     <div id="pickRest">${pickRest()}</div>`;
 }
@@ -188,6 +206,7 @@ async function signIn(name) {
     const r = await post('/api/walkin', { name });
     me = r.pilot.callsign;
     store.set(me);
+    remember(me);
     search = '';
     toast(`Heat ${r.heat + 1}, channel ${r.channel}`);
   } catch (err) { toast(err.message); }
@@ -197,10 +216,19 @@ async function signIn(name) {
 $('view').addEventListener('click', async (e) => {
   const t = e.target.closest('button');
   if (!t) return;
-  if (t.dataset.me) { me = t.dataset.me; store.set(me); left = false; return render(); }
+  if (t.dataset.me) { me = t.dataset.me; store.set(me); remember(me); left = false; return render(); }
+  if (t.hasAttribute('data-last')) {
+    const back = state.pilots.find((p) => p.callsign.toLowerCase() === last.toLowerCase());
+    if (back) { me = back.callsign; store.set(me); left = false; return render(); }
+    return signIn(last);
+  }
   if (t.hasAttribute('data-signin')) return signIn(search.trim());
   if (t.hasAttribute('data-signin-me')) return signIn(me);
-  if (t.hasAttribute('data-switch')) { me = ''; store.set(''); left = false; confirmLeave = false; search = ''; return render(); }
+  if (t.hasAttribute('data-switch')) {
+    // "Not you?" forgets the name on this phone; "Sign in again" after Going home keeps it.
+    if (!left) remember('');
+    me = ''; store.set(''); left = false; confirmLeave = false; search = ''; return render();
+  }
   if (t.hasAttribute('data-leave')) { confirmLeave = true; return render(); }
   if (t.hasAttribute('data-leave-no')) { confirmLeave = false; return render(); }
   if (t.hasAttribute('data-leave-yes')) {
@@ -213,9 +241,17 @@ $('view').addEventListener('click', async (e) => {
   }
 });
 
+// No contact with FlyDay for a few seconds (or none at all yet): not at HOBIzone.
+let awayTimer = setTimeout(() => { $('away').hidden = false; }, 6000);
+function contact(online) {
+  clearTimeout(awayTimer);
+  if (online) $('away').hidden = true;
+  else awayTimer = setTimeout(() => { $('away').hidden = false; }, 5000);
+}
+
 connect({
-  onState(s) { state = s; render(); buzz(); },
-  onStatus(online) { document.body.classList.toggle('offline', !online); },
+  onState(s) { state = s; contact(true); render(); buzz(); },
+  onStatus(online) { document.body.classList.toggle('offline', !online); contact(online); },
 });
 </script>
 </body>

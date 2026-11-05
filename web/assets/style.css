@@ -658,3 +658,11 @@ body.embedded .kiosk .done-qr #doneQr { width: 200px; height: 200px; }
 .pb-qr { display: flex; align-items: center; gap: calc(0.8 * var(--uw)); }
 .pb-qr span { font-family: var(--display); font-weight: 700; font-size: calc(1.6 * var(--u)); line-height: 1.1; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-align: right; }
 .pb-qr i { display: block; width: calc(7 * var(--u)); height: calc(7 * var(--u)); background: #fff; padding: calc(0.25 * var(--u)); box-sizing: border-box; border-radius: 2px; }
+.me-welcome { margin-bottom: 26px; }
+.me-welcome > span { display: block; font-family: var(--display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-size: 16px; }
+.me-welcome .big { margin-top: 8px; font-size: 28px; }
+.me-welcome .hint { margin: 10px 0 0; }
+.me-away { position: fixed; inset: 0; z-index: 300; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 32px; text-align: center; }
+.me-away img { width: 96px; height: 96px; margin-bottom: 18px; }
+.me-away h1 { font-size: 34px !important; }
+.me-away p { color: var(--muted); font-size: 17px; margin: 0; }

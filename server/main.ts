@@ -278,6 +278,13 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   }
 
   if (path === '/api/state' && req.method === 'GET') return json(res, 200, engine.snapshot(Date.now()));
+  // Pilot's phone page: remember the name used, in a cookie the RD PC sets (iPhones keep
+  // those; a page's own storage is wiped after 7 days without a visit).
+  if (path === '/api/remember-me' && req.method === 'POST') {
+    const name = String((await readBody(req)).name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    res.setHeader('set-cookie', `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
+    return json(res, 200, { ok: true, result: null });
+  }
   // Kiosk: what we remember about a pilot name (their usual channel).
   if (path === '/api/known' && req.method === 'GET') {
     const name = url.searchParams.get('name') ?? '';
