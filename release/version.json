@@ -1,13 +1,13 @@
 {
- "version": "2026.11.05-2011",
+ "version": "2026.11.05-2023",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "b8b556a818a71b9439b473100d1113847ff563e064afdaaffeaeed523046f7ca"
+   "sha256": "43a9599c0020157088f9af56d9fd9a37f5cd60610935bd34ee5f237c77009d82"
   },
   {
    "path": "web/assets/common.js",
-   "sha256": "5437881f402bd52308da54c0d285ba8c783ececcd286203d9ef20dec811759f2"
+   "sha256": "22482e3b7b04e96752943debbe5dd6980417bbc2aff34fedf945d13e10d87218"
   },
   {
    "path": "web/assets/favicon.svg",
@@ -54,6 +54,26 @@
    "sha256": "2a832664d136037daeb00e01fda9e84354a32aa6bd6568c90202137a92ec61e8"
   },
   {
+   "path": "web/assets/icons/apple-touch-icon.png",
+   "sha256": "6c8443bf2f9745fa43ec6cb5ad8cc2e46f260a5cd628890e68f5fc9124dc853c"
+  },
+  {
+   "path": "web/assets/icons/favicon-32.png",
+   "sha256": "3c0548ab46c0fd3c15a5b39f7efc29d3ddef68716c24c4edebad01f4d0fcbeaa"
+  },
+  {
+   "path": "web/assets/icons/icon-192.png",
+   "sha256": "a12f6c4067a9fe0a3cc174448a6fee2f59cbf94f07543fa2207f8add4805f03f"
+  },
+  {
+   "path": "web/assets/icons/icon-512.png",
+   "sha256": "9d30addd97ca5ce0649d315f84f916e1116b2a2edf713aad313f79fb36431402"
+  },
+  {
+   "path": "web/assets/icons/me.webmanifest",
+   "sha256": "6b09446d1c6a1f4edfb9b148e443574ad887d9c6e81fa94892782449b49e64eb"
+  },
+  {
    "path": "web/assets/mark-small.svg",
    "sha256": "071d4b6f186f21ffbc7316609dc00ee0810f94f948be548859035e189e4ed908"
   },
@@ -63,7 +83,11 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "2f41d78b008271ae9280d4ed661032d36dbf95393286616c3b29bfa42fc6be0e"
+   "sha256": "3e6d3af3164c770d5f115e02cc22a463e3a4378acbce049cdeff5b33a0271aa0"
+  },
+  {
+   "path": "web/assets/vendor/qrcode.js",
+   "sha256": "193d0531c24706c13cf7a300ad63e56d7487fec185170db38c414bfda5822862"
   },
   {
    "path": "web/console.html",
@@ -75,15 +99,19 @@
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "19e7bf2d710e45f02092c8e5972846a4aa795c71afe08482a0f7de46d8f65cce"
+   "sha256": "951e8c26e9ece72c232216f36a3bce7e96a7782e994c0c642868becc763d6f94"
+  },
+  {
+   "path": "web/me.html",
+   "sha256": "8b07ff77f3f21dbfd7f601357e82cc03c5cd5416b60db05a9bcff73e432c93ff"
   },
   {
    "path": "web/mobile.html",
-   "sha256": "bae0f76884c9b2ceb2310548cfc983eb741f2721fb65fe488f50e757f2916810"
+   "sha256": "62ff9e6373d50b0d3cf9df302a245ed5912c10bf7690e37cf27327149c907ad9"
   },
   {
    "path": "web/screen.html",
-   "sha256": "09c48e67456251eca8d12d6dd8e95d5069e937ffe9846912a54554a8dcc507e7"
+   "sha256": "7c37c24a95f56f4f739314ab8bcb0b7f2882ebeb05d712ef109817b4befe45d8"
   }
  ]
 }

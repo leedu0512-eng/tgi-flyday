@@ -151,7 +151,7 @@ async function install(dir, release, commit) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2011" : "dev";
+var VERSION = true ? "2026.11.05-2023" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -1820,7 +1820,8 @@ var PAGES = {
   "/console": "console.html",
   "/kiosk": "kiosk.html",
   "/screen": "screen.html",
-  "/mobile": "mobile.html"
+  "/mobile": "mobile.html",
+  "/me": "me.html"
 };
 var TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -1828,6 +1829,7 @@ var TYPES = {
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".webmanifest": "application/manifest+json",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
   ".txt": "text/plain; charset=utf-8"

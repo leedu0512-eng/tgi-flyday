@@ -16,6 +16,7 @@
     <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
     <span id="meta" class="meta">Practice</span>
     <span id="wallclock" class="wallclock num"></span>
+    <div class="pb-qr" title="Your heat on your phone"><span>Your heat<br>on your phone</span><i id="meQr"></i></div>
     <button id="signinBtn" class="pb-signin">Sign in</button>
   </header>
   <div id="main" class="pb-main"></div>
@@ -31,7 +32,7 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
@@ -164,6 +165,9 @@ wake();
 const signin = $('signin');
 const frame = $('signinFrame');
 if (new URLSearchParams(location.search).has('nosignin')) $('signinBtn').hidden = true;
+// The QR code in the header: pilots' own phone page.
+meUrl().then(qrSvg).then((svg) => { $('meQr').innerHTML = svg; }).catch(() => {});
+
 // A flyout from the right edge: the board stays in view beside it, and it slides away when done.
 let closing;
 function openSignin() {

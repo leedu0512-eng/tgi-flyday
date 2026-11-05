@@ -599,3 +599,62 @@ body.embedded .kiosk .keyboard .krow { gap: 6px; }
 body.embedded .kiosk .keyboard button { width: calc((100% - 54px) / 10); height: 64px; font-size: 24px; padding: 0; }
 body.embedded .kiosk .keyboard .krow:last-child button { flex: 1 1 0; width: auto; font-size: 18px; }
 .kiosk .slotbtn.mine { border: 2px solid var(--accent); opacity: 1; }
+
+/* ---------- Pilot's own phone page (/me) ---------- */
+body.me { background: #000; color: var(--text); font-family: var(--font); margin: 0; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); }
+.me-top { display: flex; align-items: center; justify-content: space-between; padding: calc(12px + env(safe-area-inset-top)) 0 12px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.me-top .logo { font-size: 20px; }
+.me-top .wallclock { color: var(--muted); font-size: 15px; }
+body.me h1 { font-family: var(--display); font-weight: 850; text-transform: uppercase; font-size: 34px; line-height: 1; margin: 0 0 14px; letter-spacing: 0.01em; }
+body.me h2 { font-family: var(--display); font-weight: 800; text-transform: uppercase; font-size: 18px; color: var(--muted); letter-spacing: 0.06em; margin: 22px 0 10px; }
+body.me .input { width: 100%; box-sizing: border-box; font-size: 20px; padding: 14px 16px; margin-bottom: 14px; }
+body.me .hint { color: var(--muted); font-size: 16px; }
+body.me .big { display: block; width: 100%; box-sizing: border-box; margin-top: 14px; padding: 18px; text-align: center; font-family: var(--display); font-weight: 850; font-size: 24px; text-transform: uppercase;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+body.me .big small { display: block; font-family: var(--font); font-size: 13px; font-weight: 600; text-transform: none; color: inherit; opacity: 0.7; margin-top: 4px; }
+body.me .big.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+body.me .link { background: none; border: 0; padding: 0; color: var(--muted); font-size: 15px; text-decoration: underline; cursor: pointer; }
+body.me .chip { display: inline-block; min-width: 40px; padding: 4px 6px; border-radius: 3px; color: #000; font-family: var(--display); font-weight: 850; font-size: 16px; text-align: center; font-style: normal; }
+body.me .chip.none { background: var(--line); color: var(--muted); }
+.me-list { display: grid; gap: 8px; }
+.me-list button { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; color: var(--text);
+  font-family: var(--display); font-weight: 800; font-size: 22px; text-align: left; cursor: pointer; }
+.me-list button small { font-family: var(--font); font-size: 14px; color: var(--muted); font-weight: 600; }
+.me-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.me-head h1 { margin-bottom: 4px; }
+.me-face { flex: 0 0 auto; width: 76px; height: 76px; border-radius: 4px; overflow: hidden; background: var(--panel); border: 2px solid var(--line); display: grid; place-items: center; cursor: pointer; }
+.me-face img { width: 100%; height: 100%; object-fit: cover; }
+.me-face.empty { border-style: dashed; color: var(--muted); font-size: 13px; font-weight: 700; }
+.me-photo-cta { margin: 0 0 16px !important; }
+.me-seat { display: grid; grid-template-columns: 1fr 1.4fr; gap: 10px; }
+.me-seat > div { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; }
+.me-seat small { display: block; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.75; }
+.me-seat b { display: block; font-family: var(--display); font-weight: 900; font-size: 64px; line-height: 1; margin-top: 4px; }
+.me-seat .me-ch { color: #000; border: 0; }
+.me-status { margin-top: 10px; padding: 18px; border-radius: 4px; background: var(--panel); border-left: 6px solid var(--muted); position: relative; }
+.me-status b { display: block; font-family: var(--display); font-weight: 900; text-transform: uppercase; font-size: 36px; line-height: 1; }
+.me-status span { display: block; margin-top: 6px; color: var(--muted); font-size: 16px; }
+.me-status em { position: absolute; right: 16px; top: 16px; font-style: normal; font-family: var(--stencil, var(--display)); font-weight: 900; font-size: 34px; }
+.me-status.fly { border-color: #22c55e; } .me-status.fly b { color: #22c55e; }
+.me-status.next { border-color: var(--accent); } .me-status.next b { color: var(--accent); }
+.me-status.arm { border-color: #ff3b30; background: #2a0b09; } .me-status.arm b { color: #ff3b30; }
+.me-status.wait b { color: var(--text); }
+.me-mates { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.me-mates span { display: inline-flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 800; font-size: 20px; }
+.me-leave { margin-top: 28px !important; color: var(--muted) !important; }
+.me-confirm { padding-top: 10vh; }
+.me-confirm p { color: var(--muted); font-size: 17px; }
+
+/* QR codes for the pilot's phone page: kiosk "you're in" screen and the big screen's header. */
+.kiosk .done.with-qr { display: flex; align-items: center; justify-content: center; gap: 56px; text-align: left; }
+.kiosk .done.with-qr .confirm-row { justify-content: flex-start; }
+.kiosk .done-qr { flex: 0 0 auto; text-align: center; }
+.kiosk .done-qr #doneQr { width: 240px; height: 240px; background: #fff; padding: 10px; border-radius: 4px; }
+.kiosk .done-qr svg, .pb-qr svg { width: 100%; height: 100%; display: block; }
+.kiosk .done-qr span { display: block; margin-top: 12px; font-size: 18px; color: var(--muted); font-weight: 600; }
+body.embedded .kiosk .done.with-qr { flex-direction: column; gap: 28px; text-align: center; }
+body.embedded .kiosk .done.with-qr .confirm-row { justify-content: center; }
+body.embedded .kiosk .done-qr #doneQr { width: 200px; height: 200px; }
+.pb-qr { display: flex; align-items: center; gap: calc(0.8 * var(--uw)); }
+.pb-qr span { font-family: var(--display); font-weight: 700; font-size: calc(1.6 * var(--u)); line-height: 1.1; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); text-align: right; }
+.pb-qr i { display: block; width: calc(7 * var(--u)); height: calc(7 * var(--u)); background: #fff; padding: calc(0.25 * var(--u)); box-sizing: border-box; border-radius: 2px; }

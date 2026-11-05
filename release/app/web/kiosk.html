@@ -23,7 +23,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl } from '/assets/common.js';
+import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl, meUrl, qrSvg } from '/assets/common.js';
 setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
 
 const $ = (id) => document.getElementById(id);
@@ -223,8 +223,16 @@ function leaveView() {
 }
 
 function doneView() {
-  return `<div class="done"><div class="big-msg">${doneMsg.title}</div><p>${doneMsg.text}</p>
-    <div class="confirm-row"><button class="big primary" data-go="home">OK</button></div></div>`;
+  // After signing in: a QR code that opens this pilot's own phone page, already as them.
+  const qr = doneMsg.qr ? `<div class="done-qr"><div id="doneQr"></div><span>Your heat on your phone: scan me</span></div>` : '';
+  return `<div class="done ${qr ? 'with-qr' : ''}"><div><div class="big-msg">${doneMsg.title}</div><p>${doneMsg.text}</p>
+    <div class="confirm-row"><button class="big primary" data-go="home">OK</button></div></div>${qr}</div>`;
+}
+async function fillDoneQr(callsign) {
+  try {
+    const svg = await qrSvg(await meUrl(callsign));
+    if ($('doneQr')) $('doneQr').innerHTML = svg;
+  } catch {}
 }
 
 // ---------- photo step: remembered photo, or a new one from the webcam ----------
@@ -302,7 +310,7 @@ function snap() {
 
 /** After joining or signing in: the photo step, then the "you're in" screen. */
 function signedIn(pilot, msg) {
-  doneMsg = msg;
+  doneMsg = { ...msg, qr: pilot.callsign };
   name = '';
   me = pilot;
   shot = null;
@@ -317,7 +325,9 @@ function finish() {
   me = null;
   shot = null;
   go('done');
-  setTimeout(() => { if (view === 'done') go('home'); }, 8000);
+  if (doneMsg?.qr) fillDoneQr(doneMsg.qr);
+  // A bit longer with a QR code, so there's time to scan it.
+  setTimeout(() => { if (view === 'done') go('home'); }, doneMsg?.qr ? 25000 : 8000);
 }
 
 function render() {
@@ -404,6 +414,8 @@ $('view').addEventListener('click', async (e) => {
     mover = state.pilots.find((p) => p.id === t.dataset.mover);
     return go('slot');
   }
+  if (t.dataset.pick !== undefined) { name = t.dataset.pick; return toSlots(); }
+  if (t.hasAttribute('data-next')) return toSlots();
   if (t.dataset.heat !== undefined) {
     try { await seat(Number(t.dataset.heat), Number(t.dataset.slot)); } catch (err) { toast(err.message); }
     return;

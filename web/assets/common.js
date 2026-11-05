@@ -417,7 +417,7 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
 (function viewPicker() {
   if (typeof document === 'undefined' || document.querySelector('.view-picker')) return;
   const here = location.pathname.replace(/\/$/, '') || '/';
-  if (here === '/mobile') return; // the phone doesn't need it
+  if (here === '/mobile' || here === '/me') return; // phones don't need it
   if (window.top !== window) return; // the kiosk inside the big screen's sign-in panel
   // On the RD PC (the pages come from this PC itself) the console is on the list too, as the way back.
   const rd = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
@@ -476,4 +476,57 @@ async function restart() {
   }
   say('Restarting', r?.status === 'current' ? `Up to date (${r.version}).` : r?.status === 'offline' ? 'No updates reachable right now.' : '');
   setTimeout(() => location.reload(), 1200);
+}
+
+// ---------- where a pilot stands (kiosk, personal phone page) ----------
+
+/** Heats in the order they'll fly from now: the one up next first, the one flying now last. */
+export function heatOrder(state) {
+  const c = state.clock, n = state.heats.length;
+  const start = c.phase === 'changeover' ? c.heat
+    : ['arming', 'running', 'freeflight'].includes(c.phase) ? c.heat + 1 : 0;
+  return Array.from({ length: n }, (_, k) => (start + k) % n);
+}
+
+/** How many heats with pilots fly before heat h. */
+export function heatsAhead(state, h, exceptId) {
+  let ahead = 0;
+  for (const i of heatOrder(state)) {
+    if (i === h) break;
+    if (state.heats[i].slots.some((s) => s.pilotId && s.pilotId !== exceptId)) ahead++;
+  }
+  return ahead;
+}
+
+/** Where a pilot sits, if anywhere: { heat, slot, channel }. */
+export function seatOf(state, pilotId) {
+  for (const h of state.heats) {
+    const i = h.slots.findIndex((s) => s.pilotId === pilotId);
+    if (i >= 0) return { heat: h.index, slot: i, channel: h.slots[i].channel };
+  }
+  return null;
+}
+
+/**
+ * The address of a pilot's own phone page (/me), for a QR code: other devices can't use
+ * "localhost", so on the RD PC itself it uses the PC's network address.
+ */
+export async function meUrl(name) {
+  let origin = location.origin;
+  if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) {
+    try {
+      const i = await (await fetch('/api/info')).json();
+      if (i.addresses?.[0]) origin = `http://${i.addresses[0]}:${i.port}`;
+    } catch {}
+  }
+  return `${origin}/me${name ? `?name=${encodeURIComponent(name)}` : ''}`;
+}
+
+/** A QR code for text, as an SVG string (black on white, scales to its box). */
+export async function qrSvg(text) {
+  const { default: qrcode } = await import('/assets/vendor/qrcode.js');
+  const q = qrcode(0, 'M');
+  q.addData(text);
+  q.make();
+  return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
 }

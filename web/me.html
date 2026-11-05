@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FlyDay">
+<meta name="theme-color" content="#000000">
+<title>TGI FlyDay · My heat</title>
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="manifest" href="/assets/icons/me.webmanifest">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="me">
+<div class="offline-banner">Lost connection to the race PC. Reconnecting…</div>
+<header class="me-top">
+  <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span id="wallclock" class="wallclock num"></span>
+</header>
+<main id="view"></main>
+<div id="toast" class="toast"></div>
+
+<script type="module">
+// A pilot's own page on their phone (QR code on the kiosk and the big screen):
+// who am I, my heat and channel, am I flying, and Leave. Lap times come here later.
+import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf } from '/assets/common.js';
+
+const $ = (id) => document.getElementById(id);
+const KEY = 'flyday.me';
+let state = null;
+let search = '';
+let confirmLeave = false;
+let left = false;
+
+// Who this phone belongs to: from the QR code (?name=), else remembered on the phone.
+const store = {
+  get() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } },
+  set(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} },
+};
+let me = store.get();
+const fromQr = new URLSearchParams(location.search).get('name');
+if (fromQr) { me = fromQr; store.set(me); history.replaceState(null, '', '/me'); }
+
+setInterval(() => { if (state) $('wallclock').textContent = wallClock(state); }, 1000);
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show';
+  setTimeout(() => (t.className = 'toast'), 3500);
+}
+
+const pilot = () => me && state?.pilots.find((p) => p.callsign.toLowerCase() === me.toLowerCase());
+
+// ---------- who are you? ----------
+
+function pickView() {
+  return `<h1>Who are you?</h1>
+    <input id="search" class="input" placeholder="Your pilot name" value="${esc(search)}" autocomplete="off" autocapitalize="words" enterkeyhint="go">
+    <div id="pickRest">${pickRest()}</div>`;
+}
+
+function pickRest() {
+  const flying = state.pilots
+    .map((p) => ({ p, seat: seatOf(state, p.id) }))
+    .filter((x) => !search || x.p.callsign.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => a.p.callsign.localeCompare(b.p.callsign));
+  return `<div class="me-list">${flying.map(({ p, seat }) => `<button data-me="${esc(p.callsign)}">
+        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}</span>` : '<span class="chip none">–</span>'}
+        <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
+      </button>`).join('') || `<p class="hint">${search ? 'Nobody by that name yet.' : 'Nobody has signed in yet.'}</p>`}</div>
+    ${search.trim() ? `<button class="big primary" data-signin>Sign in as ${esc(NAME(search.trim()))}<small>FlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
+}
+
+// ---------- my heat ----------
+
+function status(p, seat) {
+  const c = state.clock;
+  if (!seat) return { cls: 'idle', big: 'Not in a heat', small: 'The race director will put you in one.' };
+  if (c.phase === 'stopped') return { cls: 'idle', big: 'Practice not running', small: 'It starts when the first pilot signs in, or when the race director starts it.' };
+  if (c.heat === seat.heat) {
+    if (c.phase === 'freeflight') return { cls: 'fly', big: 'Free flight', small: 'Fly as you like.' };
+    if (c.phase === 'running') return { cls: 'fly', big: 'Flying now', small: 'Your heat is in the air.', clock: true };
+    if (c.phase === 'arming') return { cls: 'arm', big: 'Arm now', small: 'Start in less than five.' };
+    if (c.phase === 'changeover') return { cls: 'next', big: "You're up next", small: 'Get your quad on the pad.', clock: true };
+  }
+  if (c.phase === 'waiting') return { cls: 'idle', big: 'Waiting', small: 'For pilots to join.' };
+  const n = heatsAhead(state, seat.heat, p.id);
+  const min = Math.max(1, Math.round((n * (state.config.heatSeconds + state.config.changeoverSeconds)) / 60));
+  return { cls: 'wait', big: `${n} heat${n === 1 ? '' : 's'} before yours`, small: `About ${min} min.` };
+}
+
+function meView(p) {
+  const seat = seatOf(state, p.id);
+  const st = status(p, seat);
+  const pm = pilotMap(state);
+  const mates = seat ? state.heats[seat.heat].slots
+    .map((s, i) => ({ s, i, q: s.pilotId && pm.get(s.pilotId) }))
+    .filter((x) => x.q && x.q.id !== p.id) : [];
+  if (confirmLeave) {
+    return `<div class="me-confirm"><h1>Leave, ${esc(NAME(p.callsign))}?</h1>
+      <p>${seat ? `Your slot in heat ${seat.heat + 1} will be free for someone else.` : "You'll be off today's list."}</p>
+      <button class="big primary" data-leave-yes>Yes, I'm going home</button>
+      <button class="big" data-leave-no>Cancel</button></div>`;
+  }
+  return `<div class="me-head">
+      <label class="me-face ${p.photo ? '' : 'empty'}">
+        ${p.photo ? `<img src="${photoUrl(p)}" alt="">` : '<span>+ Photo</span>'}
+        <input type="file" accept="image/*" capture="user" data-photo hidden>
+      </label>
+      <div><h1>${esc(NAME(p.callsign))}</h1><button class="link" data-switch>Not you?</button></div>
+    </div>
+    ${p.photo ? '' : `<label class="big me-photo-cta">Take your photo<small>For your plate on the big screen</small><input type="file" accept="image/*" capture="user" data-photo hidden></label>`}
+    ${seat ? `<div class="me-seat">
+      <div><small>Heat</small><b>${seat.heat + 1}</b></div>
+      <div class="me-ch" style="background:${SLOT_COLORS[seat.slot]}"><small>Channel</small><b>${esc(seat.channel)}</b></div>
+    </div>` : ''}
+    <div class="me-status ${st.cls}"><b>${st.big}</b><span>${st.small}</span>${st.clock ? '<em id="clock" class="num"></em>' : ''}</div>
+    ${mates.length ? `<h2>In your heat</h2><div class="me-mates">${mates.map(({ s, i, q }) =>
+      `<span><i class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</i>${esc(NAME(q.callsign))}</span>`).join('')}</div>` : ''}
+    <button class="big me-leave" data-leave>Going home<small>Free up your slot</small></button>`;
+}
+
+function goneView() {
+  return `<div class="me-confirm"><h1>See you next time</h1><p>Your slot is free again.</p>
+    <button class="big" data-switch>Sign in again</button></div>`;
+}
+
+function notHereView() {
+  return `<h1>${esc(NAME(me))}</h1>
+    <p class="hint">You're not signed in today.</p>
+    <button class="big primary" data-signin-me>Sign me in<small>FlyDay picks your heat and channel</small></button>
+    <button class="link" data-switch>Not you?</button>`;
+}
+
+// ---------- render ----------
+
+let lastKey = '';
+function render() {
+  if (!state) return;
+  const p = pilot();
+  const html = left ? goneView() : !me ? pickView() : p ? meView(p) : notHereView();
+  // Keep typing undisturbed: only redraw the list under the name box.
+  if (!me && !left && $('pickRest')) { $('pickRest').innerHTML = pickRest(); return; }
+  $('view').innerHTML = html;
+  tickClock();
+}
+
+function tickClock() {
+  const el = $('clock');
+  if (el && state) el.textContent = fmt(clockMs(state.clock));
+}
+setInterval(tickClock, 250);
+
+// A buzz when your heat comes up (Android; iPhones don't allow it).
+let lastCls = '';
+function buzz() {
+  const p = pilot();
+  if (!p || left) return;
+  const st = status(p, seatOf(state, p.id)).cls;
+  if (st !== lastCls && (st === 'next' || st === 'arm')) try { navigator.vibrate?.(st === 'arm' ? [300, 100, 300] : 400); } catch {}
+  lastCls = st;
+}
+
+// ---------- input ----------
+
+// Your photo, from the phone's own camera (the plate on the big screen).
+$('view').addEventListener('change', async (e) => {
+  if (!e.target.matches('[data-photo]') || !e.target.files?.[0]) return;
+  const p = pilot();
+  if (!p) return;
+  try { await uploadPhoto(p.id, e.target.files[0]); toast('Photo saved.'); } catch (err) { toast(err.message); }
+});
+
+$('view').addEventListener('input', (e) => {
+  if (e.target.id === 'search') { search = e.target.value; render(); }
+});
+$('view').addEventListener('keydown', (e) => {
+  if (e.target.id === 'search' && e.key === 'Enter') document.querySelector('[data-me], [data-signin]')?.click();
+});
+
+async function signIn(name) {
+  try {
+    const r = await post('/api/walkin', { name });
+    me = r.pilot.callsign;
+    store.set(me);
+    search = '';
+    toast(`Heat ${r.heat + 1}, channel ${r.channel}`);
+  } catch (err) { toast(err.message); }
+  render();
+}
+
+$('view').addEventListener('click', async (e) => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.dataset.me) { me = t.dataset.me; store.set(me); left = false; return render(); }
+  if (t.hasAttribute('data-signin')) return signIn(search.trim());
+  if (t.hasAttribute('data-signin-me')) return signIn(me);
+  if (t.hasAttribute('data-switch')) { me = ''; store.set(''); left = false; confirmLeave = false; search = ''; return render(); }
+  if (t.hasAttribute('data-leave')) { confirmLeave = true; return render(); }
+  if (t.hasAttribute('data-leave-no')) { confirmLeave = false; return render(); }
+  if (t.hasAttribute('data-leave-yes')) {
+    const p = pilot();
+    try { if (p) await post('/api/leave', { pilotId: p.id }); left = true; } catch (err) { toast(err.message); }
+    confirmLeave = false;
+    me = '';
+    store.set('');
+    return render();
+  }
+});
+
+connect({
+  onState(s) { state = s; render(); buzz(); },
+  onStatus(online) { document.body.classList.toggle('offline', !online); },
+});
+</script>
+</body>
+</html>
