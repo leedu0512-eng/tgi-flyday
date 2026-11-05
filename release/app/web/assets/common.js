@@ -592,12 +592,11 @@ const STOPWATCH = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy
  * one per timer receiver). Faint when the timer is switched on but not connected.
  */
 export function timerMark(state, slot) {
+  // Only while the lap timer is connected: no timer, no stopwatch on any channel.
   const t = state?.timing;
-  if (!state?.config?.timer?.enabled || !t) return '';
-  const live = t.timer?.state === 'connected';
-  const n = live ? t.timedSlots : Math.min(t.timer?.nodes || 4, state.config.channels.length);
-  if (slot >= n) return '';
-  return `<i class="timed ${live ? '' : 'down'}" title="${live ? 'Lap timed' : 'Lap timer not connected'}">${STOPWATCH}</i>`;
+  if (!state?.config?.timer?.enabled || t?.timer?.state !== 'connected') return '';
+  if (slot >= t.timedSlots) return '';
+  return `<i class="timed" title="Lap timed">${STOPWATCH}</i>`;
 }
 
 // ---------- default avatars ----------

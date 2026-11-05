@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.06-0103" : "dev";
+var VERSION = true ? "2026.11.06-0122" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -294,11 +294,12 @@ var DEFAULT_CONFIG = {
     pauseResume: true,
     freeFlight: true,
     heatsChanged: true,
+    sessionEnd: true,
     gatePassBeep: false,
     gatePassVoice: true,
     texts: {
       sessionStart: "Practice session starting.",
-      sessionStop: "Practice session stopped.",
+      sessionStop: "Practice is over. Thank you all for flying! Please take your gear and rubbish with you and leave the club cleaner than you found it. See you next time!",
       waiting: "Waiting for pilots. Join a heat at the kiosk.",
       lineup: "Heat {heat}. {pilots}",
       lineupPilot: "{name} on {channel}.",
@@ -310,11 +311,15 @@ var DEFAULT_CONFIG = {
       freeFlightEnd: "Free flight is over. Please land.",
       heatsChanged: "Attention pilots, your heats and channels may have changed. Check the big screen.",
       clubQuadBroken: "{quad} is out of action. {pilots}, check the big screen for your new quad and heat.",
+      finishWarn: "Practice ends in {minutes} minutes.",
+      finishLastRound: "Practice time is up. This round will be flown to the end, then practice is over.",
+      finishDone: "That was the last round. Thank you all for flying, it was a great session! Please take your gear and rubbish with you and leave the club cleaner than you found it. See you next time!",
+      finishNow: "Practice time is up, please land. Thank you all for flying! Please take your gear and rubbish with you and leave the club cleaner than you found it. See you next time!",
       freeFlightOpen: "Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.",
       heatsForm: "More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.",
       nightAsk: "Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.",
       nightSnooze: "OK, carry on. I will ask again in an hour.",
-      nightEnd: "Practice is over for today. Thanks for flying, good night.",
+      nightEnd: "Practice is over for today. Thank you all for flying! Please leave the club cleaner than you found it. Good night!",
       gatePass: "{name}, {laptime}",
       paused: "Paused.",
       pausedAfterHeat: "Paused after this heat. Hold on, the heats are being sorted out.",
@@ -387,6 +392,11 @@ function pilotTimes(pilotId, slot, passes) {
 var FINISH_WINDOW_MS = 3e4;
 var MIN_LAP_MS = 2e3;
 var NIGHT_GRACE_MS = 5 * 6e4;
+var OLD_DEFAULT_TEXTS = {
+  nightEnd: "Practice is over for today. Thanks for flying, good night.",
+  sessionStop: "Practice session stopped."
+};
+var FINISH_WARN_MIN = [30, 20, 10];
 var NIGHT_SNOOZE_MS = 60 * 6e4;
 var EngineError = class extends Error {
 };
@@ -466,8 +476,12 @@ var Engine = class {
     heatsRun: 0,
     startedAt: null,
     freeSince: null,
-    pauseAfter: false
+    pauseAfter: false,
+    finishAt: null,
+    lastRound: false
   };
+  /** End-time warnings already given (minutes before). */
+  finishWarned = /* @__PURE__ */ new Set();
   /** The next heat's line-up still has to be said (it was paused straight away, or compacted while paused). */
   lineupPending = false;
   /** Heats in a row each pilot has not started (only counted when a timer is connected). */
@@ -503,7 +517,8 @@ var Engine = class {
           ...DEFAULT_CONFIG.callouts.texts,
           // Arm wording saved by an earlier version.
           ...saved2.callouts?.armText ? { arm: saved2.callouts.armText } : {},
-          ...saved2.callouts?.texts ?? {}
+          // Saved wording still the old default: take the new default instead (an edited one stays).
+          ...Object.fromEntries(Object.entries(saved2.callouts?.texts ?? {}).filter(([k, v]) => OLD_DEFAULT_TEXTS[k] !== v))
         }
       },
       sound: { ...DEFAULT_CONFIG.sound, ...saved2.sound ?? {} },
@@ -767,6 +782,62 @@ var Engine = class {
     this.say(this.config.callouts.texts.nightAsk);
     this.onChange();
   }
+  /**
+   * RD: when this session ends (epoch ms, the next time the clock shows the time asked for), or
+   * null for no end time. Warnings at 30, 20 and 10 minutes before (only those still ahead).
+   */
+  setFinish(at, now) {
+    const c = this.clock;
+    c.finishAt = at === null || !Number.isFinite(Number(at)) ? null : Number(at);
+    c.lastRound = false;
+    this.finishWarned.clear();
+    if (c.finishAt !== null) {
+      for (const m of FINISH_WARN_MIN) if (c.finishAt - now <= m * 6e4) this.finishWarned.add(m);
+    }
+    this.onChange();
+  }
+  /**
+   * The end time, called every second. Before it: the warnings. When it comes: in a heat loop,
+   * the round being flown is finished first (lastRound; goToNextHeat ends it when the loop
+   * would start over); still in the changeover before the round's first heat, or in free
+   * flight, or with nobody in a heat: practice ends now.
+   */
+  finishTick(now) {
+    const c = this.clock;
+    if (c.finishAt === null || c.phase === "stopped") return;
+    const co = this.config.callouts;
+    if (c.lastRound) {
+      if (c.phase === "freeflight" || c.phase === "waiting") this.finishSession(co.texts.finishNow);
+      return;
+    }
+    const left = c.finishAt - now;
+    if (left > 0) {
+      const due = FINISH_WARN_MIN.filter((m) => left <= m * 6e4 && !this.finishWarned.has(m));
+      if (!due.length) return;
+      for (const m of FINISH_WARN_MIN) if (left <= m * 6e4) this.finishWarned.add(m);
+      if (co.sessionEnd) this.say(fillText(co.texts.finishWarn, { minutes: Math.ceil(left / 6e4) }));
+      this.onChange();
+      return;
+    }
+    const roundNotStarted = c.phase === "changeover" && c.heat === this.nextHeat(0);
+    if (c.phase === "freeflight" || c.phase === "waiting" || roundNotStarted) return this.finishSession(co.texts.finishNow);
+    c.lastRound = true;
+    if (co.sessionEnd) this.say(co.texts.finishLastRound);
+    this.onChange();
+  }
+  /** The end time's done: practice stops (everyone stays signed in). */
+  finishSession(text) {
+    const c = this.clock;
+    this.closeTiming(true);
+    c.startedAt = null;
+    c.finishAt = null;
+    c.lastRound = false;
+    c.pauseAfter = false;
+    this.finishWarned.clear();
+    this.setPhase("stopped", null);
+    if (this.config.callouts.sessionEnd) this.say(text);
+    this.onChange();
+  }
   /** Someone tapped "Still flying": carry on, ask again in an hour. */
   stillFlying(now) {
     if (!this.night) return;
@@ -781,6 +852,8 @@ var Engine = class {
     this.nightSnoozeUntil = 0;
     this.closeTiming(true);
     this.clock.startedAt = null;
+    this.clock.finishAt = null;
+    this.clock.lastRound = false;
     this.setPhase("stopped", null);
     for (const id of [...this.pilots.keys()]) this.deletePilot(id);
     this.say(this.config.callouts.texts.nightEnd);
@@ -844,6 +917,7 @@ var Engine = class {
       this.enterWaiting(from % this.config.heatCount);
       return;
     }
+    if (next <= this.clock.heat && this.clock.lastRound) return this.finishSession(this.config.callouts.texts.finishDone);
     if (next <= this.clock.heat) this.clock.round++;
     this.enterChangeover(now, next);
   }
@@ -1092,6 +1166,8 @@ var Engine = class {
         this.closeTiming(true);
         c.startedAt = null;
         c.pauseAfter = false;
+        c.finishAt = null;
+        c.lastRound = false;
         this.setPhase("stopped", null);
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStop);
         return;
@@ -1964,7 +2040,7 @@ function cleanTimer(patch, current) {
 }
 function cleanCallouts(patch, current) {
   const out = { ...current };
-  for (const k of ["sessionStartStop", "lineup", "arm", "readyBeeps", "finalBeeps", "timeUp", "pauseResume", "freeFlight", "heatsChanged", "gatePassBeep", "gatePassVoice"]) {
+  for (const k of ["sessionStartStop", "lineup", "arm", "readyBeeps", "finalBeeps", "timeUp", "pauseResume", "freeFlight", "heatsChanged", "sessionEnd", "gatePassBeep", "gatePassVoice"]) {
     if (patch[k] !== void 0) out[k] = Boolean(patch[k]);
   }
   if (patch.texts && typeof patch.texts === "object") {
@@ -2389,6 +2465,7 @@ setInterval(() => {
   engine.tick(Date.now());
   const d = /* @__PURE__ */ new Date();
   engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
+  engine.finishTick(Date.now());
   if (stateDirty) {
     stateDirty = false;
     broadcast("state", engine.snapshot(Date.now()));
@@ -2469,6 +2546,16 @@ var API2 = {
   "/api/config": (b) => engine.setConfig(b),
   "/api/compact": () => engine.compact(),
   "/api/club-quads": (b) => engine.setClubQuads(b.quads),
+  // RD: the session's end time as "HH:MM" local time (the next time the clock shows it), or null.
+  "/api/finish": (b) => {
+    if (b.time == null || b.time === "") return engine.setFinish(null, Date.now());
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(b.time));
+    if (!m || +m[1] > 23 || +m[2] > 59) throw new EngineError("End time looks like 20:30.");
+    const at = /* @__PURE__ */ new Date();
+    at.setHours(+m[1], +m[2], 0, 0);
+    if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1);
+    return engine.setFinish(at.getTime(), Date.now());
+  },
   "/api/move": (b) => engine.movePilot(String(b.pilotId), Number(b.heat), Number(b.slot)),
   "/api/club-quad/assign": (b) => engine.assignClubQuad(String(b.pilotId), b.quad ?? null),
   "/api/arm-measured": (b) => engine.setArmMeasured(b.text, b.ms),
