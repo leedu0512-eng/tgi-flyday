@@ -27,10 +27,21 @@ export interface Config {
   nightStopAt: number;
   /** Lap timer (RotorHazard) on the venue network. */
   timer: TimerConfig;
+  /** The club's own quads (up to 4) for pilots without one. Each flies one fixed channel. */
+  clubQuads: ClubQuad[];
   /** Which callouts the voice makes, and when. */
   callouts: CalloutSettings;
   /** How callouts and tones sound on the RD console. */
   sound: SoundSettings;
+}
+
+export interface ClubQuad {
+  /** As on the frame, e.g. "Club 1". Pilots on it share it like any shared quad (Pilot.quad). */
+  name: string;
+  /** Its VTX channel: everyone on this quad flies it. */
+  channel: string;
+  /** Out of action: nobody is put on it. */
+  broken: boolean;
 }
 
 export interface TimerConfig {
@@ -108,6 +119,8 @@ export interface CalloutTexts {
   freeFlightEnd: string;
   /** Compact heats moved pilots or renumbered heats. */
   heatsChanged: string;
+  /** A club quad was marked broken; its pilots got another one. {quad} {pilots} */
+  clubQuadBroken: string;
   /** The first sign-in started the session, straight into free flight. {heat} */
   freeFlightOpen: string;
   /** Free flight ends because another heat has pilots: what happens now. {heats} {next} */
@@ -218,6 +231,12 @@ export const DEFAULT_CONFIG: Config = {
   autoStart: true,
   nightStop: true,
   nightStopAt: 20 * 60 + 30,
+  clubQuads: [
+    { name: 'Club 1', channel: 'R1', broken: false },
+    { name: 'Club 2', channel: 'R2', broken: false },
+    { name: 'Club 3', channel: 'F2', broken: false },
+    { name: 'Club 4', channel: 'F4', broken: false },
+  ],
   timer: { enabled: false, host: '', user: 'admin', password: 'rotorhazard' },
   callouts: {
     sessionStartStop: true,
@@ -246,6 +265,7 @@ export const DEFAULT_CONFIG: Config = {
       freeFlight: 'Free flight. Only heat {heat} is left, fly as you like.',
       freeFlightEnd: 'Free flight is over. Please land.',
       heatsChanged: 'Attention pilots, your heats and channels may have changed. Check the big screen.',
+      clubQuadBroken: '{quad} is out of action. {pilots}, check the big screen for your new quad and heat.',
       freeFlightOpen: 'Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.',
       heatsForm: 'More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.',
       nightAsk: 'Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.',

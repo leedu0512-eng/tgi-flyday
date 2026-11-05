@@ -60,19 +60,22 @@ function rememberPhoto(id: string) {
  * it first next time: most pilots fly the same channel every week.
  */
 const KNOWN_FILE = join(resolve(DATA_FILE, '..'), 'known.json');
-const known: Record<string, { channel: string }> = (() => {
+const known: Record<string, { channel?: string; club?: boolean }> = (() => {
   try { return JSON.parse(readFileSync(KNOWN_FILE, 'utf8')); } catch { return {}; }
 })();
 const knownKey = (callsign: string) => callsign.trim().toLowerCase();
 function rememberChannel(pilotId: string) {
   const p = engine.pilots.get(pilotId);
   if (!p) return;
+  const k = knownKey(p.callsign);
+  const club = !!engine.clubQuadOf(p);
   for (const [h, slots] of engine.heats.entries()) {
     const i = slots.indexOf(pilotId);
     if (i < 0) continue;
-    const channel = engine.channelOf(h, i);
-    if (known[knownKey(p.callsign)]?.channel === channel) return;
-    known[knownKey(p.callsign)] = { channel };
+    // A club quad's channel isn't the pilot's own: only remember that they fly a club quad.
+    const channel = club ? known[k]?.channel : engine.channelOf(h, i);
+    if (known[k]?.channel === channel && !!known[k]?.club === club) return;
+    known[k] = { ...(channel ? { channel } : {}), ...(club ? { club } : {}) };
     try {
       mkdirSync(resolve(KNOWN_FILE, '..'), { recursive: true });
       writeFileSync(KNOWN_FILE, JSON.stringify(known, null, 1));
@@ -222,7 +225,9 @@ const API: Record<string, Handler> = {
     return pilot;
   },
   '/api/walkin': (b) => {
-    const r = engine.walkIn(b.name, known[knownKey(String(b.name ?? ''))]?.channel);
+    // Club quad: as asked, else as last time (remembered by name).
+    const k = known[knownKey(String(b.name ?? ''))];
+    const r = engine.walkIn(b.name, k?.channel, b.club === undefined ? !!k?.club : !!b.club);
     rememberChannel(r.pilot.id);
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
@@ -247,6 +252,7 @@ const API: Record<string, Handler> = {
   },
   '/api/config': (b) => engine.setConfig(b),
   '/api/compact': () => engine.compact(),
+  '/api/club-quads': (b) => engine.setClubQuads(b.quads),
   '/api/arm-measured': (b) => engine.setArmMeasured(b.text, b.ms),
   '/api/pilots-per-heat': (b) => engine.setPilotsPerHeat(Number(b.count)),
   '/api/slot-channel': (b) => engine.setSlotChannel(Number(b.slot), String(b.channel)),

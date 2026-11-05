@@ -918,3 +918,56 @@ test('end of the day: asks at 20:30, "still flying" holds it off an hour, no ans
   e.nightTick(T + 200 * 60_000, at + 300);
   assert.equal(e.night, null);
 });
+
+test('club quads: first free working one, its channel; when all are taken they get shared', () => {
+  const { e } = setup(0); // random 0: the first of equally used quads
+  e.setConfig({ heatCount: 1 });
+  e.setClubQuads([
+    { name: 'Club 1', channel: 'R1', broken: false },
+    { name: 'Club 2', channel: 'R2', broken: true },
+    { name: 'Club 3', channel: 'F2', broken: false },
+  ]);
+  const a = e.walkIn('Ann', undefined, true);
+  assert.equal(a.quad, 'Club 1');
+  assert.equal(e.channelOf(a.heat, a.slot), 'R1');
+  const b = e.walkIn('Bob', undefined, true);
+  assert.equal(b.quad, 'Club 3', 'Club 2 is broken: skipped');
+  assert.equal(e.channelOf(b.heat, b.slot), 'F2');
+  const c = e.walkIn('Cid', undefined, true);
+  assert.equal(c.quad, 'Club 1', 'all taken: shared');
+  assert.notEqual(c.heat, a.heat, 'never in the same heat as its quad-mate');
+  assert.equal(e.channelOf(c.heat, c.slot), 'R1');
+  assert.deepEqual(c.mates, [{ callsign: 'Ann', heat: a.heat }]);
+  const d = e.walkIn('Dee', undefined, true);
+  assert.equal(d.quad, 'Club 3', 'the least shared one next');
+  // Signing in again keeps the seat; with their own quad today, the club quad is let go.
+  assert.equal(e.walkIn('Ann', undefined, true).already, true);
+  e.walkIn('Dee');
+  assert.equal(e.pilots.get(d.pilot.id)!.quad, undefined);
+});
+
+test('club quad breaks: its pilots get another one and are told; none left: they wait', () => {
+  const { e, said } = setup(0);
+  const quads = [
+    { name: 'Club 1', channel: 'R1', broken: false },
+    { name: 'Club 2', channel: 'R2', broken: false },
+  ];
+  e.setClubQuads(quads);
+  const a = e.walkIn('Ann', undefined, true);  // Club 1
+  const b = e.walkIn('Bob', undefined, true);  // Club 2
+  const res = e.setClubQuads([{ ...quads[0], broken: true }, quads[1]]);
+  assert.equal(res.moved.length, 1);
+  assert.equal(e.pilots.get(a.pilot.id)!.quad, 'Club 2');
+  assert.notEqual(e.heats.findIndex((r) => r.includes(a.pilot.id)), e.heats.findIndex((r) => r.includes(b.pilot.id)));
+  assert.match(said().at(-1)!, /Club 1 is out of action\. Ann, check the big screen/);
+  // Renamed: the pilots follow. Channel changed: re-seated on it.
+  e.setClubQuads([{ ...quads[0], broken: true }, { name: 'Green one', channel: 'F4', broken: false }]);
+  assert.equal(e.pilots.get(b.pilot.id)!.quad, 'Green one');
+  const hb = e.heats.findIndex((r) => r.includes(b.pilot.id));
+  assert.equal(e.channelOf(hb, e.heats[hb].indexOf(b.pilot.id)), 'F4');
+  // Every club quad broken: they wait without a heat.
+  e.setClubQuads([{ ...quads[0], broken: true }, { name: 'Green one', channel: 'F4', broken: true }]);
+  assert.equal(e.heats.findIndex((r) => r.includes(a.pilot.id)), -1);
+  assert.throws(() => e.walkIn('Cid', undefined, true), /No club quad is working/);
+  assert.throws(() => e.setClubQuads([{ name: 'X', channel: 'R1' }, { name: 'x', channel: 'R2' }]), /own name/);
+});

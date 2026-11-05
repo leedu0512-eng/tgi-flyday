@@ -89,6 +89,20 @@ async function typeKeys(scope, text) {
     await k.click('[data-confirm-leave]');
     s = await state();
     check(!s.pilots.some((p) => p.id === ghost.id), 'Going home removes the pilot');
+
+    // "I don't have my own quad": a club quad, on its channel.
+    await k.click('[data-flow=join]');
+    await typeKeys(k, 'Kit');
+    await k.click('[data-club]');
+    check(await k.$eval('[data-club]', (e) => e.classList.contains('on')), 'club quad button ticks');
+    await k.click('[data-next]');
+    await k.waitForSelector('[data-snap], .done', { timeout: 5000 });
+    if (await k.$('[data-snap]')) { await k.click('[data-snap]'); await k.waitForSelector('[data-use]', { timeout: 6000 }); await k.click('[data-use]'); }
+    await k.waitForSelector('.done .big-msg', { timeout: 5000 });
+    check(/club quad/i.test(await k.textContent('.done')), 'done screen names the club quad');
+    s = await state();
+    check(!!s.pilots.find((p) => p.callsign === 'Kit')?.quad, 'Kit flies a club quad');
+    await k.click('[data-go=home]');
     await k.close();
 
     // ---- big screen: Sign in flyout with the on-screen keyboard ----
