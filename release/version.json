@@ -1,9 +1,9 @@
 {
- "version": "2026.11.05-1920",
+ "version": "2026.11.05-1926",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "57218f4b8051cd31f6d174cb76e9220e97e446777fedb6443d42625460cff503"
+   "sha256": "682d74a2870aabf928340bf2754b52b1148ce7c88c530eaea4e591254e50052d"
   },
   {
    "path": "web/assets/common.js",

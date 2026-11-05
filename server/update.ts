@@ -28,8 +28,13 @@ async function get(url: string, accept: string): Promise<Buffer> {
  * then fetched from that exact commit, so a half-cached mix of old and new can't happen.
  */
 export async function latest(): Promise<{ release: Release; commit: string }> {
-  const commit = (await get(`${API}/commits/main`, 'application/vnd.github.sha')).toString().trim();
-  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error('GitHub gave no commit.');
+  // GitHub allows 60 of these lookups an hour per internet address. If it says no, read
+  // straight from the main branch instead (may lag a few minutes; the sha256 checks catch a mix).
+  let commit = 'main';
+  try {
+    const sha = (await get(`${API}/commits/main`, 'application/vnd.github.sha')).toString().trim();
+    if (/^[0-9a-f]{40}$/.test(sha)) commit = sha;
+  } catch {}
   const release = JSON.parse((await get(`${RAW}/${commit}/release/version.json`, '*/*')).toString());
   if (typeof release?.version !== 'string' || !Array.isArray(release.files)) throw new Error('No release found in the repo.');
   return { release, commit };

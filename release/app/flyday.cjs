@@ -121,8 +121,12 @@ async function get(url, accept) {
   return Buffer.from(await res.arrayBuffer());
 }
 async function latest() {
-  const commit = (await get(`${API}/commits/main`, "application/vnd.github.sha")).toString().trim();
-  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error("GitHub gave no commit.");
+  let commit = "main";
+  try {
+    const sha = (await get(`${API}/commits/main`, "application/vnd.github.sha")).toString().trim();
+    if (/^[0-9a-f]{40}$/.test(sha)) commit = sha;
+  } catch {
+  }
   const release = JSON.parse((await get(`${RAW}/${commit}/release/version.json`, "*/*")).toString());
   if (typeof release?.version !== "string" || !Array.isArray(release.files)) throw new Error("No release found in the repo.");
   return { release, commit };
@@ -147,7 +151,7 @@ async function install(dir, release, commit) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-1920" : "dev";
+var VERSION = true ? "2026.11.05-1926" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
