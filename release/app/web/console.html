@@ -735,12 +735,32 @@ function renderPlaceBar() {
   const n = unseated.filter((p) => pickIds.has(p.id)).length;
   bar.innerHTML = `<span>${unseated.length} not in a heat</span>
     <button class="btn small" data-pickall>${n === unseated.length ? 'Untick all' : 'Tick all'}</button>
+    <button class="btn small" data-gone ${n ? '' : 'disabled'} title="Take the ticked pilots off the list: they've left">${n || ''} ticked gone home</button>
     <button class="btn small primary" data-place ${n ? '' : 'disabled'}>Put ${n || ''} ticked in heats</button>`;
 }
 $('placeBar').addEventListener('click', async (e) => {
   const unseated = state.pilots.filter((p) => !seatOf(p.id));
   if (e.target.closest('[data-pickall]')) {
     if (unseated.every((p) => pickIds.has(p.id))) pickIds.clear(); else unseated.forEach((p) => pickIds.add(p.id));
+    renderPilotsPanel(true);
+    return;
+  }
+  if (e.target.closest('[data-gone]')) {
+    // They've left: off the list, like Going home at the kiosk (photos stay remembered).
+    const gone = unseated.filter((p) => pickIds.has(p.id));
+    if (!gone.length) return;
+    for (const p of gone) { pickIds.delete(p.id); openPilotIds.delete(p.id); await act('/api/leave', { pilotId: p.id }); }
+    const names = gone.map((p) => NAME(p.callsign)).join(', ');
+    toast(`${names} went home.`, true, { label: 'Undo', run: async () => {
+      for (const p of gone) {
+        const back = await act('/api/pilot/add', { callsign: p.callsign });
+        if (!back) continue;
+        await act('/api/pilot/update', { id: back.id, spokenName: p.spokenName, ...(p.quad ? { quad: p.quad } : {}) });
+        pickIds.add(back.id);
+      }
+      toast(`${names} back on the list.`, true);
+      renderPilotsPanel(true);
+    } });
     renderPilotsPanel(true);
     return;
   }
