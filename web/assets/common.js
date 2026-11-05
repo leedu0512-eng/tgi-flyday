@@ -428,6 +428,7 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
     `<a href="${href}" class="${href === here ? 'on' : ''}">${label}</a>`).join('')}
       <button class="vp-restart">↻ Restart · check for updates</button>
       <span class="vp-version"></span></div>
+    <span class="vp-ver"></span>
     <button class="vp-btn" aria-label="Change view" title="Change view">
       <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6"/><rect x="9" y="1" width="6" height="6"/><rect x="1" y="9" width="6" height="6"/><rect x="9" y="9" width="6" height="6"/></svg>
     </button>`;
@@ -443,6 +444,8 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
   box.querySelector('.vp-restart').addEventListener('click', (e) => { e.stopPropagation(); close(); restart(); });
   document.addEventListener('click', (e) => { if (!box.contains(e.target)) close(); });
   document.body.appendChild(box);
+  // The running version, small and faint next to the picker.
+  fetch('/api/info').then((r) => r.json()).then((i) => { if (i.version) box.querySelector('.vp-ver').textContent = /^\d/.test(i.version) ? `v${i.version}` : i.version; }).catch(() => {});
 })();
 
 /**
