@@ -95,7 +95,7 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 
 **Kiosk.** Three buttons: **Fly today**, **Change channel**, **Going home**.
 - *Fly today:* type your name, that's all. FlyDay puts you in the first heat to fly that has a free seat, on your usual channel (the one you flew last time) when that heat has it free, and adds a new heat when every heat is full. The screen says your heat, your channel and how many heats are before yours.
-- *Change channel:* tap your name, tap the channel you want; you move to the soonest heat where it's free. **Pick a slot myself** shows the full heat board.
+- *Change channel:* tap your name, then a free slot on the heat board (your current seat is outlined).
 - *Going home:* tap your name; you're off the session and the Pilots list (your photo and usual channel are remembered, in `data/photos/known/` and `data/known.json`).
 
 **Pilot photos.** Pilots take their own at the kiosk: after signing in, the kiosk's webcam shows them, they tap **Take photo** (3, 2, 1) and **Use this photo**, or **Skip**. Photos are remembered by pilot name, also after the pilot is removed or leaves: next time they sign in, the kiosk shows the photo and asks **Is this you?** (**Yes, that's me** or **No, take a new photo**). Pilots added in the console or on the phone get their remembered photo by themselves. You can also add or change one in the Pilots panel (console) or the Pilots tab (phone); **Remove photo** forgets it for good. Photos are saved in `data/photos/` (remembered ones in `data/photos/known/`). A pilot with a photo gets it on their plate on the big screen.

@@ -149,49 +149,7 @@ function seatOf(pilotId) {
   return null;
 }
 
-/** Every channel flown today, each with the free seat that flies soonest (or none). */
-function channelChoices(pilotId) {
-  const order = heatOrder();
-  const byCh = new Map();
-  for (const h of state.heats) h.slots.forEach((s, i) => {
-    if (!byCh.has(s.channel)) byCh.set(s.channel, { channel: s.channel, color: SLOT_COLORS[i], best: null, rank: Infinity });
-    if (s.pilotId) return;
-    const c = byCh.get(s.channel);
-    const rank = order.indexOf(h.index);
-    if (rank < c.rank) { c.rank = rank; c.best = { heat: h.index, slot: i }; c.color = SLOT_COLORS[i]; }
-  });
-  return [...byCh.values()];
-}
-
 const pilotNamed = (n) => state.pilots.find((p) => p.callsign.toLowerCase() === n.trim().toLowerCase());
-
-function channelView() {
-  const who = flow === 'move' ? mover : pilotNamed(name);
-  const seat = who ? seatOf(who.id) : null;
-  const choices = channelChoices(who?.id);
-  const callsign = who?.callsign ?? name;
-  return `<button class="btn back" data-go="${flow === 'move' ? 'move' : 'name'}">← Back</button>
-    <h1>${esc(NAME(callsign))}, what channel is your quad on?</h1>
-    ${seat ? `<p class="hint ch-now">You're in heat ${seat.heat + 1} on <b>${esc(seat.channel)}</b>. Tap another channel to move.</p>` : ''}
-    <div class="ch-grid">${choices.map((c) => {
-      const mine = seat?.channel === c.channel;
-      const tag = mine ? "You're on this" : usual === c.channel ? 'Your usual' : '';
-      const ahead = c.best ? heatsBefore(c.best.heat, who?.id) : 0;
-      const where = mine ? `Heat ${seat.heat + 1}<small>your seat</small>`
-        : c.best ? `Heat ${c.best.heat + 1}<small>${ahead === 0 ? 'next up' : `${ahead} heat${ahead === 1 ? '' : 's'} before`}</small>`
-        : 'Full<small>no free seat</small>';
-      const ok = mine || c.best;
-      return `<button class="chbtn ${tag ? 'mark' : ''}" ${ok ? `data-ch="${esc(c.channel)}"` : 'disabled'}>
-        <span class="chip" style="background:${c.color}">${esc(c.channel)}</span>
-        <span class="where">${where}</span>${tag ? `<em>${tag}</em>` : ''}
-      </button>`;
-    }).join('')}</div>
-    <div class="checkin">
-      <span>Your channel isn't here? Switch your quad to one of these.</span>
-      <button class="btn" data-go="slot">Pick a slot myself</button>
-      ${flow === 'join' && !seat ? '<button class="btn" data-checkin>Sign in without a heat</button>' : ''}
-    </div>`;
-}
 
 /** Change channel: tap your name first. */
 function moveView() {
@@ -211,7 +169,7 @@ function slotView() {
   const checkin = free
     ? `<div class="checkin"><span>No slot that suits you?</span><button class="btn" data-checkin>Sign in without a heat</button></div>`
     : `<div class="checkin full"><span>All heats are full. Sign in and the race director will find you a place.</span><button class="big primary" data-checkin>Sign me in</button></div>`;
-  return `<button class="btn back" data-go="channel">← Back</button>
+  return `<button class="btn back" data-go="${flow === 'move' ? 'move' : 'home'}">← Back</button>
     <h1>${esc(NAME(flow === 'move' ? mover.callsign : name))}, ${free ? 'pick a free slot' : 'every heat is full'}</h1>
     ${free || flow === 'move' ? '' : checkin}
     ${board(true)}
@@ -229,8 +187,9 @@ function board(pickable) {
       ${h.slots.map((s, i) => {
         const p = s.pilotId ? pm.get(s.pilotId) : null;
         const free = !p;
+        const mine = pickable && flow === 'move' && p && p.id === mover?.id;
         const attrs = pickable && free ? `data-heat="${h.index}" data-slot="${i}"` : 'disabled';
-        return `<button class="slotbtn ${free ? 'free' : 'taken'}" ${attrs}>
+        return `<button class="slotbtn ${free ? 'free' : 'taken'} ${mine ? 'mine' : ''}" ${attrs}>
           <span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</span>
           <span>${p ? esc(NAME(p.callsign)) : 'Free'}</span>
         </button>`;
@@ -364,7 +323,7 @@ function finish() {
 function render() {
   if (!state) return;
   const v = $('view');
-  v.innerHTML = { home: homeView, name: nameView, channel: channelView, move: moveView, slot: slotView, leave: leaveView, done: doneView, isyou: isYouView, camera: cameraView }[view]();
+  v.innerHTML = { home: homeView, name: nameView, move: moveView, slot: slotView, leave: leaveView, done: doneView, isyou: isYouView, camera: cameraView }[view]();
   if (view === 'camera' && !shot) startCamera();
   if (view === 'name') {
     const input = $('nameInput');
@@ -443,39 +402,8 @@ $('view').addEventListener('click', async (e) => {
   if (t.dataset.flow) { flow = t.dataset.flow; name = ''; mover = null; usual = null; return go(flow === 'move' ? 'move' : 'name'); }
   if (t.dataset.mover) {
     mover = state.pilots.find((p) => p.id === t.dataset.mover);
-    usual = null;
-    if (mover) try { usual = (await (await fetch(`/api/known?name=${encodeURIComponent(mover.callsign)}`)).json()).channel ?? null; } catch {}
-    return go('channel');
+    return go('slot');
   }
-  if (t.dataset.ch !== undefined) {
-    const who = flow === 'move' ? mover : pilotNamed(name);
-    const cur = who && seatOf(who.id);
-    if (cur && cur.channel === t.dataset.ch) {
-      // Staying put.
-      const msg = { title: `Heat ${cur.heat + 1} · ${esc(cur.channel)}`, text: `${esc(NAME(who.callsign))}, you're already on <b>${esc(cur.channel)}</b>.<br>${whenText(cur.heat, who.id)}` };
-      if (flow === 'move') { doneMsg = msg; mover = null; return finish(); }
-      return signedIn(who, msg);
-    }
-    const c = channelChoices(who?.id).find((x) => x.channel === t.dataset.ch);
-    if (!c?.best) return toast('That channel just filled up. Pick another one.');
-    try { await seat(c.best.heat, c.best.slot); } catch (err) { toast(err.message); }
-    return;
-  }
-  if (t.hasAttribute('data-shift')) { shiftManual = !shiftOn(); return updateKeys(); }
-  if (t.dataset.key !== undefined) {
-    const k = t.dataset.key;
-    const ch = /^[A-Z]$/.test(k) && !shiftOn() ? k.toLowerCase() : k;
-    name = k === '⌫' ? name.slice(0, -1) : (name + ch).slice(0, 24);
-    shiftManual = null;
-    const input = $('nameInput');
-    input.value = name;
-    input.focus();
-    refreshSuggestions();
-    updateKeys();
-    return;
-  }
-  if (t.dataset.pick !== undefined) { name = t.dataset.pick; return toSlots(); }
-  if (t.hasAttribute('data-next')) return toSlots();
   if (t.dataset.heat !== undefined) {
     try { await seat(Number(t.dataset.heat), Number(t.dataset.slot)); } catch (err) { toast(err.message); }
     return;

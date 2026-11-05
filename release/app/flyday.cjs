@@ -151,7 +151,7 @@ async function install(dir, release, commit) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2004" : "dev";
+var VERSION = true ? "2026.11.05-2011" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {

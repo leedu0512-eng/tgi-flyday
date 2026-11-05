@@ -598,3 +598,4 @@ body.embedded .kiosk .keyboard { gap: 7px; }
 body.embedded .kiosk .keyboard .krow { gap: 6px; }
 body.embedded .kiosk .keyboard button { width: calc((100% - 54px) / 10); height: 64px; font-size: 24px; padding: 0; }
 body.embedded .kiosk .keyboard .krow:last-child button { flex: 1 1 0; width: auto; font-size: 18px; }
+.kiosk .slotbtn.mine { border: 2px solid var(--accent); opacity: 1; }
