@@ -47,6 +47,12 @@ const WORD = {
   paused: 'Paused',
 };
 
+/** A little club quad mark before the name of a pilot flying one of the club's quads. */
+function clubMark(p) {
+  const q = (state.config.clubQuads ?? []).find((c) => c.name.toLowerCase() === p.quad?.toLowerCase());
+  return q ? `<i class="club-q" title="Club quad ${esc(q.name)}"></i>` : '';
+}
+
 function plates(heat, pm) {
   // Only the pilots who fly: empty slots aren't shown.
   return `<div class="plates">${heat.slots.map((s, i) => {
@@ -58,7 +64,7 @@ function plates(heat, pm) {
     const img = face.src;
     return `<div class="plate ${img ? 'photo' : ''} ${face.avatar ? 'avatar' : ''}" style="${c}">
       ${img ? `<img src="${img}" alt="" ${face.avatar ? 'class="avatar"' : ''}>` : ''}
-      <span class="ch">${esc(s.channel)}${timerMark(state, i)}</span><span class="nm">${esc(NAME(p.callsign))}</span>
+      <span class="ch">${esc(s.channel)}${timerMark(state, i)}</span><span class="nm">${clubMark(p)}${esc(NAME(p.callsign))}</span>
     </div>`;
   }).join('')}</div>`;
 }
@@ -241,7 +247,7 @@ function renderNext(pm) {
   if (!pilots.length) { $('next').innerHTML = ''; return; }
   $('next').innerHTML = `
     <div class="tag"><span>GET READY</span><b>${n.index === c.heat ? 'SAME HEAT' : `HEAT ${n.index + 1}`}</b></div>
-    <div class="list">${pilots.map((x) => `<div class="who"><span>${esc(x.ch)}${timerMark(state, x.i)}</span><b>${esc(NAME(x.p.callsign))}</b></div>`).join('')}</div>`;
+    <div class="list">${pilots.map((x) => `<div class="who"><span>${esc(x.ch)}${timerMark(state, x.i)}</span><b>${clubMark(x.p)}${esc(NAME(x.p.callsign))}</b></div>`).join('')}</div>`;
 }
 
 function tick() {
