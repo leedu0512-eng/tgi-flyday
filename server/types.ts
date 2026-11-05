@@ -16,6 +16,8 @@ export interface Config {
   dropAfterMissed: number;
   /** When only one heat has pilots, stop running timed heats and let it fly freely. */
   freeFlight: boolean;
+  /** The first sign-in while the session is stopped starts it (in free flight with one heat). */
+  autoStart: boolean;
   /** Lap timer (RotorHazard) on the venue network. */
   timer: TimerConfig;
   /** Which callouts the voice makes, and when. */
@@ -93,8 +95,12 @@ export interface CalloutTexts {
   timeUp: string;
   /** Free flight starts: only one heat has pilots left. {heat} */
   freeFlight: string;
-  /** Free flight ends because another heat has pilots again. */
+  /** Free flight ends (switched off). */
   freeFlightEnd: string;
+  /** The first sign-in started the session, straight into free flight. {heat} */
+  freeFlightOpen: string;
+  /** Free flight ends because another heat has pilots: what happens now. {heats} {next} */
+  heatsForm: string;
   /** Each lap with a timer. {name} {lap} {laptime} */
   gatePass: string;
   paused: string;
@@ -175,6 +181,7 @@ export const DEFAULT_CONFIG: Config = {
   armMaxMs: 4000,
   dropAfterMissed: 2,
   freeFlight: true,
+  autoStart: true,
   timer: { enabled: false, host: '', user: 'admin', password: 'rotorhazard' },
   callouts: {
     sessionStartStop: true,
@@ -201,6 +208,8 @@ export const DEFAULT_CONFIG: Config = {
       timeUp: 'Time.',
       freeFlight: 'Free flight. Only heat {heat} is left, fly as you like.',
       freeFlightEnd: 'Free flight is over. Please land.',
+      freeFlightOpen: 'Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.',
+      heatsForm: 'More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.',
       gatePass: '{name}, {laptime}',
       paused: 'Paused.',
       resumed: 'Resumed.',

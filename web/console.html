@@ -49,6 +49,7 @@
           <div class="field wide"><label>Channels in every heat</label>
             <div id="slotChannels" class="slot-channels"></div></div>
           <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
+          <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
           <div class="wide presets">
             <button class="btn small" data-preset="R1 R2 F2 F4 R7 R8">IMD6C · 6 pilots</button>
             <button class="btn small" data-preset="R1 R2 R3 R4 R5 R6 R7 R8">Raceband · 8 pilots</button>
@@ -189,7 +190,7 @@ const CALLOUTS = [
   { key: 'finalBeeps', label: 'Countdown beeps on the last 4 seconds of a heat, then the end BEEP' },
   { key: 'timeUp', label: 'After the end BEEP', texts: [['timeUp', '']] },
   { key: 'pauseResume', label: 'Pause and resume', texts: [['paused', 'When paused'], ['resumed', 'When resumed']] },
-  { key: 'freeFlight', label: 'Free flight starts and ends', texts: [['freeFlight', 'When it starts'], ['freeFlightEnd', 'When it ends']] },
+  { key: 'freeFlight', label: 'Free flight starts and ends', texts: [['freeFlightOpen', 'First sign-in starts practice'], ['freeFlight', 'When only one heat is left'], ['heatsForm', 'When a second heat forms. {heats} {next}'], ['freeFlightEnd', 'When it is switched off']] },
 ];
 
 /** Same filling as the server, for the Hear buttons. */
@@ -410,6 +411,7 @@ function renderSetup() {
   if (document.activeElement !== $('heatCount')) $('heatCount').value = cfg.heatCount;
   if (document.activeElement !== $('perHeat')) $('perHeat').value = cfg.channels.length;
   $('freeFlight').checked = cfg.freeFlight;
+  $('autoStart').checked = cfg.autoStart !== false;
   const box = $('slotChannels');
   if (!box.contains(document.activeElement)) {
     box.innerHTML = cfg.channels.map((ch, i) =>
@@ -420,6 +422,7 @@ for (const id of ['heatSeconds', 'changeoverSeconds']) {
   $(id).onchange = (e) => act('/api/config', { [id]: Number(e.target.value) });
 }
 $('freeFlight').onchange = (e) => act('/api/config', { freeFlight: e.target.checked });
+$('autoStart').onchange = (e) => act('/api/config', { autoStart: e.target.checked });
 $('heatCount').onchange = (e) => act('/api/config', { heatCount: Number(e.target.value) }).then(() => renderSetup());
 const placedNote = (res) => res?.placed?.length ? ' ' + res.placed.map((x) => `${NAME(x.pilot.callsign)} moved to heat ${x.heat + 1} ${x.channel}`).join(' · ') : '';
 $('perHeat').onchange = async (e) => {

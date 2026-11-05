@@ -430,7 +430,7 @@ test('free flight: one heat left keeps flying with no timer, until another heat 
   run(e, t, 200);
   assert.equal(e.clock.phase, 'changeover');
   assert.equal(e.clock.heat, 1);
-  assert.ok(said().includes('Free flight is over. Please land.'));
+  assert.ok(said().some((t) => /there are 2 heats now\. Free flight is over, please land\. Heat 2 is up next/.test(t)));
 });
 
 test('free flight from the start when only one heat has pilots; off means timed heats', () => {
@@ -703,4 +703,40 @@ test('walk-in: first heat with room, usual channel if free there, a new heat whe
   // Walking in again keeps the seat.
   const again = e.walkIn('first');
   assert.deepEqual([again.heat, again.slot, again.already], [0, 0, true]);
+});
+
+test('first sign-in starts the session straight into free flight; a second heat is announced', () => {
+  const { e, said } = setup();
+  e.setConfig({ freeFlight: true });
+  e.walkIn('First');
+  e.tick(1000);
+  assert.equal(e.clock.phase, 'freeflight');
+  assert.match(said().at(-1)!, /Practice is on\. Free flight in heat 1/);
+  // A full heat 1, then one more pilot: a second heat forms and free flight ends, out loud.
+  for (let i = 1; i < e.config.channels.length; i++) e.walkIn(`P${i}`);
+  e.tick(2000);
+  assert.equal(e.clock.phase, 'freeflight');
+  e.walkIn('Seventh');
+  e.tick(3000);
+  assert.equal(e.clock.phase, 'changeover');
+  assert.equal(e.clock.heat, 1);
+  assert.ok(said().some((t) => /there are 2 heats now\. Free flight is over, please land\. Heat 2 is up next/.test(t)));
+});
+
+test('after Stop, the session stays stopped until someone new signs in; autoStart off never starts it', () => {
+  const { e } = setup();
+  e.setConfig({ freeFlight: true });
+  e.walkIn('A');
+  e.tick(1000);
+  e.action('stop', 2000);
+  e.tick(3000);
+  assert.equal(e.clock.phase, 'stopped');
+  e.walkIn('B');
+  e.tick(4000);
+  assert.equal(e.clock.phase, 'freeflight');
+  e.action('stop', 5000);
+  e.setConfig({ autoStart: false });
+  e.walkIn('C');
+  e.tick(6000);
+  assert.equal(e.clock.phase, 'stopped');
 });

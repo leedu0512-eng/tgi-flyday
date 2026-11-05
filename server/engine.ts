@@ -117,6 +117,7 @@ export class Engine {
   config: Config;
   pilots = new Map<string, Pilot>();
   heats: (string | null)[][] = [];
+  private autoStartPending = false;
   clock: ClockState = {
     phase: 'stopped',
     heat: 0,
@@ -250,6 +251,11 @@ export class Engine {
     const c = this.clock;
     // Laps of the last heat can no longer finish: stop the timer (whatever phase we're in).
     if (this.live?.endAt != null && now >= this.live.endAt + FINISH_WINDOW_MS) this.closeTiming(true);
+    // Someone signed in while the session was stopped: start it.
+    if (this.autoStartPending) {
+      this.autoStartPending = false;
+      if (c.phase === 'stopped' && this.config.autoStart && this.heatsInUse() > 0) return this.autoStart(now);
+    }
     if (c.phase === 'waiting') {
       // Someone joined: carry on with the first heat that has pilots.
       if (!c.paused && this.nextHeat(c.heat) >= 0) this.enterChangeover(now, this.nextHeat(c.heat));
@@ -258,7 +264,13 @@ export class Engine {
     if (c.phase === 'freeflight') {
       // Another heat has pilots again (or this one emptied, or free flight was switched off): back to the loop.
       if (this.heatIsEmpty(c.heat) || this.heatsInUse() > 1 || !this.config.freeFlight) {
-        if (this.config.callouts.freeFlight && !this.heatIsEmpty(c.heat)) this.say(this.config.callouts.texts.freeFlightEnd);
+        const co = this.config.callouts;
+        // More heats formed: say what happens now. Switched off: just land.
+        if (co.freeFlight && !this.heatIsEmpty(c.heat)) {
+          this.say(this.heatsInUse() > 1
+            ? fillText(co.texts.heatsForm, { heats: this.heatsInUse(), next: this.nextHeat(c.heat + 1) + 1 })
+            : co.texts.freeFlightEnd);
+        }
         this.clock.heatsRun++;
         this.endTiming(now);
         this.goToNextHeat(now, c.heat + 1);
@@ -397,6 +409,28 @@ export class Engine {
     this.tone('start');
     if (this.onlyHeatLeft(this.clock.heat)) this.enterFreeFlight(now);
     else this.setPhase('running', now + this.config.heatSeconds * 1000);
+  }
+
+  /**
+   * Started by the first sign-in: with one heat of pilots (and free flight on) straight into
+   * free flight, no changeover or start sequence; otherwise the usual start.
+   */
+  private autoStart(now: number) {
+    const c = this.clock;
+    if (!(this.config.freeFlight && this.heatsInUse() === 1)) return this.action('start', now);
+    c.round = 1;
+    c.heatsRun = 0;
+    c.startedAt = now;
+    c.heat = this.nextHeat(0);
+    this.setPhase('freeflight', null);
+    c.freeSince = now;
+    const co = this.config.callouts;
+    if (co.sessionStartStop || co.freeFlight) this.say(fillText(co.texts.freeFlightOpen, { heat: c.heat + 1 }));
+  }
+
+  /** A pilot got a seat: if the session is stopped, the next tick starts it (when autoStart is on). */
+  private signedIn() {
+    if (this.clock.phase === 'stopped') this.autoStartPending = true;
   }
 
   /** Free flight: the one heat with pilots keeps flying, no heat timer, until another heat gets pilots. */
@@ -692,6 +726,7 @@ export class Engine {
     this.removeFromSlots(pilot.id);
     this.heats[heat][slot] = pilot.id;
     this.missed.set(pilot.id, 0);
+    this.signedIn();
     this.onChange();
     return pilot;
   }
@@ -707,8 +742,12 @@ export class Engine {
       const s = this.heats[h].indexOf(pilot.id);
       if (s >= 0) { this.onChange(); return { pilot, heat: h, slot: s, added: false, already: true }; }
     }
-    // The heat up next first, the one flying now last.
-    let heat = this.loopOrder().find((h) => this.slotAny(pilot, h) >= 0);
+    // The heat up next first, the one flying now last. In free flight the flying heat
+    // fills up first: only a full heat makes a second one (and ends free flight).
+    const order = this.clock.phase === 'freeflight'
+      ? [this.clock.heat, ...this.loopOrder().filter((h) => h !== this.clock.heat)]
+      : this.loopOrder();
+    let heat = order.find((h) => this.slotAny(pilot, h) >= 0);
     const added = heat === undefined;
     if (heat === undefined) heat = this.addHeat();
     if (heat === undefined) {
@@ -719,6 +758,7 @@ export class Engine {
     let slot = usual ? this.heats[h].findIndex((id, i) => id === null && this.channelOf(h, i) === usual) : -1;
     if (slot < 0) slot = this.slotAny(pilot, h);
     this.seat(pilot, h, slot);
+    this.signedIn();
     this.onChange();
     return { pilot, heat: h, slot, added, already: false };
   }
@@ -904,6 +944,7 @@ export class Engine {
       if (h === undefined) { unplaced.push(p); continue; }
       done(p, h, this.slotAny(p, h));
     }
+    if (placed.length) this.signedIn();
     this.onChange();
     return { placed, unplaced, addedHeats: this.config.heatCount - heatsBefore };
   }
@@ -1115,6 +1156,7 @@ export class Engine {
     }
     if (patch.channels !== undefined) this.checkChannels(patch.channels);
     if (patch.freeFlight !== undefined) next.freeFlight = Boolean(patch.freeFlight);
+    if (patch.autoStart !== undefined) next.autoStart = Boolean(patch.autoStart);
     if (patch.timer !== undefined) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.callouts !== undefined) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== undefined) next.sound = cleanSound(patch.sound, next.sound);

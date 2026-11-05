@@ -45,7 +45,7 @@ The folder version (start.bat) keeps working as before, with screens updating by
 
 **Linux kiosk (with a webcam for photos):** copy **kiosk.sh** to it, open it in a text editor and set `RDPC=` to the RD PC's address (the number shown in the RD console under **Kiosk on another PC**). Run `bash kiosk.sh`. It opens Chromium or Chrome (or Firefox) full screen with its own profile that lets the kiosk page use the webcam without asking: browsers block cameras on plain `http` pages unless told otherwise, so open the kiosk this way rather than typing the address into a browser. Close it with Alt+F4. To start it with the PC, add `bash /path/to/kiosk.sh` to the desktop's startup applications.
 
-**Big screen and kiosk on one PC:** the big screen has a **Sign in / Leave** button at the top. It opens the kiosk in a panel over the board, webcam included, and the panel closes by itself when the pilot is done (or with ✕). On that PC set `PAGE=screen` in kiosk.sh. To hide the button on a big screen nobody can touch, open it as `/screen?nosignin`.
+**Big screen and kiosk on one PC:** the big screen has a **Sign in** button at the top. The kiosk slides in from the right as a flyout (webcam included) with the board still in view beside it, and slides away by itself when the pilot is done (or with ✕, or a tap on the board). On that PC set `PAGE=screen` in kiosk.sh. To hide the button on a big screen nobody can touch, open it as `/screen?nosignin`.
 
 **Windows kiosk:**
 
@@ -90,6 +90,8 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 **Channels.** *Pilots per heat* sets how many slots each heat has. *Channels in every heat* has one picker per slot: changing one swaps that channel in every heat. To change a channel in one heat only, click the channel chip on that heat's card; a dashed outline marks a heat's own channel.
 
 **Look.** Black, bright orange and white (the HOBIzone colours), with a pit-board spectator screen: big stencil planks for the heat and the clock, white race plates for the line-up, and the next heat on the orange board. Fonts are bundled, so it works offline.
+
+**Starts by itself.** The first pilot to sign in while practice is stopped starts it, straight into free flight ("Practice is on. Free flight in heat 1…"). When a second heat forms, FlyDay says so: how many heats there are now, free flight is over, which heat is up next. After **Stop** it stays stopped until the next new sign-in. Switch it off in the console: **Start by itself**.
 
 **Kiosk.** Three buttons: **Fly today**, **Change channel**, **Going home**.
 - *Fly today:* type your name, that's all. FlyDay puts you in the first heat to fly that has a free seat, on your usual channel (the one you flew last time) when that heat has it free, and adds a new heat when every heat is full. The screen says your heat, your channel and how many heats are before yours.
