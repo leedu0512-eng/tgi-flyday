@@ -127,8 +127,8 @@ function render() {
   const screen = $('screen');
   screen.classList.toggle('pay-view', view === 'pay');
   $('wmWord').textContent = view === 'pay' ? 'Track' : 'Fly';
-  // A car day with no drone practice: no drone bits in the header.
-  screen.classList.toggle('car-day', view === 'pay' && (c.phase === 'stopped' || c.phase === 'waiting'));
+  // TrackDay is for the RC cars: no drone bits in the header (sign in, the phone QR).
+  screen.classList.toggle('car-day', view === 'pay');
   document.title = view === 'pay' ? 'TGI TrackDay' : 'TGI FlyDay · Spectator view';
   $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}`;
 
