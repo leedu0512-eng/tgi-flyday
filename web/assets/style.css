@@ -591,6 +591,15 @@ body.embedded .kiosk .view { padding-top: 24px; }
 .restart-cover { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.88); display: grid; place-items: center; color: #fff; text-align: center; font-family: var(--font); }
 .restart-cover b { display: block; font-family: var(--display); font-size: 48px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.03em; }
 .restart-cover span { display: block; margin-top: 10px; font-size: 20px; color: #aaa; }
+.restart-cover .rc-box { width: min(560px, 86vw); }
+.restart-cover .rc-bar { position: relative; height: 10px; margin: 26px 0 0; border-radius: 999px; background: #222; overflow: hidden; }
+.restart-cover .rc-bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--accent); transition: width .3s ease-out;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 100%); background-size: 120px 100%; background-repeat: no-repeat;
+  animation: rc-sheen 1.4s linear infinite; background-color: var(--accent); }
+@keyframes rc-sheen { from { background-position: -120px 0; } to { background-position: 600px 0; } }
+.restart-cover .rc-step { margin-top: 12px; font-size: 15px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.2em; }
+.restart-cover .rc-line:empty { display: none; }
+.restart-cover.failed .rc-bar i { background-color: var(--danger); animation: none; }
 /* The kiosk in the big screen's flyout: one column, no heat board (the big screen shows it). */
 body.embedded .kiosk .big-actions.three { grid-template-columns: 1fr; max-width: none; margin-top: 56px; gap: 16px; }
 body.embedded .kiosk .big-actions .big { min-height: 0; padding: 30px 24px; }
@@ -759,13 +768,21 @@ img.avatar { filter: brightness(0.55) saturate(0.8); }
 
 /* Big screen, second view (tap the logo): the clock stays, the plates make way for a QR card. */
 #viewToggle { cursor: pointer; }
-.pay-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; justify-items: center; align-items: center; gap: calc(1.4 * var(--u));
-  background: #fff; color: #000; padding: calc(2.6 * var(--u)) calc(2 * var(--uw)); min-height: 0; border-top: calc(1 * var(--u)) solid var(--accent); }
-.pay-card h2 { margin: 0; font-family: var(--display); font-weight: 900; text-transform: uppercase; text-align: center; line-height: 1; font-size: calc(5.6 * var(--u)); letter-spacing: 0.01em; }
-.pay-card .pay-qr { height: 100%; aspect-ratio: 1; min-height: 0; }
+.pay-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; justify-items: center; align-items: center; gap: calc(2.4 * var(--u));
+  background: #fff; color: #000; padding: calc(4.4 * var(--u)) calc(3.6 * var(--uw)) calc(3.8 * var(--u)); min-height: 0; border-top: calc(1 * var(--u)) solid var(--accent); }
+.pay-card h2 { margin: 0; font-family: var(--display); font-weight: 900; text-transform: uppercase; text-align: center; line-height: 1.04; font-size: calc(4.6 * var(--u)); letter-spacing: 0.01em; max-width: 100%; text-wrap: balance; }
+.pay-card .pay-qr { height: 82%; aspect-ratio: 1; min-height: 0; }
 .pay-card .pay-qr svg { width: 100%; height: 100%; display: block; }
-.pay-card .pay-price { margin: 0; font-family: var(--stencil); font-weight: 900; font-size: calc(7 * var(--u)); line-height: 1; color: var(--accent); text-transform: uppercase; }
-.pay-card .pay-cta { margin: 0; font-family: var(--display); font-weight: 800; font-size: calc(2.6 * var(--u)); letter-spacing: 0.14em; text-transform: uppercase; color: #555; }
+.pay-card .pay-price { margin: 0; font-family: var(--stencil); font-weight: 900; font-size: calc(5.4 * var(--u)); line-height: 1; color: var(--accent); text-transform: uppercase; text-align: center; }
+.pay-card .pay-cta { margin: 0; font-family: var(--display); font-weight: 800; font-size: calc(2.4 * var(--u)); letter-spacing: 0.14em; text-transform: uppercase; color: #555; }
+.pay-card.join { border-top-color: var(--running); }
+.pay-card.join .pay-price { color: #16a34a; }
+/* The TrackDay panel flips in 3D between its cards. */
+.card-flip { perspective: 2400px; min-height: 0; display: grid; }
+.card-flip .card-inner { position: relative; display: grid; transform-style: preserve-3d; transition: transform 1.1s cubic-bezier(.6, 0, .25, 1); min-height: 0; }
+.card-flip.flipped .card-inner { transform: rotateY(180deg); }
+.card-flip .face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.card-flip .face.back { transform: rotateY(180deg); }
 .pb-main > .pb-idle .logo { font-size: calc(9 * var(--u)); }
 .td-board .td-name { justify-content: center; }
 .td-board .td-name .logo { font-size: calc(5.4 * var(--u)); }

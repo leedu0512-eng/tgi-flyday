@@ -456,26 +456,59 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
 async function restart() {
   const cover = document.createElement('div');
   cover.className = 'restart-cover';
-  cover.innerHTML = '<div><b>Checking for updates…</b><span></span></div>';
+  cover.innerHTML = `<div class="rc-box"><b>Checking for updates…</b>
+    <div class="rc-bar"><i></i></div><span class="rc-step"></span><span class="rc-line"></span></div>`;
   document.body.appendChild(cover);
-  const say = (title, line = '') => { cover.querySelector('b').textContent = title; cover.querySelector('span').textContent = line; };
+  const say = (title, line = '') => { cover.querySelector('b').textContent = title; cover.querySelector('.rc-line').textContent = line; };
+  const fill = cover.querySelector('.rc-bar i');
+  let shown = 0;
+  /** The bar only moves forward. */
+  const bar = (pct, step = '') => {
+    shown = Math.max(shown, Math.min(100, pct));
+    fill.style.width = `${shown}%`;
+    cover.querySelector('.rc-step').textContent = step;
+  };
+  bar(3);
+  // While the server works, follow it: checking 0–10 %, downloading 10–85 %, restarting 85–100 %.
+  let following = true;
+  (async () => {
+    while (following) {
+      try {
+        const p = await (await fetch('/api/update/progress', { cache: 'no-store' })).json();
+        if (p.stage === 'check') bar(Math.min(10, shown + 1), 'Looking on GitHub');
+        else if (p.stage === 'download' && p.total) {
+          say(`Updating to ${p.to}`);
+          bar(10 + 75 * (p.done / p.total), `Downloading ${p.done} of ${p.total} files`);
+        }
+      } catch {}
+      await new Promise((ok) => setTimeout(ok, 200));
+    }
+  })();
   let r = null;
   try {
     const res = await fetch('/api/update', { method: 'POST', body: '{}', signal: AbortSignal.timeout(90_000) });
     r = (await res.json()).result;
   } catch {}
+  following = false;
   if (r?.status === 'updated') {
     say(`Updating to ${r.version}`, 'Back in a few seconds.');
-    // Wait until FlyDay answers again, then reload.
+    bar(85, 'Restarting FlyDay');
+    // Wait until FlyDay answers again (creeping on towards 98 %), then fill up and reload.
+    const creep = setInterval(() => bar(shown + (98 - shown) * 0.08, 'Restarting FlyDay'), 250);
     await new Promise((ok) => setTimeout(ok, 3000));
     for (let i = 0; i < 60; i++) {
       try { if ((await fetch('/api/info', { cache: 'no-store' })).ok) break; } catch {}
       await new Promise((ok) => setTimeout(ok, 1000));
     }
+    clearInterval(creep);
+    bar(100, 'Done');
+    await new Promise((ok) => setTimeout(ok, 400));
     return location.reload();
   }
   // Say why, so a problem can be reported: no internet, or something on this PC.
-  say('Restarting', r?.status === 'current' ? `Up to date (${r.version}).`
+  if (r?.status === 'offline') { cover.classList.add('failed'); bar(100, ''); }
+  else bar(100, 'Restarting');
+  say(r?.status === 'offline' ? 'No update' : 'Restarting', r?.status === 'current' ? `Up to date (${r.version}).`
     : r?.status === 'offline' ? `No update installed: ${r.error || 'no answer from GitHub'}`
     : r ? '' : 'FlyDay on the RD PC did not answer.');
   setTimeout(() => location.reload(), r?.status === 'offline' ? 6000 : 1200);

@@ -70,7 +70,7 @@ const safe = (p: string) => /^[A-Za-z0-9._/-]+$/.test(p) && !p.split('/').includ
  * then point <dir>/app.json at it. Nothing in use is ever renamed or deleted (Windows
  * refuses that), so the running version stays intact until the restart.
  */
-export async function install(dir: string, release: Release, commit: string) {
+export async function install(dir: string, release: Release, commit: string, onFile?: (done: number, total: number) => void) {
   if (!/^[0-9A-Za-z.-]+$/.test(release.version)) throw new Error(`Odd version: ${release.version}`);
   const versions = join(dir, 'versions');
   const target = join(versions, release.version);
@@ -82,6 +82,7 @@ export async function install(dir: string, release: Release, commit: string) {
     const out = join(fresh, ...f.path.split('/'));
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, data);
+    onFile?.(release.files.indexOf(f) + 1, release.files.length);
   }
   writeFileSync(join(fresh, 'version.json'), JSON.stringify(release, null, 1));
   if (existsSync(target)) rmSync(target, { recursive: true, force: true }); // a half-done earlier try

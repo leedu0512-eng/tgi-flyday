@@ -306,23 +306,31 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   }
   // Restart button (view picker): look for a newer version on GitHub, install it, restart.
   // Only the app/ folder next to the exe is replaced; data/ (pilots, photos) is never touched.
+  // How far the update is, for the progress bar on the restart cover.
+  if (path === '/api/update/progress' && req.method === 'GET') return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === '/api/update' && req.method === 'POST') {
+    if (!IN_EXE && process.env.FLYDAY_FAKE_UPDATE) return fakeUpdate(res);
     if (!IN_EXE) return json(res, 200, { ok: true, result: { status: 'dev', version: VERSION } });
     if (updating) return json(res, 200, { ok: true, result: { status: 'busy', version: VERSION } });
     updating = true;
+    updateProgress = { stage: 'check', done: 0, total: 0 };
     try {
       const { release, commit } = await latest();
       if (!(release.version > VERSION)) {
         updating = false;
+        updateProgress = { stage: 'idle', done: 0, total: 0 };
         return json(res, 200, { ok: true, result: { status: 'current', version: VERSION } });
       }
       console.log(`\nUpdating TGI FlyDay ${VERSION} -> ${release.version} ...`);
-      await install(ROOT, release, commit);
+      updateProgress = { stage: 'download', done: 0, total: release.files.length, to: release.version };
+      await install(ROOT, release, commit, (done, total) => { updateProgress = { stage: 'download', done, total, to: release.version }; });
+      updateProgress = { stage: 'restart', done: release.files.length, total: release.files.length, to: release.version };
       json(res, 200, { ok: true, result: { status: 'updated', version: release.version } });
       setTimeout(restartIntoUpdate, 400);
       return;
     } catch (err: any) {
       updating = false;
+      updateProgress = { stage: 'idle', done: 0, total: 0 };
       console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
       return json(res, 200, { ok: true, result: { status: 'offline', version: VERSION, error: why(err) } });
     }
@@ -437,6 +445,18 @@ function lanAddresses(): string[] {
 const AFTER_UPDATE = process.argv.includes('--after-update');
 const OPEN_WINDOWS = process.platform === 'win32' && (IN_EXE || process.argv.includes('--open')) && !AFTER_UPDATE;
 let updating = false;
+let updateProgress: { stage: 'idle' | 'check' | 'download' | 'restart'; done: number; total: number; to?: string } = { stage: 'idle', done: 0, total: 0 };
+/** Dev only (FLYDAY_FAKE_UPDATE=1): walks through an update slowly, to see the progress bar. */
+async function fakeUpdate(res: ServerResponse) {
+  const pause = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+  updateProgress = { stage: 'check', done: 0, total: 0 };
+  await pause(1200);
+  const total = 31;
+  for (let i = 0; i <= total; i++) { updateProgress = { stage: 'download', done: i, total, to: 'test' }; await pause(120); }
+  updateProgress = { stage: 'restart', done: total, total, to: 'test' };
+  json(res, 200, { ok: true, result: { status: 'updated', version: 'test' } });
+  setTimeout(() => { updateProgress = { stage: 'idle', done: 0, total: 0 }; }, 1000);
+}
 /** Windows Firewall: do phones and the kiosk get in? Checked at start (null: can't tell). */
 let firewall: FirewallStatus | null = null;
 /** Save, start the updated FlyDay, and step aside (it waits for the port). */
