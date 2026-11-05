@@ -166,7 +166,7 @@
     <p class="hint">For pilots without their own quad. At the kiosk they tap <b>I don't have my own quad</b> and get the first free club quad that isn't broken, on its channel. When every working one is taken, the one with the fewest pilots is shared: each of them flies a different heat, on that quad's channel. FlyDay remembers who flew a club quad and offers it again next time.</p>
     <div id="clubList" class="club-list"></div>
     <div><button id="clubAdd" class="btn small">+ Add a club quad</button></div>
-    <p class="hint">Marking a quad <b>Broken</b> moves its pilots to another club quad straight away, and the voice tells them to check the big screen. Up to 4 club quads.</p>
+    <p class="hint">Marking a quad <b>Broken</b> moves its pilots to another club quad straight away, and the voice tells them to check the big screen. Up to 8 club quads.</p>
   </section>
 </section>
 <section id="videoView" class="card drawer view" hidden aria-label="Video">
@@ -381,7 +381,8 @@ function renderClubView(force = false) {
       <div class="club-pilots">${pilots || '<span class="hint">Free</span>'}</div>
     </div>`;
   }).join('') || '<p class="hint">No club quads yet.</p>';
-  $('clubAdd').hidden = clubQuads().length >= 4;
+  $('clubAdd').disabled = clubQuads().length >= 8;
+  $('clubAdd').title = clubQuads().length >= 8 ? 'Up to 8 club quads: remove one first' : 'Add another club quad';
 }
 async function saveClub(quads) {
   const res = await act('/api/club-quads', { quads });

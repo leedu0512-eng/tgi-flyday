@@ -970,4 +970,9 @@ test('club quad breaks: its pilots get another one and are told; none left: they
   assert.equal(e.heats.findIndex((r) => r.includes(a.pilot.id)), -1);
   assert.throws(() => e.walkIn('Cid', undefined, true), /No club quad is working/);
   assert.throws(() => e.setClubQuads([{ name: 'X', channel: 'R1' }, { name: 'x', channel: 'R2' }]), /own name/);
+  // Up to 8.
+  const eight = Array.from({ length: 8 }, (_, i) => ({ name: `Q${i + 1}`, channel: ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'][i], broken: false }));
+  e.setClubQuads(eight);
+  assert.equal(e.config.clubQuads.length, 8);
+  assert.throws(() => e.setClubQuads([...eight, { name: 'Q9', channel: 'F1', broken: false }]), /Up to 8/);
 });

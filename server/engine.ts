@@ -998,14 +998,14 @@ export class Engine {
   }
 
   /**
-   * RD: the club quads (up to 4): name, channel, broken. A quad that is renamed keeps its
+   * RD: the club quads (up to 8): name, channel, broken. A quad that is renamed keeps its
    * pilots; one that changed channel re-seats its pilots on the new channel. Pilots on a quad
    * that broke or was removed get another working club quad (shared if need be), and the
    * voice tells them; with no working quad left they wait without a heat.
    */
   setClubQuads(list: unknown) {
     if (!Array.isArray(list)) throw new EngineError('Club quads: a list, please.');
-    if (list.length > 4) throw new EngineError('Up to 4 club quads.');
+    if (list.length > 8) throw new EngineError('Up to 8 club quads.');
     const next: ClubQuad[] = list.map((x: any, i) => ({
       name: cleanQuad(x?.name) || `Club ${i + 1}`,
       channel: cleanChannel(x?.channel),

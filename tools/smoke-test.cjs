@@ -96,10 +96,11 @@ async function typeKeys(scope, text) {
     await k.click('[data-club]');
     check(await k.$eval('[data-club]', (e) => e.classList.contains('on')), 'club quad button ticks');
     await k.click('[data-next]');
-    await k.waitForSelector('[data-snap], .done', { timeout: 5000 });
+    // The camera screen is a .done too: wait for the snap button or the real done screen.
+    await k.waitForSelector('[data-snap], .done:not(.photo-step)', { timeout: 5000 });
     if (await k.$('[data-snap]')) { await k.click('[data-snap]'); await k.waitForSelector('[data-use]', { timeout: 6000 }); await k.click('[data-use]'); }
-    await k.waitForSelector('.done .big-msg', { timeout: 5000 });
-    check(/club quad/i.test(await k.textContent('.done')), 'done screen names the club quad');
+    await k.waitForSelector('.done:not(.photo-step) .big-msg', { timeout: 5000 });
+    check(/club quad/i.test(await k.textContent('.done:not(.photo-step)')), 'done screen names the club quad');
     s = await state();
     check(!!s.pilots.find((p) => p.callsign === 'Kit')?.quad, 'Kit flies a club quad');
     await k.click('[data-go=home]');

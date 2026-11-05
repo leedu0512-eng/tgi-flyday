@@ -27,7 +27,7 @@ export interface Config {
   nightStopAt: number;
   /** Lap timer (RotorHazard) on the venue network. */
   timer: TimerConfig;
-  /** The club's own quads (up to 4) for pilots without one. Each flies one fixed channel. */
+  /** The club's own quads (up to 8) for pilots without one. Each flies one fixed channel. */
   clubQuads: ClubQuad[];
   /** Which callouts the voice makes, and when. */
   callouts: CalloutSettings;
