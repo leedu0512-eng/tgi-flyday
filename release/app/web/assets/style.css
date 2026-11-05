@@ -794,3 +794,56 @@ img.avatar { filter: brightness(0.55) saturate(0.8); }
 .night-prompt.card b { font-size: 34px; }
 .night-prompt.card .np-yes { font-size: 22px; padding: 16px; width: 100%; }
 .input.inline { display: inline-block; width: auto; padding: 2px 6px; margin: 0 2px; font-size: inherit; }
+
+/* RD console: status icons in the top bar. ok green, warn orange, bad red. */
+.status-icons { display: flex; align-items: center; gap: 8px; }
+.status-icons .si { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--muted); font: 700 15px var(--font); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.status-icons button.si { cursor: pointer; }
+.status-icons button.si:hover { border-color: var(--muted); }
+.status-icons .si svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.status-icons .si .num { color: var(--text); }
+.status-icons .si.idle .num { color: var(--muted); }
+.status-icons .si.ok, .status-icons .si-pair.ok .si { color: #22C55E; border-color: rgba(34,197,94,.45); background: rgba(34,197,94,.08); }
+.status-icons .si.warn, .status-icons .si-pair.warn .si { color: var(--accent); border-color: rgba(255,107,0,.6); background: rgba(255,107,0,.1); }
+.status-icons .si.bad, .status-icons .si-pair.bad .si { color: #FF3B30; border-color: rgba(255,59,48,.5); background: rgba(255,59,48,.08); }
+.status-icons .si-pair { display: inline-flex; }
+.status-icons .si-pair .si:first-child { border-radius: 8px 0 0 8px; }
+.status-icons .si-pair .si:last-child { border-radius: 0 8px 8px 0; border-left: none; }
+.status-icons .si-pair .off { display: none; }
+.status-icons .si-pair.muted .on { display: none; }
+.status-icons .si-pair.muted .off { display: inline; }
+.status-icons .si-pair.warn #soundBtn { animation: si-blink 1.2s infinite; }
+@keyframes si-blink { 50% { opacity: .45; } }
+.status-icons #openPilots .count.waiting { margin-left: 2px; }
+
+/* RD console: Pilots, Callouts and sound, Lap timer, Video and Spectrum open as pages in the main area. */
+.drawer.view { position: static; width: auto; top: auto !important; z-index: auto; border: 1px solid var(--line); border-radius: var(--radius); padding: 0 22px 12px; }
+.drawer.view[hidden] { display: none; }
+.drawer.view .drawer-head { position: static; }
+.drawer.view .drawer-sec { max-width: 860px; }
+.drawer.view p { margin: 0; line-height: 1.5; }
+.status-icons .si.active { box-shadow: 0 0 0 2px var(--text); }
+.dev-status { display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line); }
+.dev-status b { font-family: var(--display); font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.dev-status span { color: var(--muted); }
+.dev-status.ok { border-color: rgba(34,197,94,.5); background: rgba(34,197,94,.08); } .dev-status.ok b { color: #22C55E; }
+.dev-status.warn { border-color: rgba(255,107,0,.6); background: rgba(255,107,0,.1); } .dev-status.warn b { color: var(--accent); }
+.dev-status.bad { border-color: rgba(255,59,48,.5); background: rgba(255,59,48,.08); } .dev-status.bad b { color: #FF3B30; }
+.dev-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* RD console: folds ("More", "All screens") and the screens' addresses with QR codes. */
+details.more > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 700; font-size: 14px; padding: 6px 0; user-select: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
+details.more[open] > summary::before { transform: rotate(45deg); }
+details.more > summary:hover { color: var(--text); }
+details.more .more-body { display: grid; gap: 14px; padding-top: 10px; }
+.screen-link { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; }
+.screen-link.main { grid-template-columns: 116px 1fr; }
+.screen-link .qr { background: #fff; border-radius: 6px; padding: 4px; line-height: 0; }
+.screen-link .qr svg { width: 100%; height: auto; }
+.screen-link > div:last-child { display: grid; gap: 2px; min-width: 0; }
+.screen-link b { font-family: var(--display); font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.screen-link code { overflow-wrap: anywhere; }
+.screen-link .hint { margin: 0; font-size: 13px; }
+.kiosk-info code.plain { font-size: 13px; color: var(--text); }

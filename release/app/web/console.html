@@ -14,10 +14,17 @@
     <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
     <div class="sub">Practice · RD console</div>
     <div class="spacer"></div>
-    <span id="wallclock" class="wallclock num"></span>
-    <button id="soundBtn" class="btn small"></button>
-    <button id="openPilots" class="btn small">Pilots <span id="pilotCount" class="count"></span><span id="waitingCount" class="count waiting" title="Signed in, not in a heat"></span></button>
-    <button id="openDrawer" class="btn small">Callouts and sound</button>
+    <div class="status-icons">
+      <span class="si" title="Time of day"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="wallclock" class="num"></span></span>
+      <span class="si" id="sessionSi" title="Session time"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M12 14V10M10 3h4M12 3v4M18 7l1.5-1.5"/></svg><span id="sessionTime" class="num"></span></span>
+      <span class="si-pair" id="soundPair">
+        <button class="si" id="soundBtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="on" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9l5 6M21 9l-5 6"/></svg></button><button class="si" id="openDrawer" type="button" title="Callouts and sound settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4a6 6 0 0 1 6 6c0 2-1 3-1 4v2h-3v3H8v-3H6v-3l-2-1 2-3a6 6 0 0 1 3-5z"/><path d="M18 8a5 5 0 0 1 0 6M20.5 6a8 8 0 0 1 0 10"/></svg></button>
+      </span>
+      <button class="si" id="timerSi" type="button" data-view="timer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 20v-9h8v9"/><path d="M12 14l1.5 2"/><circle cx="12" cy="14" r="0.6"/></svg></button>
+      <button class="si" id="videoSi" type="button" data-view="video"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></button>
+      <button class="si" id="spectrumSi" type="button" data-view="spectrum"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 17v-3M8 17V9M11 17v-6M14 17V5M17 17v-8M20 17v-4"/></svg></button>
+      <button class="si" id="openPilots" type="button" title="Pilots"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M7 7h10"/></svg><span id="pilotCount" class="num">0</span><span id="waitingCount" class="count waiting" title="Signed in, not in a heat"></span></button>
+    </div>
   </div>
 
   <div class="grid">
@@ -48,25 +55,30 @@
             <select id="perHeat" class="input"></select></div>
           <div class="field wide"><label>Channels in every heat</label>
             <div id="slotChannels" class="slot-channels"></div></div>
-          <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
-          <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes stops practice and takes everyone off the list.</span></label>
-          <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
           <div class="wide presets">
             <button class="btn small" data-preset="R1 R2 F2 F4 R7 R8">IMD6C · 6 pilots</button>
             <button class="btn small" data-preset="R1 R2 R3 R4 R5 R6 R7 R8">Raceband · 8 pilots</button>
           </div>
+          <details class="more wide" id="setupMore">
+            <summary>More</summary>
+            <div class="more-body">
+              <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
+              <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes stops practice and takes everyone off the list.</span></label>
+              <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
+            </div>
+          </details>
           <p class="hint wide" id="setupHint">All of this can change during a session. To change a channel in one heat only, click the channel on that heat's card.</p>
         </div>
       </section>
 
       <section class="card">
-        <h2>Phones and kiosk</h2>
+        <h2>Phones and screens</h2>
         <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
       </section>
     </div>
 
     <div>
-      <section class="card">
+      <section class="card" id="heatsCard">
         <div class="card-head">
           <div class="tabs" id="rightTabs"><button data-tab="heats" class="on">Heats</button><button data-tab="times">Times</button></div>
           <button id="compact" class="btn small primary" title="Pack pilots into as few heats as possible">Compact heats</button>
@@ -75,13 +87,10 @@
         <div id="times" class="times" hidden></div>
       </section>
 
-    </div>
-  </div>
-</div>
-<aside id="drawer" class="drawer" hidden aria-label="Callouts and sound">
+<section id="drawer" class="card drawer view" hidden aria-label="Callouts and sound">
   <div class="drawer-head">
     <h2>Callouts and sound</h2>
-    <button id="closeDrawer" class="btn small">Close</button>
+    <button id="closeDrawer" class="btn small">Back to heats</button>
   </div>
 
   <section class="drawer-sec">
@@ -105,11 +114,11 @@
     <div id="dCallouts" class="callouts"></div>
     <p class="hint">The start BEEP and the end BEEP always play.</p>
   </section>
-</aside>
-<aside id="pilotsDrawer" class="drawer" hidden aria-label="Pilots">
+</section>
+<section id="pilotsDrawer" class="card drawer view" hidden aria-label="Pilots">
   <div class="drawer-head">
     <h2>Pilots</h2>
-    <button class="btn small" data-close>Close</button>
+    <button class="btn small" data-close>Back to heats</button>
   </div>
   <section class="drawer-sec">
     <div class="add-row">
@@ -125,12 +134,64 @@
     <p class="hint" style="margin:0">Pilots who share one quad fly on the same channel, each in a different heat, and are called by their own names.</p>
     <div id="quadList" class="plist"></div>
   </section>
-</aside>
+</section>
+<section id="timerView" class="card drawer view" hidden aria-label="Lap timer">
+  <div class="drawer-head"><h2>Lap timer</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec">
+    <div id="tStatus" class="dev-status"></div>
+  </section>
+  <section class="drawer-sec">
+    <h3>RotorHazard</h3>
+    <label class="toggle"><input type="checkbox" id="tEnabled"><span><b>Use the lap timer</b></span></label>
+    <div class="field"><label for="tHost">Address on the venue network</label><input id="tHost" class="input" placeholder="192.168.1.50 or rotorhazard.local:5000" autocomplete="off"></div>
+    <div class="dev-row">
+      <div class="field"><label for="tUser">Admin user</label><input id="tUser" class="input" autocomplete="off"></div>
+      <div class="field"><label for="tPass">Admin password</label><input id="tPass" class="input" type="password" autocomplete="new-password"></div>
+    </div>
+    <div><button id="tSave" class="btn primary">Save and connect</button></div>
+    <p class="hint">The timer's defaults are admin / rotorhazard. Give it a fixed address on the router so this never changes. FlyDay keeps trying to reconnect by itself, and practice carries on without laps if the timer drops out.</p>
+  </section>
+  <section class="drawer-sec">
+    <h3>On every gate pass</h3>
+    <label class="toggle"><input type="checkbox" id="tBeep"><span><b>Short beep</b></span></label>
+    <label class="toggle"><input type="checkbox" id="tVoice"><span><b>Say the lap</b></span></label>
+    <div class="field"><label for="tVoiceText">What the voice says</label><input id="tVoiceText" class="input" autocomplete="off"></div>
+    <p class="hint">{name} the pilot, {lap} lap number, {laptime} lap time.</p>
+  </section>
+</section>
+<section id="videoView" class="card drawer view" hidden aria-label="Video">
+  <div class="drawer-head"><h2>Video</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec"><div id="vStatus" class="dev-status"></div></section>
+  <section class="drawer-sec">
+    <h3>What it will do</h3>
+    <p>Each pilot's FPV feed plays in their plate on the big screen while they fly, and every heat is recorded, so you can watch any heat again from the Times page, lined up with the laps.</p>
+    <p class="hint">Not built yet. It needs the capture hardware first: one USB grabber per receiver, or a quad splitter into one capture card. Once it's here, its settings (which input is which channel, recording on or off, where recordings go) live on this page.</p>
+  </section>
+</section>
+<section id="spectrumView" class="card drawer view" hidden aria-label="Spectrum analyser">
+  <div class="drawer-head"><h2>Spectrum analyser</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
+  <section class="drawer-sec">
+    <h3>What it will do</h3>
+    <p>Listens to the 5.8 GHz band and shows which channels are noisy, so FlyDay can steer pilots away from them when it hands out channels.</p>
+    <p class="hint">Not built yet. It runs on the Waveshare ESP32-C5 with a receiver module, cabled to this PC. Its settings (which port, how often it scans) will live on this page.</p>
+  </section>
+</section>
+
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt } from '/assets/common.js';
-setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt, qrSvg } from '/assets/common.js';
+setInterval(() => {
+  const [time, session] = wallClock(state).split(' · session ');
+  $('wallclock').textContent = time;
+  $('sessionTime').textContent = session ?? '–:––';
+  $('sessionSi').classList.toggle('idle', !session);
+}, 250);
 
 const $ = (id) => document.getElementById(id);
 // The RD console is the screen that plays callouts and tones (on by default).
@@ -159,12 +220,32 @@ async function act(path, body) {
   try { return await post(path, body); } catch (e) { toast(e.message); }
 }
 
+// ---------- status icons: timer and spectrum analyser ----------
+function renderDevices() {
+  const t = state.timing?.timer ?? { state: 'off' }, on = state.config.timer?.enabled;
+  const ts = t.state === 'connected' ? 'ok' : t.state === 'connecting' ? 'warn' : 'bad';
+  $('timerSi').className = `si ${ts}`;
+  $('timerSi').title = t.state === 'connected' ? `Lap timer connected (${t.nodes} receivers)`
+    : t.state === 'connecting' ? 'Lap timer: connecting…'
+    : !on ? 'Lap timer not connected (switched off)' : `Lap timer not connected${t.message ? `: ${t.message}` : ''}`;
+  const v = state.video ?? { state: 'off' };
+  $('videoSi').className = `si ${v.state === 'online' ? 'ok' : 'bad'}`;
+  $('videoSi').title = v.state === 'online' ? 'Video online' : 'Video not online';
+  const sp = state.spectrum ?? { state: 'off' };
+  $('spectrumSi').className = `si ${sp.state === 'connected' ? 'ok' : 'bad'}`;
+  $('spectrumSi').title = sp.state === 'connected' ? 'Spectrum analyser connected' : 'Spectrum analyser not connected';
+  devStatus($('vStatus'), v.state === 'online' ? 'ok' : 'bad', v.state === 'online' ? 'Online' : 'Not online', v.state === 'online' ? '' : 'No video inputs yet.');
+  devStatus($('sStatus'), sp.state === 'connected' ? 'ok' : 'bad', sp.state === 'connected' ? 'Connected' : 'Not connected', sp.state === 'connected' ? '' : 'No analyser cabled to this PC yet.');
+  renderTimerView();
+}
+
 // ---------- sound ----------
 function renderSound() {
-  const b = $('soundBtn');
-  if (!sound.enabled) { b.textContent = 'Sound off on this screen'; b.className = 'btn small'; }
-  else if (sound.blocked) { b.textContent = 'Click to allow sound'; b.className = 'btn small danger confirm'; }
-  else { b.textContent = 'Sound on'; b.className = 'btn small primary'; }
+  const b = $('soundBtn'), pair = $('soundPair');
+  const st = !sound.enabled ? 'bad' : sound.blocked ? 'warn' : 'ok';
+  pair.className = `si-pair ${st}${sound.enabled ? '' : ' muted'}`;
+  b.title = !sound.enabled ? 'Sound off on this screen. Click to switch it on.'
+    : sound.blocked ? 'Click to allow sound (the browser blocks it until you click)' : 'Sound on. Click to switch it off on this screen.';
 }
 $('soundBtn').onclick = () => {
   sound.enabled = sound.blocked ? true : !sound.enabled;
@@ -235,23 +316,59 @@ function renderCallouts() {
 
 const drawer = $('drawer');
 const pilotsDrawer = $('pilotsDrawer');
-// Side panels start just under the top bar, so its buttons stay usable (switch panels, close).
-const placePanels = () => {
-  const top = Math.max(0, document.querySelector('.topbar').getBoundingClientRect().bottom + 8);
-  for (const el of [drawer, pilotsDrawer]) el.style.top = top + 'px';
-};
-window.addEventListener('resize', placePanels);
-window.addEventListener('scroll', placePanels, { passive: true });
-const openDrawer = () => { placePanels(); pilotsDrawer.hidden = true; drawer.hidden = false; renderDrawer(true); };
-const closeDrawer = () => { drawer.hidden = true; pilotsDrawer.hidden = true; };
-$('openDrawer').onclick = () => (drawer.hidden ? openDrawer() : closeDrawer());
-$('openPilots').onclick = () => {
-  if (!pilotsDrawer.hidden) return closeDrawer();
-  placePanels(); drawer.hidden = true; pilotsDrawer.hidden = false; renderPilotsPanel(true);
-};
+// Pages in the main area: Heats and Times, or one opened from the status icons (no flyouts).
+const VIEWS = { sound: drawer, pilots: pilotsDrawer, timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
+const ICONS = { sound: $('openDrawer'), pilots: $('openPilots'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
+let view = 'heats';
+function showView(v) {
+  view = VIEWS[v] ? v : 'heats';
+  for (const [k, el] of Object.entries(VIEWS)) el.hidden = k !== view;
+  for (const [k, el] of Object.entries(ICONS)) el.classList.toggle('active', k === view);
+  $('heatsCard').hidden = view !== 'heats';
+  if (view === 'sound') renderDrawer(true);
+  if (view === 'pilots') renderPilotsPanel(true);
+  if (view === 'timer') renderTimerView(true);
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+const toggleView = (v) => showView(view === v ? 'heats' : v);
+const closeDrawer = () => showView('heats');
+$('openDrawer').onclick = () => toggleView('sound');
+$('openPilots').onclick = () => toggleView('pilots');
+for (const id of ['timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
 $('closeDrawer').onclick = closeDrawer;
-pilotsDrawer.querySelector('[data-close]').onclick = closeDrawer;
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+for (const b of document.querySelectorAll('.view [data-close]')) b.onclick = closeDrawer;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.matches('input, textarea, select')) closeDrawer(); });
+
+// ---------- lap timer page ----------
+function devStatus(el, kind, head, text) {
+  el.className = `dev-status ${kind}`;
+  el.innerHTML = `<b>${esc(head)}</b>${text ? `<span>${esc(text)}</span>` : ''}`;
+}
+function renderTimerView(force = false) {
+  if (!state || $('timerView').hidden) return;
+  const cfg = state.config.timer, t = state.timing?.timer ?? { state: 'off', nodes: 0, message: '' };
+  if (t.state === 'connected') devStatus($('tStatus'), 'ok', 'Connected', `${t.nodes} receivers: the first ${state.timing?.timedSlots ?? t.nodes} channels in every heat are timed.`);
+  else if (t.state === 'connecting') devStatus($('tStatus'), 'warn', 'Connecting…', t.message);
+  else devStatus($('tStatus'), 'bad', 'Not connected', !cfg.enabled ? 'The lap timer is switched off.' : !cfg.host ? 'Fill in its address.' : t.message);
+  const co = state.config.callouts;
+  for (const [id, v] of [['tHost', cfg.host], ['tUser', cfg.user], ['tVoiceText', co.texts.gatePass]]) {
+    if (force || document.activeElement !== $(id)) $(id).value = v ?? '';
+  }
+  if (force) $('tPass').value = '';
+  $('tPass').placeholder = cfg.passwordSet ? 'Saved (type to change)' : '';
+  $('tEnabled').checked = !!cfg.enabled;
+  $('tBeep').checked = !!co.gatePassBeep;
+  $('tVoice').checked = !!co.gatePassVoice;
+}
+$('tEnabled').onchange = (e) => act('/api/config', { timer: { enabled: e.target.checked } });
+$('tSave').onclick = async () => {
+  const r = await act('/api/config', { timer: { enabled: true, host: $('tHost').value, user: $('tUser').value, password: $('tPass').value } });
+  if (r) { $('tPass').value = ''; toast('Saved. Connecting to the timer…', true); }
+};
+$('tHost').onkeydown = $('tUser').onkeydown = $('tPass').onkeydown = (e) => { if (e.key === 'Enter') $('tSave').click(); };
+$('tBeep').onchange = (e) => saveCallouts({ gatePassBeep: e.target.checked });
+$('tVoice').onchange = (e) => saveCallouts({ gatePassVoice: e.target.checked });
+$('tVoiceText').onchange = (e) => saveCallouts({ texts: { gatePass: e.target.value } });
 
 const saveSound = (patch) => act('/api/config', { sound: patch });
 const saveCallouts = (patch) => act('/api/config', { callouts: patch });
@@ -538,7 +655,8 @@ function sharedQuads() {
 }
 
 function renderPilotsPanel(force = false) {
-  $('pilotCount').textContent = state.pilots.length ? String(state.pilots.length) : '';
+  $('pilotCount').textContent = String(state.pilots.length);
+  renderDevices();
   // Pilots signed in without a heat (e.g. at the kiosk when every heat was full).
   const seated = new Set(state.heats.flatMap((h) => h.slots.map((s) => s.pilotId)).filter(Boolean));
   const waiting = state.pilots.filter((p) => !seated.has(p.id)).length;
@@ -720,18 +838,45 @@ async function addPilot() {
 $('addPilot').onclick = addPilot;
 $('newPilot').onkeydown = (e) => { if (e.key === 'Enter') addPilot(); };
 
-// ---------- kiosk address ----------
-function showInfo(info) {
-  const urls = [`http://${info.hostname}:${info.port}/kiosk`, ...info.addresses.map((a) => `http://${a}:${info.port}/kiosk`)];
+// ---------- phones and screens: their addresses, with QR codes ----------
+const SCREENS = [
+  ['/me', 'Pilots\' phones', 'Each pilot\'s own page: heat, channel, laps, Going home.'],
+  ['/screen', 'Big screen', 'The pit board for the hall.'],
+  ['/kiosk', 'Kiosk', 'Sign in, change channel, going home. On the kiosk PC, kiosk.sh / kiosk.bat opens it with the camera allowed.'],
+  ['/mobile', 'RD phone', 'The race director\'s console on a phone.'],
+  ['/console', 'RD console', 'This page, from another PC.'],
+];
+const qrCache = new Map();
+async function qrFor(url) {
+  if (!qrCache.has(url)) qrCache.set(url, await qrSvg(url));
+  return qrCache.get(url);
+}
+async function showInfo(info) {
+  const host = info.addresses[0] ?? info.hostname;
+  const url = (path) => `http://${host}:${info.port}${path}`;
   const fw = info.firewall;
+  let open = $('screensMore')?.open;
+  if (open == null) { try { open = !!localStorage.getItem('flyday.more.screensMore'); } catch { open = false; } }
+  const qrs = await Promise.all(SCREENS.map(([path]) => qrFor(url(path))));
   $('kioskInfo').innerHTML = `
     ${fw && !fw.ok ? `<div class="fw-warn"><b>Phones and the kiosk can't reach this PC.</b>
       <span>Windows Firewall: ${esc(fw.reason)} on this ${esc(fw.network.toLowerCase())} network.</span>
       <button class="btn primary" id="fwFix">Let them in</button><small>Windows asks for permission once.</small></div>` : ''}
-    <p class="hint" style="margin:0">Pilots' phones (the QR codes open this): <code>http://${esc(info.addresses[0] ?? info.hostname)}:${info.port}/me</code></p>
-    <p class="hint" style="margin:0">On the kiosk PC, run <b>kiosk.sh</b> / <b>kiosk.bat</b> with this PC's address. Or open one of these in the browser:</p>
-    ${urls.map((u) => `<code>${esc(u)}</code>`).join('')}
-    <p class="hint" style="margin:0">Phones and the kiosk must be on the same network as this PC.</p>`;
+    <div class="screen-link main">
+      <div class="qr">${qrs[0]}</div>
+      <div><b>${SCREENS[0][1]}</b><code>${esc(url('/me'))}</code><span class="hint">${SCREENS[0][2]} The big screen and the kiosk show this QR code too.</span></div>
+    </div>
+    <details class="more" id="screensMore"${open ? ' open' : ''}>
+      <summary>All screens</summary>
+      <div class="more-body">
+        ${SCREENS.slice(1).map(([path, name, text], i) => `<div class="screen-link">
+          <div class="qr">${qrs[i + 1]}</div>
+          <div><b>${name}</b><code>${esc(url(path))}</code><span class="hint">${text}</span></div>
+        </div>`).join('')}
+        ${info.addresses.length > 1 ? `<p class="hint">This PC also answers on ${info.addresses.slice(1).map((a) => `<code class="plain">${esc(a)}</code>`).join(', ')}.</p>` : ''}
+        <p class="hint">Phones and the kiosk must be on the same network as this PC.</p>
+      </div>
+    </details>`;
   $('fwFix')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     e.target.textContent = 'Check the Windows prompt…';
@@ -743,6 +888,13 @@ function showInfo(info) {
   });
 }
 fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {});
+// "More" folds are remembered on this PC.
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.id || !d.classList.contains('more')) return;
+  try { localStorage.setItem(`flyday.more.${d.id}`, d.open ? '1' : ''); } catch {}
+}, true);
+try { if (localStorage.getItem('flyday.more.setupMore')) $('setupMore').open = true; } catch {}
 // The firewall check takes a few seconds after start: look again.
 setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 
