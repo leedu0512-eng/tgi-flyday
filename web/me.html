@@ -157,6 +157,8 @@ function lapTime(ms) {
 }
 
 function badge(sb) { return `<em class="pbsb ${sb ? 'is-sb' : 'is-pb'}">${sb ? 'SB' : 'PB'}</em>`; }
+/** F1 colours: green = this pilot's best, purple = the best of everyone this session. */
+const tone = (ms, best) => (ms != null && best && ms === best.ms ? (best.sb ? 't-sb' : 't-pb') : '');
 
 /**
  * Best lap and best 3 consecutive (3C) on top, marked SB when nobody this session beat it,
@@ -174,15 +176,15 @@ function lapsView() {
     const title = r.free ? `Round ${r.round}, heat ${r.heat + 1} · free flight` : `Round ${r.round}, heat ${r.heat + 1}`;
     return `<details class="me-run ${r.live ? 'live' : ''}" data-run="${key}" ${open ? 'open' : ''}>
       <summary><span>${title}${r.live ? ' <i class="now">flying</i>' : ''}</span>
-        <span class="sum">${r.best3 != null ? `3C ${lapTime(r.best3)}` : `${r.laps.length} lap${r.laps.length === 1 ? '' : 's'}`}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
-      <ol>${r.laps.map((ms, j) => `<li class="${r.best3At >= 0 && j >= r.best3At && j < r.best3At + 3 ? 'b3' : ''} ${ms === r.bestLap ? 'best' : ''}">
+        <span class="sum">${r.best3 != null ? `3C <b class="${tone(r.best3, laps.best3)}">${lapTime(r.best3)}</b>` : `${r.laps.length} lap${r.laps.length === 1 ? '' : 's'}`}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
+      <ol>${r.laps.map((ms, j) => `<li class="${r.best3At >= 0 && j >= r.best3At && j < r.best3At + 3 ? 'b3' : ''} ${tone(ms, laps.bestLap)}">
         <span>Lap ${j + 1}</span><b>${lapTime(ms)}</b></li>`).join('')}</ol>
     </details>`;
   }).join('');
   return `<h2>Your laps</h2>
     <div class="me-bests">
-      <div><small>Best lap</small><b>${lapTime(laps.bestLap?.ms)}</b>${laps.bestLap?.sb ? badge(true) : ''}</div>
-      <div><small>Best 3C</small><b>${lapTime(laps.best3?.ms)}</b>${laps.best3?.sb ? badge(true) : ''}</div>
+      <div><small>Best lap</small><b class="${tone(laps.bestLap?.ms, laps.bestLap)}">${lapTime(laps.bestLap?.ms)}</b>${laps.bestLap?.sb ? badge(true) : ''}</div>
+      <div><small>Best 3C</small><b class="${tone(laps.best3?.ms, laps.best3)}">${lapTime(laps.best3?.ms)}</b>${laps.best3?.sb ? badge(true) : ''}</div>
     </div>
     <div class="me-runs">${runs}</div>`;
 }

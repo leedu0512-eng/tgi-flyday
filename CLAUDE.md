@@ -48,4 +48,4 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 ## Words
 
 - Best 3 consecutive laps: **3C** ("Best 3C"). Never "3 in a row": pilots learn the real terms here.
-- PB = a pilot's own best, SB = the best of everyone this session. The phone's top tiles only mark SB (a pilot's best is obviously their PB); the round holding their best is marked PB, or SB.
+- PB = a pilot's own best (green, #22C55E), SB = the best of everyone this session (purple), F1 style: the times themselves are coloured. CSS classes t-pb / t-sb, never .pb (that is the pit board). The phone's top tiles only mark SB (a pilot's best is obviously their PB); the round holding their best is marked PB, or SB.

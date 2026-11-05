@@ -764,19 +764,21 @@ function renderTimes() {
     $('times').innerHTML = `<p class="hint">${state?.config.timer?.enabled ? 'No laps yet this session. Every timed heat shows up here as soon as pilots cross the gate.' : 'The lap timer is off. Once it is connected, every heat\'s laps show up here.'}</p>`;
     return;
   }
-  const sb = (v, best) => v != null && v === best ? '<em class="sbm">SB</em>' : '';
+  // F1 colours: purple = best of everyone this session, green = that pilot's own best.
+  const mine = new Map(t.leaders.map((l) => [l.name.toLowerCase(), l]));
+  const tone = (v, sbBest, pb) => v == null ? '' : v === sbBest ? 't-sb' : v === pb ? 't-pb' : '';
   const board = `<h3>Session bests</h3><table class="lb"><thead><tr><th></th><th>Pilot</th><th>Best 3C</th><th>Best lap</th><th>Laps</th><th>Heats</th></tr></thead><tbody>
-    ${t.leaders.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(NAME(l.name))}</td><td>${lapTime(l.best3)}${sb(l.best3, t.sb.best3)}</td><td>${lapTime(l.bestLap)}${sb(l.bestLap, t.sb.lap)}</td><td>${l.laps}</td><td>${l.heats}</td></tr>`).join('')}</tbody></table>`;
+    ${t.leaders.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(NAME(l.name))}</td><td class="${tone(l.best3, t.sb.best3)}">${lapTime(l.best3)}</td><td class="${tone(l.bestLap, t.sb.lap)}">${lapTime(l.bestLap)}</td><td>${l.laps}</td><td>${l.heats}</td></tr>`).join('')}</tbody></table>`;
   const runs = [...t.runs].reverse().map((r, i) => {
     const key = `${r.round}-${r.heat}-${r.at}`;
     const open = !closedTimes.has(key) && (openTimes.has(key) || r.live || i === 0);
     return `<details class="trun ${r.live ? 'live' : ''}" data-key="${key}" ${open ? 'open' : ''}>
       <summary><b>Round ${r.round}, heat ${r.heat + 1}</b>${r.free ? '<span>free flight</span>' : ''}${r.live ? '<span class="now">flying</span>' : ''}<span class="cnt">${r.pilots.length} pilot${r.pilots.length === 1 ? '' : 's'}</span></summary>
-      <table><tbody>${r.pilots.map((p) => `<tr>
+      <table><tbody>${r.pilots.map((p) => { const me = mine.get(p.name.toLowerCase()); return `<tr>
         <td class="nm">${esc(NAME(p.name))}</td>
-        <td class="laps">${p.laps.map((ms, j) => `<span class="${p.best3At >= 0 && j >= p.best3At && j < p.best3At + 3 ? 'b3' : ''} ${ms === p.bestLap ? 'best' : ''}">${lapTime(ms)}</span>`).join('')}</td>
-        <td class="tot"><small>3C</small>${lapTime(p.best3)}${sb(p.best3, t.sb.best3)}</td>
-        <td class="tot"><small>best</small>${lapTime(p.bestLap)}${sb(p.bestLap, t.sb.lap)}</td></tr>`).join('')}</tbody></table>
+        <td class="laps">${p.laps.map((ms, j) => `<span class="${p.best3At >= 0 && j >= p.best3At && j < p.best3At + 3 ? 'b3' : ''} ${tone(ms, t.sb.lap, me?.bestLap)}">${lapTime(ms)}</span>`).join('')}</td>
+        <td class="tot ${tone(p.best3, t.sb.best3, me?.best3)}"><small>3C</small>${lapTime(p.best3)}</td>
+        <td class="tot ${tone(p.bestLap, t.sb.lap, me?.bestLap)}"><small>best</small>${lapTime(p.bestLap)}</td></tr>`; }).join('')}</tbody></table>
     </details>`;
   }).join('');
   $('times').innerHTML = board + `<h3>Heats</h3>` + runs;

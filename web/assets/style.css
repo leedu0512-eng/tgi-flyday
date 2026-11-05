@@ -687,8 +687,8 @@ body.embedded .kiosk .done-qr #doneQr { width: 200px; height: 200px; }
 .me-bests b { display: block; font-family: var(--stencil); font-weight: 900; font-size: 40px; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .me-bests .pbsb { position: absolute; top: 10px; right: 10px; }
 body.me .pbsb { display: inline-block; font-style: normal; font-family: var(--display); font-weight: 900; font-size: 13px; letter-spacing: 0.08em; padding: 2px 7px; border-radius: 3px; }
-body.me .pbsb.is-pb { background: var(--text); color: #000; }
-body.me .pbsb.is-sb { background: #a855f7; color: #fff; }
+body.me .pbsb.is-pb { background: var(--pb); color: #000; }
+body.me .pbsb.is-sb { background: var(--sb); color: #fff; }
 .me-runs { display: grid; gap: 8px; margin-top: 10px; }
 .me-run { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
 .me-run.live { border-color: #22c55e; }
@@ -706,7 +706,6 @@ body.me .pbsb.is-sb { background: #a855f7; color: #fff; }
 .me-run li b { font-variant-numeric: tabular-nums; font-weight: 700; }
 .me-run li.b3 { background: rgba(255, 107, 0, 0.16); }
 .me-run li.b3 b { color: var(--accent); }
-.me-run li.best b::after { content: ' ●'; font-size: 10px; vertical-align: 3px; color: var(--accent); }
 .me-run summary > span:first-of-type { min-width: 0; }
 .me-run summary .sum { flex: none; }
 .me-bests small { padding-right: 34px; }
@@ -740,6 +739,13 @@ body.me .pbsb.is-sb { background: #a855f7; color: #fff; }
 .trun td.laps { display: flex; flex-wrap: wrap; gap: 4px; }
 .trun td.laps span { padding: 3px 7px; border-radius: 3px; font-variant-numeric: tabular-nums; font-size: 14px; background: #161616; }
 .trun td.laps span.b3 { background: rgba(255, 107, 0, 0.18); color: var(--accent); font-weight: 700; }
-.trun td.laps span.best { outline: 1px solid var(--accent); }
 .trun td.tot { width: 92px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
 .trun td.tot small { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+/* F1 timing colours: green = personal best, purple = session best. (Not .pb: that's the pit board.) */
+:root { --pb: #22c55e; --sb: #b44dff; }
+.me-bests b.t-pb, .me-run .sum b.t-pb, .me-run li.t-pb b, .times td.t-pb, .times .laps span.t-pb { color: var(--pb) !important; }
+.me-bests b.t-sb, .me-run .sum b.t-sb, .me-run li.t-sb b, .times td.t-sb, .times .laps span.t-sb { color: var(--sb) !important; }
+.me-run .sum b { font-weight: 700; color: var(--text); }
+.times .laps span.t-sb { outline: 1px solid var(--sb); }
+.times .laps span.t-pb { outline: 1px solid var(--pb); }
