@@ -414,6 +414,19 @@ $('view').addEventListener('click', async (e) => {
     mover = state.pilots.find((p) => p.id === t.dataset.mover);
     return go('slot');
   }
+  if (t.hasAttribute('data-shift')) { shiftManual = !shiftOn(); return updateKeys(); }
+  if (t.dataset.key !== undefined) {
+    const k = t.dataset.key;
+    const ch = /^[A-Z]$/.test(k) && !shiftOn() ? k.toLowerCase() : k;
+    name = k === '⌫' ? name.slice(0, -1) : (name + ch).slice(0, 24);
+    shiftManual = null;
+    const input = $('nameInput');
+    input.value = name;
+    input.focus();
+    refreshSuggestions();
+    updateKeys();
+    return;
+  }
   if (t.dataset.pick !== undefined) { name = t.dataset.pick; return toSlots(); }
   if (t.hasAttribute('data-next')) return toSlots();
   if (t.dataset.heat !== undefined) {
