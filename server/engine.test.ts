@@ -274,25 +274,58 @@ test('distribute: adds heats when there is no room, even while running', () => {
   assert.throws(() => e.distribute(placed.map((x) => x.pilot.id)), /already in a heat/);
 });
 
-test('compact: fewest heats, keeping channels where possible, the heat up next untouched', () => {
+test('compact between heats: every heat counts, also the one up next; channels kept where possible', () => {
   const { e } = setup(); // channels R1 R2 F2 F4
   e.setConfig({ heatCount: 5 });
   const a = e.join('A', 0, 0);                    // heat 1 R1 (up next once started)
   const b = e.join('B', 1, 1);                    // heat 2 R2
-  const c = e.join('C', 3, 1);                    // heat 4 R2: clashes with B
+  const c = e.join('C', 3, 1);                    // heat 4 R2
   const d = e.join('D', 4, 2);                    // heat 5 F2
   const [mia, leo] = e.placeSharedQuad('Kit', 3, ['Mia', 'Leo']).map((x) => x.pilot); // F4, heats 1 and 2
   e.action('start', 0);
   const res = e.compact();
-  assert.equal(e.heats[0][0], a.id, 'the heat up next is untouched');
-  assert.equal(res.heatsInUse, 2, 'everyone else fits in one heat');
+  assert.equal(res.heatsInUse, 2, '6 pilots on 4 channels: 2 heats');
+  assert.ok(e.heats[0].includes(a.id), 'pilots in a kept heat stay put');
+  assert.equal(e.clock.heat, 0, 'the changeover is still for heat 1');
   const chan = (id: string) => { for (let h = 0; h < 5; h++) { const s = e.heats[h].indexOf(id); if (s >= 0) return e.channelOf(h, s); } };
-  assert.equal(chan(b.id), 'R2');
-  assert.equal(chan(d.id), 'F2');
-  assert.equal(chan(leo.id), 'F4');
-  assert.notEqual(chan(c.id), 'R2', 'C had to change channel to fit');
-  assert.deepEqual(res.channelChanges.map((x) => x.pilot.callsign), ['C']);
-  assert.ok(mia);
+  for (const [p, ch] of [[b, 'R2'], [c, 'R2'], [d, 'F2'], [leo, 'F4'], [mia, 'F4']] as const) assert.equal(chan(p.id), ch);
+  assert.equal(res.channelChanges.length, 0, 'nobody had to change channel');
+});
+
+test('compact also empties the heat up next when that saves a heat; the changeover moves on', () => {
+  const { e } = setup(); // R1 R2 F2 F4, 3 heats
+  e.join('A', 0, 0);                          // heat 1: 1 pilot (up next)
+  ['B', 'C', 'D'].forEach((n, s) => e.join(n, 1, s + 1)); // heat 2: 3 pilots, R1 free
+  e.action('start', 0);
+  assert.equal(e.clock.heat, 0);
+  const res = e.compact();
+  assert.equal(res.heatsInUse, 1, 'everyone fits in one heat');
+  assert.equal(e.clock.heat, 1, 'the changeover is now for heat 2');
+  assert.equal(e.clock.phase, 'changeover');
+});
+
+test('compact waits while a heat is on; "Pause after this heat" stops in the changeover, line-up on resume', () => {
+  const { e, said } = setup(0.5);
+  e.join('A', 0, 0); e.join('B', 1, 1); e.join('C', 2, 2);
+  e.action('start', 0);
+  assert.throws(() => e.action('pauseAfter', 0), /while a heat is on/);
+  let t = run(e, 0, 120_000 + 10_000); // changeover, arm, start: heat 1 is flying
+  assert.equal(e.clock.phase, 'running');
+  assert.throws(() => e.compact(), /A heat is on/);
+  e.action('pauseAfter', t);
+  assert.equal(e.clock.pauseAfter, true);
+  t = run(e, t, 180_000);
+  assert.equal(e.clock.phase, 'changeover');
+  assert.equal(e.clock.paused, true, 'paused straight after the heat');
+  assert.equal(e.clock.pausedRemaining, 120_000, 'with the full changeover left');
+  assert.equal(e.clock.pauseAfter, false);
+  assert.match(said().at(-1)!, /Paused after this heat/);
+  assert.ok(!said().some((x) => /Heat 2\. B/.test(x)), 'no line-up yet');
+  const res = e.compact();
+  assert.equal(res.heatsInUse, 1);
+  e.action('resume', t + 1000);
+  assert.match(said().at(-1)!, /^Heat \d\. /, 'the line-up comes on resume');
+  assert.equal(e.clock.paused, false);
 });
 
 test('compact keeps a channel by switching a free slot to it when that heat does not use it', () => {
@@ -361,11 +394,17 @@ test('heats can change during a session; only empty heats at the end can be remo
   assert.throws(() => e.setConfig({ channels: ['R1', 'r1'] }), /once/);
 });
 
-test('20 s to start cuts the changeover and skips the earlier calls', () => {
+test('20 s to start: always 20 seconds, also when less is left', () => {
   const { e, audio, said } = setup(0.5);
   e.join('Alpha', 0, 0);
   e.action('start', 0);
   let t = run(e, 0, 5000);
+  audio.length = 0;
+  e.action('to20', t);
+  assert.equal(e.clock.endsAt! - t, 20_000);
+  t = run(e, t, 15_000);
+  assert.deepEqual(said(), ['20 seconds to heat 1.', '10 seconds to heat 1.']);
+  // 5 seconds left: back to 20, and the 10 seconds call comes again.
   audio.length = 0;
   e.action('to20', t);
   assert.equal(e.clock.endsAt! - t, 20_000);

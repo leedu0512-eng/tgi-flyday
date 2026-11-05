@@ -851,3 +851,7 @@ details.more .more-body { display: grid; gap: 14px; padding-top: 10px; }
 /* Console columns: cards spaced by a gap, so a hidden card (Heats while a page is open) leaves no space. */
 .console .grid > div { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .console .grid > div > .card + .card { margin-top: 0; }
+
+/* Clock box: "Pause after this heat" (orange once asked for). Compact heats greys out while a heat is on. */
+.controls .pause-after.on { background: rgba(255,107,0,.15); border-color: var(--accent); color: var(--accent); }
+#compact:disabled { background: var(--panel-2); border-color: var(--line); color: var(--muted); cursor: not-allowed; opacity: 1; }

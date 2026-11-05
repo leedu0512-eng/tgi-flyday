@@ -117,6 +117,8 @@ export interface CalloutTexts {
   /** Each lap with a timer. {name} {lap} {laptime} */
   gatePass: string;
   paused: string;
+  /** The heat ended and the RD had asked to pause after it. */
+  pausedAfterHeat: string;
   resumed: string;
 }
 
@@ -166,6 +168,8 @@ export interface ClockState {
   startedAt: number | null;
   /** Epoch ms when free flight began; null otherwise. */
   freeSince: number | null;
+  /** RD asked to pause when the heat that is on now ends (changeover starts paused). */
+  pauseAfter: boolean;
 }
 
 export type AudioEvent =
@@ -243,6 +247,7 @@ export const DEFAULT_CONFIG: Config = {
       nightEnd: 'Practice is over for today. Thanks for flying, good night.',
       gatePass: '{name}, {laptime}',
       paused: 'Paused.',
+      pausedAfterHeat: 'Paused after this heat. Hold on, the heats are being sorted out.',
       resumed: 'Resumed.',
     },
   },
