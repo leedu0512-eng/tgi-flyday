@@ -534,7 +534,10 @@ body.m { padding: env(safe-area-inset-top) 0 calc(72px + env(safe-area-inset-bot
 .kiosk .face-guide text { fill: #fff; font: 800 4.2px var(--display, sans-serif); letter-spacing: 0.25em; text-anchor: middle; }
 
 /* View picker: barely there in the bottom-right corner of every screen. */
-.view-picker { position: fixed; right: 10px; bottom: 10px; z-index: 100; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-family: var(--font); }
+.view-picker { position: fixed; right: 10px; bottom: 10px; z-index: 100; display: grid; grid-template-columns: auto auto; align-items: center; justify-items: end; gap: 6px; font-family: var(--font); }
+.view-picker .vp-menu { grid-column: 1 / -1; }
+.view-picker .vp-ver { font-size: 11px; font-variant-numeric: tabular-nums; color: #fff; opacity: 0.18; pointer-events: none; }
+body.idle .view-picker .vp-ver { opacity: 0.1; }
 
 .view-picker .vp-btn { width: 34px; height: 34px; padding: 9px; border: 0; border-radius: 6px; background: transparent; cursor: pointer; opacity: 0.12; transition: opacity 0.2s; }
 .view-picker .vp-btn svg { width: 100%; height: 100%; fill: #fff; display: block; }
@@ -551,10 +554,11 @@ body.idle .view-picker:not(.open) .vp-btn { opacity: 0.05; }
 .pb-signin { font-family: var(--display); font-weight: 800; font-size: calc(2.8 * var(--u)); letter-spacing: 0.08em; text-transform: uppercase;
   background: var(--accent); color: #000; border: 0; border-radius: 3px; padding: calc(1.1 * var(--u)) calc(1.8 * var(--uw)); cursor: pointer; }
 .pb-signin:active { transform: translateY(1px); }
-.pb-signin-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.7); display: grid; place-items: center; }
-.pb-signin-panel { position: relative; width: min(94vw, 167vh); height: 92vh; background: #000; border: 3px solid var(--accent); border-radius: 6px; overflow: hidden; box-shadow: 0 20px 80px rgba(0, 0, 0, 0.8); }
+.pb-signin-overlay { position: fixed; top: 0; right: 0; bottom: 0; z-index: 60; width: min(760px, 44vw); transform: translateX(100%); transition: transform 0.35s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.pb-signin-overlay.open { transform: none; pointer-events: auto; }
+.pb-signin-panel { position: relative; width: 100%; height: 100%; background: #000; border-left: 4px solid var(--accent); box-shadow: -30px 0 80px rgba(0, 0, 0, 0.75); }
 .pb-signin-panel iframe { width: 100%; height: 100%; border: 0; display: block; background: #000; }
-.pb-signin-close { position: absolute; top: 12px; right: 12px; z-index: 2; width: 56px; height: 56px; border-radius: 50%; border: 2px solid #444; background: #111; color: #fff; font-size: 26px; cursor: pointer; }
+.pb-signin-close { position: absolute; top: 14px; right: 14px; z-index: 2; width: 52px; height: 52px; border-radius: 50%; border: 2px solid #444; background: #111; color: #fff; font-size: 24px; cursor: pointer; }
 body.idle .pb-signin-overlay { cursor: auto; }
 /* The kiosk inside that panel: no top bar of its own. */
 body.embedded .kiosk > .bar { display: none; }
@@ -587,3 +591,10 @@ body.embedded .kiosk .view { padding-top: 24px; }
 .restart-cover { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.88); display: grid; place-items: center; color: #fff; text-align: center; font-family: var(--font); }
 .restart-cover b { display: block; font-family: var(--display); font-size: 48px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.03em; }
 .restart-cover span { display: block; margin-top: 10px; font-size: 20px; color: #aaa; }
+/* The kiosk in the big screen's flyout: one column, no heat board (the big screen shows it). */
+body.embedded .kiosk .big-actions.three { grid-template-columns: 1fr; max-width: none; margin-top: 56px; gap: 16px; }
+body.embedded .kiosk .big-actions .big { min-height: 0; padding: 30px 24px; }
+body.embedded .kiosk .keyboard { gap: 7px; }
+body.embedded .kiosk .keyboard .krow { gap: 6px; }
+body.embedded .kiosk .keyboard button { width: calc((100% - 54px) / 10); height: 64px; font-size: 24px; padding: 0; }
+body.embedded .kiosk .keyboard .krow:last-child button { flex: 1 1 0; width: auto; font-size: 18px; }

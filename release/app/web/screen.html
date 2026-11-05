@@ -16,14 +16,14 @@
     <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
     <span id="meta" class="meta">Practice</span>
     <span id="wallclock" class="wallclock num"></span>
-    <button id="signinBtn" class="pb-signin">Sign in / Leave</button>
+    <button id="signinBtn" class="pb-signin">Sign in</button>
   </header>
   <div id="main" class="pb-main"></div>
   <div id="next" class="pb-next"></div>
 </div>
 
 <!-- The kiosk, opened over the big screen when kiosk and screen share one PC. -->
-<div id="signin" class="pb-signin-overlay" hidden>
+<div id="signin" class="pb-signin-overlay">
   <div class="pb-signin-panel">
     <button id="signinClose" class="pb-signin-close" aria-label="Close">✕</button>
     <iframe id="signinFrame" title="Pilot sign-in" allow="camera; autoplay"></iframe>
@@ -164,17 +164,22 @@ wake();
 const signin = $('signin');
 const frame = $('signinFrame');
 if (new URLSearchParams(location.search).has('nosignin')) $('signinBtn').hidden = true;
+// A flyout from the right edge: the board stays in view beside it, and it slides away when done.
+let closing;
 function openSignin() {
+  clearTimeout(closing);
   frame.src = '/kiosk?embed';
-  signin.hidden = false;
+  signin.classList.add('open');
 }
 function closeSignin() {
-  signin.hidden = true;
-  frame.src = 'about:blank'; // also switches the webcam off
+  if (!signin.classList.contains('open')) return;
+  signin.classList.remove('open');
+  closing = setTimeout(() => { frame.src = 'about:blank'; }, 400); // also switches the webcam off
 }
-$('signinBtn').addEventListener('click', openSignin);
+$('signinBtn').addEventListener('click', (e) => { e.stopPropagation(); signin.classList.contains('open') ? closeSignin() : openSignin(); });
 $('signinClose').addEventListener('click', closeSignin);
-signin.addEventListener('click', (e) => { if (e.target === signin) closeSignin(); });
+// A tap on the board beside the flyout closes it too.
+document.addEventListener('click', (e) => { if (!signin.contains(e.target)) closeSignin(); });
 addEventListener('message', (e) => {
   if (e.origin === location.origin && e.data?.flyday === 'kiosk-done') closeSignin();
 });

@@ -76,8 +76,7 @@ function homeView() {
       <button class="big" data-flow="move">Change channel<small>Move to another channel or heat</small></button>
       <button class="big" data-go="leave">Going home<small>Free up your slot</small></button>
     </div>
-    <h1 style="margin-top:6vh">Heats</h1>
-    ${board(false)}`;
+    ${EMBED ? '' : `<h1 style="margin-top:6vh">Heats</h1>${board(false)}`}`;
 }
 
 function nameView() {
