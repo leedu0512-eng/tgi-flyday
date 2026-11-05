@@ -54,6 +54,10 @@ interface LiveTiming {
 
 /** End of the day: how long the "still flying?" question waits, and how long "yes" holds it off. */
 const NIGHT_GRACE_MS = 5 * 60_000;
+/** Callout wordings that earlier versions had as defaults; saved unchanged, they follow the new default. */
+const OLD_DEFAULT_TEXTS: Record<string, string> = {
+  nightEnd: 'Practice is over for today. Thanks for flying, good night.',
+};
 /** Warnings before the session's end time, in minutes. */
 const FINISH_WARN_MIN = [30, 20, 10];
 const NIGHT_SNOOZE_MS = 60 * 60_000;
@@ -185,7 +189,8 @@ export class Engine {
           ...DEFAULT_CONFIG.callouts.texts,
           // Arm wording saved by an earlier version.
           ...((saved.callouts as any)?.armText ? { arm: (saved.callouts as any).armText } : {}),
-          ...(saved.callouts?.texts ?? {}),
+          // Saved wording still the old default: take the new default instead (an edited one stays).
+          ...Object.fromEntries(Object.entries(saved.callouts?.texts ?? {}).filter(([k, v]) => OLD_DEFAULT_TEXTS[k] !== v)),
         },
       },
       sound: { ...DEFAULT_CONFIG.sound, ...(saved.sound ?? {}) },

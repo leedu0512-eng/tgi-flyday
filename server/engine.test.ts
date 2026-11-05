@@ -902,7 +902,7 @@ test('end of the day: asks at 20:30, "still flying" holds it off an hour, no ans
   e.nightTick(H + 4000 + 66 * 60_000, at + 66); // 5 minutes, nobody answered
   assert.equal(e.clock.phase, 'stopped');
   assert.equal(e.pilots.size, 0);
-  assert.match(said().at(-1)!, /good night/);
+  assert.match(said().at(-1)!, /cleaner than you found it\. Good night!/);
   // A session started after 20:30 gets its first hour before the question.
   const T = 10 * H;
   e.walkIn('Night owl');
@@ -1039,7 +1039,7 @@ test('session end time: warnings at 30, 20, 10 min, the round being flown finish
   while (e.clock.phase !== 'stopped') { t += 100; e.tick(t); e.finishTick(t); }
   assert.equal(e.clock.round, round, 'no new round started');
   assert.equal(e.clock.heatsRun % 3, 0, 'heats 2 and 3 were flown to finish the round');
-  assert.match(said().at(-1)!, /That was the last round/);
+  assert.match(said().at(-1)!, /That was the last round\. Thank you all for flying.*cleaner than you found it/);
   assert.equal(e.clock.finishAt, null, 'cleared for the next session');
   assert.equal(e.pilots.size, 3, 'everyone stays signed in');
 });
@@ -1051,7 +1051,7 @@ test('session end time: in the changeover before a round starts, or in free flig
   e.setFinish(1000, 0);
   e.finishTick(1000);
   assert.equal(e.clock.phase, 'stopped');
-  assert.match(said().at(-1)!, /Please land/);
+  assert.match(said().at(-1)!, /please land\. Thank you all/);
   const f = setup(0.5).e;
   f.setConfig({ freeFlight: true });
   f.walkIn('Solo');
@@ -1066,4 +1066,10 @@ test('session end time: in the changeover before a round starts, or in free flig
   assert.equal(f.clock.finishAt, 10 * 60_000);
   f.walkIn('Solo'); f.action('start', 20 * 60_000); f.action('stop', 20 * 60_000 + 1);
   assert.equal(f.clock.finishAt, null);
+});
+
+test('saved callout wording that was the old default follows the new default; edited wording stays', () => {
+  const e = new Engine({ config: { callouts: { texts: { nightEnd: 'Practice is over for today. Thanks for flying, good night.', sessionStart: 'Off we go!' } } } as any }, { random: () => 0.5, newId: () => 'x', onAudio: () => {} });
+  assert.match(e.config.callouts.texts.nightEnd, /cleaner than you found it/);
+  assert.equal(e.config.callouts.texts.sessionStart, 'Off we go!');
 });
