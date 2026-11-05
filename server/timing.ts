@@ -7,7 +7,7 @@ export function lapsFrom(passes: number[]): number[] {
   return laps;
 }
 
-/** Fastest total of `n` laps in a row (EDRL: best 3 consecutive); null when there aren't enough. */
+/** Fastest total of `n` consecutive laps (EDRL: best 3 consecutive, 3C); null when there aren't enough. */
 export function bestConsecutive(laps: number[], n = 3): number | null {
   if (laps.length < n) return null;
   let sum = laps.slice(0, n).reduce((a, b) => a + b, 0);
@@ -19,7 +19,7 @@ export function bestConsecutive(laps: number[], n = 3): number | null {
   return best;
 }
 
-/** Where the fastest `n` laps in a row start (index into laps); -1 when there aren't enough. */
+/** Where the fastest `n` consecutive laps start (index into laps); -1 when there aren't enough. */
 export function bestWindow(laps: number[], n = 3): number {
   if (laps.length < n) return -1;
   let sum = laps.slice(0, n).reduce((a, b) => a + b, 0);

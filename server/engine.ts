@@ -616,7 +616,7 @@ export class Engine {
 
   /**
    * A pilot's laps this session, for their phone: every run they have laps in (the one
-   * flying now included), their best lap and best 3 in a row, and whether those are
+   * flying now included), their best lap and best 3 consecutive, and whether those are
    * also the best of everyone this session (SB) or only their own (PB).
    */
   lapReport(name: string) {
@@ -634,7 +634,7 @@ export class Engine {
     });
     let myLap: number | null = null, my3: number | null = null;
     for (const r of runs) { myLap = min(myLap, r.bestLap); my3 = min(my3, r.best3); }
-    // The run that holds the pilot's best: by best 3 in a row, else by best lap.
+    // The run that holds the pilot's best: by best 3 consecutive, else by best lap.
     const pbRun = my3 !== null ? runs.findIndex((r) => r.best3 === my3) : myLap !== null ? runs.findIndex((r) => r.bestLap === myLap) : -1;
     return {
       runs, pbRun,
@@ -645,7 +645,7 @@ export class Engine {
   }
 
   /**
-   * The RD's view of this session's laps: a leaderboard (best 3 in a row, then best lap)
+   * The RD's view of this session's laps: a leaderboard (best 3 consecutive, then best lap)
    * and every timed heat with each pilot's laps, the one flying now included.
    */
   timesReport() {

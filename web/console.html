@@ -765,7 +765,7 @@ function renderTimes() {
     return;
   }
   const sb = (v, best) => v != null && v === best ? '<em class="sbm">SB</em>' : '';
-  const board = `<h3>Session bests</h3><table class="lb"><thead><tr><th></th><th>Pilot</th><th>Best 3 in a row</th><th>Best lap</th><th>Laps</th><th>Heats</th></tr></thead><tbody>
+  const board = `<h3>Session bests</h3><table class="lb"><thead><tr><th></th><th>Pilot</th><th>Best 3C</th><th>Best lap</th><th>Laps</th><th>Heats</th></tr></thead><tbody>
     ${t.leaders.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(NAME(l.name))}</td><td>${lapTime(l.best3)}${sb(l.best3, t.sb.best3)}</td><td>${lapTime(l.bestLap)}${sb(l.bestLap, t.sb.lap)}</td><td>${l.laps}</td><td>${l.heats}</td></tr>`).join('')}</tbody></table>`;
   const runs = [...t.runs].reverse().map((r, i) => {
     const key = `${r.round}-${r.heat}-${r.at}`;
@@ -775,7 +775,7 @@ function renderTimes() {
       <table><tbody>${r.pilots.map((p) => `<tr>
         <td class="nm">${esc(NAME(p.name))}</td>
         <td class="laps">${p.laps.map((ms, j) => `<span class="${p.best3At >= 0 && j >= p.best3At && j < p.best3At + 3 ? 'b3' : ''} ${ms === p.bestLap ? 'best' : ''}">${lapTime(ms)}</span>`).join('')}</td>
-        <td class="tot"><small>3 in a row</small>${lapTime(p.best3)}${sb(p.best3, t.sb.best3)}</td>
+        <td class="tot"><small>3C</small>${lapTime(p.best3)}${sb(p.best3, t.sb.best3)}</td>
         <td class="tot"><small>best</small>${lapTime(p.bestLap)}${sb(p.bestLap, t.sb.lap)}</td></tr>`).join('')}</tbody></table>
     </details>`;
   }).join('');

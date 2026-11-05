@@ -44,3 +44,8 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - POST /api/update (server/update.ts): latest commit via the GitHub API (falls back to `main` when rate-limited), then every file from raw.githubusercontent.com at that commit, sha256-checked, into versions/<v>, then app.json. Then relaunch with `--after-update` (no new windows; waits for the port) and exit. data/ is never touched. Node also trusts the OS certificate store (antivirus HTTPS inspection). Errors are reported with their cause (`why()`), shown on the restart cover.
 - **Before every publish:** `npm test` and `node tools/smoke-test.cjs` (Playwright: clicks the kiosk's on-screen keys, the big screen flyout, change channel, Going home and the phone page like a pilot). Both must pass. Tests that type into inputs directly missed two kiosk breakages.
 - The restart item lives in the view picker (common.js `restart()`); test with FLYDAY_UPDATE_API / FLYDAY_UPDATE_RAW pointing at a fake server.
+
+## Words
+
+- Best 3 consecutive laps: **3C** ("Best 3C"). Never "3 in a row": pilots learn the real terms here.
+- PB = a pilot's own best, SB = the best of everyone this session. The phone's top tiles only mark SB (a pilot's best is obviously their PB); the round holding their best is marked PB, or SB.

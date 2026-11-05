@@ -787,14 +787,14 @@ test('lap history: every timed heat by round and heat, free flight timed too, PB
   assert.equal(e.lapReport('Ghost').runs.length, 0);
 });
 
-test('bestWindow finds where the best 3 in a row start', async () => {
+test('bestWindow finds where the best 3 consecutive start', async () => {
   const { bestWindow } = await import('./timing.ts');
   assert.equal(bestWindow([30, 20, 21, 22, 40]), 1);
   assert.equal(bestWindow([10, 10, 10, 30]), 0);
   assert.equal(bestWindow([10, 10]), -1);
 });
 
-test('times report: leaderboard by best 3 in a row, every run with everyone', () => {
+test('times report: leaderboard by best 3 consecutive, every run with everyone', () => {
   const e = new Engine({ runs: [
     { round: 1, heat: 0, free: false, at: 1, laps: [{ name: 'Ghost', laps: [20000, 19000, 20000] }, { name: 'Chirp', laps: [18000, 18000, 18000, 17000] }] },
     { round: 2, heat: 0, free: false, at: 2, laps: [{ name: 'Ghost', laps: [16000] }] },

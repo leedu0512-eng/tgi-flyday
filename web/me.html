@@ -159,8 +159,8 @@ function lapTime(ms) {
 function badge(sb) { return `<em class="pbsb ${sb ? 'is-sb' : 'is-pb'}">${sb ? 'SB' : 'PB'}</em>`; }
 
 /**
- * Best lap and best 3 in a row on top (SB when nobody this session beat it, else PB),
- * then every timed heat, oldest first, collapsible. The best 3 in a row in each are
+ * Best lap and best 3 consecutive (3C) on top, marked SB when nobody this session beat it,
+ * then every timed heat, oldest first, collapsible. The best 3 consecutive laps in each are
  * highlighted; the round with the pilot's best is marked PB (or SB).
  */
 function lapsView() {
@@ -174,15 +174,15 @@ function lapsView() {
     const title = r.free ? `Round ${r.round}, heat ${r.heat + 1} · free flight` : `Round ${r.round}, heat ${r.heat + 1}`;
     return `<details class="me-run ${r.live ? 'live' : ''}" data-run="${key}" ${open ? 'open' : ''}>
       <summary><span>${title}${r.live ? ' <i class="now">flying</i>' : ''}</span>
-        <span class="sum">${r.best3 != null ? `3 in a row ${lapTime(r.best3)}` : `${r.laps.length} lap${r.laps.length === 1 ? '' : 's'}`}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
+        <span class="sum">${r.best3 != null ? `3C ${lapTime(r.best3)}` : `${r.laps.length} lap${r.laps.length === 1 ? '' : 's'}`}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
       <ol>${r.laps.map((ms, j) => `<li class="${r.best3At >= 0 && j >= r.best3At && j < r.best3At + 3 ? 'b3' : ''} ${ms === r.bestLap ? 'best' : ''}">
         <span>Lap ${j + 1}</span><b>${lapTime(ms)}</b></li>`).join('')}</ol>
     </details>`;
   }).join('');
   return `<h2>Your laps</h2>
     <div class="me-bests">
-      <div><small>Best lap</small><b>${lapTime(laps.bestLap?.ms)}</b>${laps.bestLap ? badge(laps.bestLap.sb) : ''}</div>
-      <div><small>Best 3 in a row</small><b>${lapTime(laps.best3?.ms)}</b>${laps.best3 ? badge(laps.best3.sb) : ''}</div>
+      <div><small>Best lap</small><b>${lapTime(laps.bestLap?.ms)}</b>${laps.bestLap?.sb ? badge(true) : ''}</div>
+      <div><small>Best 3C</small><b>${lapTime(laps.best3?.ms)}</b>${laps.best3?.sb ? badge(true) : ''}</div>
     </div>
     <div class="me-runs">${runs}</div>`;
 }
