@@ -13,7 +13,7 @@
 <div id="screen" class="pb">
   <div class="chequer"></div>
   <header class="pb-head">
-    <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+    <div class="logo" id="viewToggle" title="Switch view"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small><span id="wmWord">Fly</span><b>Day</b></span></div>
     <span id="meta" class="meta">Practice</span>
     <span id="wallclock" class="wallclock num"></span>
     <div class="pb-qr" title="Your heat on your phone"><span>Your heat<br>on your phone</span><i id="meQr"></i></div>
@@ -63,18 +63,93 @@ function plates(heat, pm) {
   }).join('')}</div>`;
 }
 
+// ---------- TrackDay view: the clock and a QR code (tap the logo to switch) ----------
+// The RC car days: the screen says TGI TrackDay and shows how to pay for the track day.
+// It switches to it by itself every Wednesday, Saturday and Sunday at 09:00 (once a day,
+// so tapping back to FlyDay that day sticks).
+
+/** QR cards for the second view. More can follow; for now: paying for the track day. */
+const CARDS = [
+  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo' },
+];
+let view = (() => { try { return localStorage.getItem('flyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
+const cardQr = new Map();
+function setView(v) {
+  view = v;
+  try { localStorage.setItem('flyday.screen.view', view); } catch {}
+  render();
+}
+$('viewToggle').addEventListener('click', () => setView(view === 'plates' ? 'pay' : 'plates'));
+
+const TRACK_DAYS = [3, 6, 0]; // Wednesday, Saturday, Sunday
+const TRACK_FROM = 9 * 60;    // 09:00
+function trackDaySchedule() {
+  const d = new Date();
+  if (!TRACK_DAYS.includes(d.getDay()) || d.getHours() * 60 + d.getMinutes() < TRACK_FROM) return;
+  const today = d.toDateString();
+  let done = '';
+  try { done = localStorage.getItem('flyday.screen.trackday') || ''; } catch {}
+  if (done === today) return;
+  try { localStorage.setItem('flyday.screen.trackday', today); } catch {}
+  if (view !== 'pay') setView('pay');
+}
+setInterval(trackDaySchedule, 30_000);
+
+/** The big time of day, for the TrackDay view when no drone practice runs. */
+function dayClock() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+setInterval(() => {
+  const el = document.getElementById('dayClock');
+  if (!el) return;
+  if (el.textContent !== dayClock()) el.textContent = dayClock();
+  fitClock(el);
+}, 1000);
+
+function payCard() {
+  const card = CARDS[0];
+  if (!cardQr.has(card.url)) {
+    cardQr.set(card.url, '');
+    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); const el = document.querySelector('.pay-qr'); if (el) el.innerHTML = svg; });
+  }
+  return `<div class="pay-card">
+    <h2>${esc(card.title)}</h2>
+    <div class="pay-qr">${cardQr.get(card.url)}</div>
+    <p class="pay-price">${esc(card.price)}</p>
+    <p class="pay-cta">${esc(card.cta)}</p>
+  </div>`;
+}
+
 function render() {
   if (!state) return;
   const c = state.clock;
   const screen = $('screen');
+  screen.classList.toggle('pay-view', view === 'pay');
+  $('wmWord').textContent = view === 'pay' ? 'Track' : 'Fly';
+  // TrackDay is for the RC cars: no drone bits in the header (sign in, the phone QR).
+  screen.classList.toggle('car-day', view === 'pay');
+  document.title = view === 'pay' ? 'TGI TrackDay' : 'TGI FlyDay · Spectator view';
   $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}`;
 
   if (c.phase === 'stopped' || c.phase === 'waiting') {
     screen.classList.add('no-next');
     $('next').innerHTML = '';
     const msg = c.phase === 'waiting' ? 'Waiting for pilots · join a heat at the kiosk' : 'Practice is not running';
+    const idle = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
+    if (view === 'pay') {
+      // No drone practice: TrackDay and a big clock with the time of day.
+      $('main').className = 'pb-main';
+      $('main').innerHTML = `<div class="pb-board td-board">
+          <div class="plank top"><span class="heat">TRACK DAY</span></div>
+          <div class="plank clock-plank"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
+          <div class="plank bar td-name"><span class="label">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+        </div>${payCard()}`;
+      fitClock($('dayClock'));
+      return;
+    }
     $('main').className = 'pb-idle';
-    $('main').innerHTML = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
+    $('main').innerHTML = idle;
     return;
   }
   const pm = pilotMap(state);
@@ -86,7 +161,7 @@ function render() {
       <div class="plank clock-plank"><span id="bigclock" class="bigclock num"></span></div>
       <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
     </div>
-    ${plates(state.heats[c.heat], pm)}`;
+    ${view === 'pay' ? payCard() : plates(state.heats[c.heat], pm)}`;
   renderNext(pm);
   tick();
 }
@@ -189,6 +264,8 @@ document.addEventListener('click', (e) => { if (!signin.contains(e.target)) clos
 addEventListener('message', (e) => {
   if (e.origin === location.origin && e.data?.flyday === 'kiosk-done') closeSignin();
 });
+
+trackDaySchedule();
 
 connect({
   onState(s) { state = s; render(); },
