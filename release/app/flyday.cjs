@@ -217,7 +217,7 @@ async function latest() {
   return { release, commit };
 }
 var safe = (p) => /^[A-Za-z0-9._/-]+$/.test(p) && !p.split("/").includes("..");
-async function install(dir, release, commit) {
+async function install(dir, release, commit, onFile) {
   if (!/^[0-9A-Za-z.-]+$/.test(release.version)) throw new Error(`Odd version: ${release.version}`);
   const versions = (0, import_node_path2.join)(dir, "versions");
   const target = (0, import_node_path2.join)(versions, release.version);
@@ -229,6 +229,7 @@ async function install(dir, release, commit) {
     const out = (0, import_node_path2.join)(fresh, ...f.path.split("/"));
     (0, import_node_fs2.mkdirSync)((0, import_node_path2.dirname)(out), { recursive: true });
     (0, import_node_fs2.writeFileSync)(out, data);
+    onFile?.(release.files.indexOf(f) + 1, release.files.length);
   }
   (0, import_node_fs2.writeFileSync)((0, import_node_path2.join)(fresh, "version.json"), JSON.stringify(release, null, 1));
   if ((0, import_node_fs2.existsSync)(target)) (0, import_node_fs2.rmSync)(target, { recursive: true, force: true });
@@ -259,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.06-0005" : "dev";
+var VERSION = true ? "2026.11.06-0018" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -286,6 +287,7 @@ var DEFAULT_CONFIG = {
     timeUp: true,
     pauseResume: true,
     freeFlight: true,
+    heatsChanged: true,
     gatePassBeep: false,
     gatePassVoice: true,
     texts: {
@@ -300,6 +302,7 @@ var DEFAULT_CONFIG = {
       timeUp: "Time.",
       freeFlight: "Free flight. Only heat {heat} is left, fly as you like.",
       freeFlightEnd: "Free flight is over. Please land.",
+      heatsChanged: "Attention pilots, your heats and channels may have changed. Check the big screen.",
       freeFlightOpen: "Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.",
       heatsForm: "More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.",
       nightAsk: "Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.",
@@ -1423,8 +1426,8 @@ var Engine = class {
    * RD, between heats: pack everyone into as few heats as possible, so the loop is shorter.
    * Every heat counts, also the one up next. Pilots keep their channel wherever possible;
    * when that would cost an extra heat, they move to another channel (listed so the RD can
-   * tell them). Shared quads stay apart. Emptied heats are skipped by the loop.
-   * While a heat is on it refuses: use "Pause after this heat" first.
+   * tell them). Shared quads stay apart. Empty heats are removed and the rest renumbered
+   * 1, 2, 3… from the one up next. While a heat is on it refuses: use "Pause after this heat" first.
    */
   compact() {
     if (this.heatIsLive()) throw new EngineError("A heat is on. Compact the heats between heats: press Pause after this heat first.");
@@ -1451,15 +1454,18 @@ var Engine = class {
     for (const x of left) this.seat(x.p, x.from, this.heats[x.from].indexOf(null));
     const before = new Map(pending.map((x) => [x.p.id, x]));
     const moved = out.filter((o) => o.heat !== o.from || o.channel !== before.get(o.pilot.id).ch).length;
-    if (c.phase === "changeover") {
-      if (this.heatIsEmpty(c.heat)) {
-        const h = this.nextHeat(c.heat);
-        if (h >= 0) c.heat = h;
-      }
-      if ([...this.heats[c.heat]].join() !== nextBefore) {
-        if (c.paused) this.lineupPending = true;
-        else this.announceLineup(c.heat);
-      }
+    const used = order.filter((h) => !this.heatIsEmpty(h));
+    const renumbered = used.some((h, i) => h !== i);
+    if ((moved > 0 || renumbered) && this.config.callouts.heatsChanged) this.say(this.config.callouts.texts.heatsChanged);
+    if (used.length) {
+      this.heats = used.map((h) => this.heats[h]);
+      this.heatChannels = used.map((h) => this.heatChannels[h]);
+      this.config = { ...this.config, heatCount: used.length };
+      c.heat = 0;
+    }
+    if (c.phase === "changeover" && used.length && [...this.heats[0]].join() !== nextBefore) {
+      if (c.paused) this.lineupPending = true;
+      else this.announceLineup(0);
     }
     this.onChange();
     return {
@@ -1720,7 +1726,7 @@ function cleanTimer(patch, current) {
 }
 function cleanCallouts(patch, current) {
   const out = { ...current };
-  for (const k of ["sessionStartStop", "lineup", "arm", "readyBeeps", "finalBeeps", "timeUp", "pauseResume", "freeFlight", "gatePassBeep", "gatePassVoice"]) {
+  for (const k of ["sessionStartStop", "lineup", "arm", "readyBeeps", "finalBeeps", "timeUp", "pauseResume", "freeFlight", "heatsChanged", "gatePassBeep", "gatePassVoice"]) {
     if (patch[k] !== void 0) out[k] = Boolean(patch[k]);
   }
   if (patch.texts && typeof patch.texts === "object") {
@@ -2275,24 +2281,33 @@ data: ${JSON.stringify(engine.snapshot(Date.now()))}
     firewall = await firewallStatus();
     return json(res, 200, { ok: true, result: { accepted, firewall } });
   }
+  if (path === "/api/update/progress" && req.method === "GET") return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === "/api/update" && req.method === "POST") {
+    if (!IN_EXE && process.env.FLYDAY_FAKE_UPDATE) return fakeUpdate(res);
     if (!IN_EXE) return json(res, 200, { ok: true, result: { status: "dev", version: VERSION } });
     if (updating) return json(res, 200, { ok: true, result: { status: "busy", version: VERSION } });
     updating = true;
+    updateProgress = { stage: "check", done: 0, total: 0 };
     try {
       const { release, commit } = await latest();
       if (!(release.version > VERSION)) {
         updating = false;
+        updateProgress = { stage: "idle", done: 0, total: 0 };
         return json(res, 200, { ok: true, result: { status: "current", version: VERSION } });
       }
       console.log(`
 Updating TGI FlyDay ${VERSION} -> ${release.version} ...`);
-      await install(ROOT, release, commit);
+      updateProgress = { stage: "download", done: 0, total: release.files.length, to: release.version };
+      await install(ROOT, release, commit, (done, total) => {
+        updateProgress = { stage: "download", done, total, to: release.version };
+      });
+      updateProgress = { stage: "restart", done: release.files.length, total: release.files.length, to: release.version };
       json(res, 200, { ok: true, result: { status: "updated", version: release.version } });
       setTimeout(restartIntoUpdate, 400);
       return;
     } catch (err) {
       updating = false;
+      updateProgress = { stage: "idle", done: 0, total: 0 };
       console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
       return json(res, 200, { ok: true, result: { status: "offline", version: VERSION, error: why(err) } });
     }
@@ -2389,6 +2404,22 @@ function lanAddresses() {
 var AFTER_UPDATE = process.argv.includes("--after-update");
 var OPEN_WINDOWS = process.platform === "win32" && (IN_EXE || process.argv.includes("--open")) && !AFTER_UPDATE;
 var updating = false;
+var updateProgress = { stage: "idle", done: 0, total: 0 };
+async function fakeUpdate(res) {
+  const pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  updateProgress = { stage: "check", done: 0, total: 0 };
+  await pause(1200);
+  const total = 31;
+  for (let i = 0; i <= total; i++) {
+    updateProgress = { stage: "download", done: i, total, to: "test" };
+    await pause(120);
+  }
+  updateProgress = { stage: "restart", done: total, total, to: "test" };
+  json(res, 200, { ok: true, result: { status: "updated", version: "test" } });
+  setTimeout(() => {
+    updateProgress = { stage: "idle", done: 0, total: 0 };
+  }, 1e3);
+}
 var firewall = null;
 function restartIntoUpdate() {
   store.now();

@@ -68,9 +68,13 @@ function plates(heat, pm) {
 // It switches to it by itself every Wednesday, Saturday and Sunday at 09:00 (once a day,
 // so tapping back to FlyDay that day sticks).
 
-/** QR cards for the second view. More can follow; for now: paying for the track day. */
+/**
+ * QR cards for the second view, taking turns on one panel that flips in 3D: paying for the
+ * track day first (shown for `secs`), then joining the club, and back.
+ */
 const CARDS = [
-  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo' },
+  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', secs: 30 },
+  { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', secs: 15, cls: 'join' },
 ];
 let view = (() => { try { return localStorage.getItem('flyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
 const cardQr = new Map();
@@ -107,19 +111,44 @@ setInterval(() => {
   fitClock(el);
 }, 1000);
 
-function payCard() {
-  const card = CARDS[0];
+/** One card face. Its QR code is drawn once and kept. */
+function cardFace(card, i) {
   if (!cardQr.has(card.url)) {
     cardQr.set(card.url, '');
-    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); const el = document.querySelector('.pay-qr'); if (el) el.innerHTML = svg; });
+    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); for (const el of document.querySelectorAll(`[data-qr="${i}"]`)) el.innerHTML = svg; });
   }
-  return `<div class="pay-card">
+  return `<div class="pay-card face ${card.cls ?? ''}">
     <h2>${esc(card.title)}</h2>
-    <div class="pay-qr">${cardQr.get(card.url)}</div>
+    <div class="pay-qr" data-qr="${i}">${cardQr.get(card.url)}</div>
     <p class="pay-price">${esc(card.price)}</p>
     <p class="pay-cta">${esc(card.cta)}</p>
   </div>`;
 }
+
+/**
+ * The flipping panel. It is one element kept across renders (the board is redrawn on every
+ * state change), so a flip is never cut short; render() puts it where #cardSlot is.
+ */
+let cardSide = 0, cardSince = Date.now(), cardEl = null;
+function payCard() { return '<div id="cardSlot"></div>'; }
+function placeCard() {
+  const slot = document.getElementById('cardSlot');
+  if (!slot) return;
+  if (!cardEl) {
+    cardEl = document.createElement('div');
+    cardEl.className = 'card-flip';
+    cardEl.innerHTML = `<div class="card-inner">${cardFace(CARDS[0], 0)}${cardFace(CARDS[1], 1).replace('face ', 'face back ')}</div>`;
+  }
+  cardEl.classList.toggle('flipped', cardSide === 1);
+  slot.replaceWith(cardEl);
+}
+setInterval(() => {
+  if (view !== 'pay') { cardSide = 0; cardSince = Date.now(); cardEl?.classList.remove('flipped'); return; }
+  if (Date.now() - cardSince < CARDS[cardSide].secs * 1000) return;
+  cardSide = (cardSide + 1) % CARDS.length;
+  cardSince = Date.now();
+  cardEl?.classList.toggle('flipped', cardSide === 1);
+}, 500);
 
 function render() {
   if (!state) return;
@@ -149,6 +178,7 @@ function render() {
           <div class="plank clock-plank"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
           <div class="plank bar td-name"><span class="label">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
         </div>${payCard()}`;
+      placeCard();
       fitClock($('dayClock'));
       return;
     }
@@ -166,6 +196,7 @@ function render() {
       <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
     </div>
     ${view === 'pay' ? payCard() : plates(state.heats[c.heat], pm)}`;
+  placeCard();
   renderNext(pm);
   tick();
 }
