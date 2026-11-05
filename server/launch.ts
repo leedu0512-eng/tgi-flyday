@@ -2,7 +2,7 @@
 // for the folder version), keep the server window out of the way, and the kiosk mode.
 // PowerShell snippets run with -EncodedCommand, so no quoting can go wrong.
 
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { createInterface } from 'node:readline/promises';
@@ -85,6 +85,59 @@ while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) {
     child.on('error', () => {});
     child.unref();
   } catch {}
+}
+
+function psAsync(script: string, timeout = 30_000): Promise<string> {
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  return new Promise((done) => {
+    execFile('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded], { windowsHide: true, timeout },
+      (err, out) => done(err ? '' : String(out ?? '').trim()));
+  });
+}
+
+export interface FirewallStatus { ok: boolean; network: string; reason: string }
+
+/**
+ * Windows Firewall: can phones and the kiosk reach FlyDay on this network? (Dismissing
+ * Windows' own "allow access" question quietly adds a rule that blocks FlyDay.)
+ * null = can't tell (not Windows, or PowerShell didn't answer).
+ */
+export async function firewallStatus(): Promise<FirewallStatus | null> {
+  if (process.platform !== 'win32') return null;
+  const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
+  const out = await psAsync(`$ErrorActionPreference = 'SilentlyContinue'
+$cat = [string](Get-NetConnectionProfile | Where-Object { $_.IPv4Connectivity -ne 'Disconnected' } | Select-Object -First 1).NetworkCategory
+if (-not $cat) { $cat = 'Public' }
+$prof = if ($cat -eq 'DomainAuthenticated') { 'Domain' } else { $cat }
+$on = [string](Get-NetFirewallProfile -Name $prof).Enabled
+$rules = @(Get-NetFirewallApplicationFilter -Program ${q(process.execPath)} | Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' })
+$hit = { param($r) $p = [string]$r.Profile; $p -eq 'Any' -or $p -match $prof }
+$allow = @($rules | Where-Object { $_.Action -eq 'Allow' -and (& $hit $_) }).Count
+$block = @($rules | Where-Object { $_.Action -eq 'Block' -and (& $hit $_) }).Count
+"$prof|$on|$allow|$block"`);
+  const m = out.match(/^(\w+)\|(\w*)\|(\d+)\|(\d+)$/m);
+  if (!m) return null;
+  const [, network, on, allow, block] = m;
+  if (on === 'False') return { ok: true, network, reason: 'firewall off' };
+  if (Number(block) > 0) return { ok: false, network, reason: 'a firewall rule blocks FlyDay' };
+  if (Number(allow) === 0) return { ok: false, network, reason: 'no firewall rule lets FlyDay in' };
+  return { ok: true, network, reason: 'allowed' };
+}
+
+/**
+ * Let phones and the kiosk in: one Windows permission prompt, then a firewall rule that
+ * allows FlyDay (and removes rules that block it). True when the prompt was accepted.
+ */
+export async function firewallAllow(): Promise<boolean> {
+  if (process.platform !== 'win32') return false;
+  const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
+  const inner = `$exe = ${q(process.execPath)}
+Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Action -eq 'Block' } | Remove-NetFirewallRule
+Get-NetFirewallRule -DisplayName 'TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName 'TGI FlyDay' -Description 'Phones and the pilot kiosk reach TGI FlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
+  const encoded = Buffer.from(inner, 'utf16le').toString('base64');
+  const out = await psAsync(`try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; 'yes' } catch { 'no' }`, 120_000);
+  return out.endsWith('yes');
 }
 
 /** Start this program again (after an update), in its own minimised window on Windows. */

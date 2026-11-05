@@ -10,7 +10,7 @@ import { hostname, networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as sea from 'node:sea';
-import { closeOldWindows, keepAwake, openRdWindows, relaunch, tameConsole } from './launch.ts';
+import { closeOldWindows, firewallAllow, firewallStatus, keepAwake, openRdWindows, relaunch, tameConsole, type FirewallStatus } from './launch.ts';
 import { install, latest, tidy, why } from './update.ts';
 import { VERSION } from './version.ts';
 import { Engine, EngineError } from './engine.ts';
@@ -290,7 +290,13 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     const name = url.searchParams.get('name') ?? '';
     return json(res, 200, known[knownKey(name)] ?? {});
   }
-  if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION });
+  if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall });
+  // Console: "Let them in" (Windows Firewall), one permission prompt on this PC.
+  if (path === '/api/firewall/allow' && req.method === 'POST') {
+    const accepted = await firewallAllow();
+    firewall = await firewallStatus();
+    return json(res, 200, { ok: true, result: { accepted, firewall } });
+  }
   // Restart button (view picker): look for a newer version on GitHub, install it, restart.
   // Only the app/ folder next to the exe is replaced; data/ (pilots, photos) is never touched.
   if (path === '/api/update' && req.method === 'POST') {
@@ -394,11 +400,29 @@ const server = createServer((req, res) => {
 });
 
 /** This PC's wired-network addresses, for the kiosk PC to connect to. */
+/**
+ * This PC's network addresses, the one phones and the kiosk can reach first. Windows also
+ * lists virtual adapters (WSL, Hyper-V, VirtualBox, VPNs...) that nothing else can reach,
+ * so those go last, and real Wi-Fi / Ethernet with a home or club address goes first.
+ */
 function lanAddresses(): string[] {
-  return Object.values(networkInterfaces())
-    .flat()
-    .filter((i) => i && i.family === 'IPv4' && !i.internal)
-    .map((i) => i!.address);
+  const VIRTUAL = /vEthernet|WSL|Hyper-?V|Default Switch|VirtualBox|VMware|vmnet|vbox|docker|br-|veth|Loopback|Bluetooth|Tailscale|ZeroTier|Npcap|TAP|TUN|VPN|Hamachi|Radmin/i;
+  const REAL = /Wi-?Fi|WLAN|Wireless|Ethernet|Local Area Connection|^eth|^en|^wl/i;
+  const score = (name: string, a: string) => {
+    let s = 0;
+    if (VIRTUAL.test(name)) s -= 100;
+    if (REAL.test(name)) s += 10;
+    if (a.startsWith('169.254.')) s -= 200; // no network behind it
+    if (a.startsWith('192.168.56.')) s -= 50; // VirtualBox's own network
+    if (a.startsWith('192.168.')) s += 3;
+    else if (a.startsWith('10.')) s += 2;
+    else if (/^172\.(1[6-9]|2\d|3[01])\./.test(a)) s += 1; // often WSL / Docker
+    return s;
+  };
+  return Object.entries(networkInterfaces())
+    .flatMap(([name, list]) => (list ?? []).filter((i) => i.family === 'IPv4' && !i.internal).map((i) => ({ a: i.address, s: score(name, i.address) })))
+    .sort((x, y) => y.s - x.s)
+    .map((x) => x.a);
 }
 
 // The exe on Windows does what start.bat does for the folder version: open the screens.
@@ -406,6 +430,8 @@ function lanAddresses(): string[] {
 const AFTER_UPDATE = process.argv.includes('--after-update');
 const OPEN_WINDOWS = process.platform === 'win32' && (IN_EXE || process.argv.includes('--open')) && !AFTER_UPDATE;
 let updating = false;
+/** Windows Firewall: do phones and the kiosk get in? Checked at start (null: can't tell). */
+let firewall: FirewallStatus | null = null;
 /** Save, start the updated FlyDay, and step aside (it waits for the port). */
 function restartIntoUpdate() {
   store.now();
@@ -430,6 +456,10 @@ server.listen(PORT, '0.0.0.0', () => {
   if (OPEN_WINDOWS) { closeOldWindows(); openRdWindows(PORT); }
   if (process.platform === 'win32' && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
   keepAwake(); // the RD PC must not fall asleep mid-session
+  firewallStatus().then((f) => {
+    firewall = f;
+    if (f && !f.ok) console.log(`\n  Phones and the kiosk can't reach this PC: ${f.reason} (${f.network} network).\n  Fix it in the RD console: "Let them in".`);
+  });
   // Old update folders: keep only the one running now (and nothing older).
   if (IN_EXE) setTimeout(() => tidy(ROOT, [VERSION]), 10_000);
   const lan = lanAddresses();

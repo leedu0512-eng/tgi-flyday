@@ -59,7 +59,7 @@
       </section>
 
       <section class="card">
-        <h2>Kiosk on another PC</h2>
+        <h2>Phones and kiosk</h2>
         <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
       </section>
     </div>
@@ -712,13 +712,30 @@ $('addPilot').onclick = addPilot;
 $('newPilot').onkeydown = (e) => { if (e.key === 'Enter') addPilot(); };
 
 // ---------- kiosk address ----------
-fetch('/api/info').then((r) => r.json()).then((info) => {
+function showInfo(info) {
   const urls = [`http://${info.hostname}:${info.port}/kiosk`, ...info.addresses.map((a) => `http://${a}:${info.port}/kiosk`)];
+  const fw = info.firewall;
   $('kioskInfo').innerHTML = `
-    <p class="hint" style="margin:0">On the kiosk PC, run <b>kiosk.bat</b> with this PC's name, <b>${esc(info.hostname)}</b>. Or open one of these addresses in Edge:</p>
+    ${fw && !fw.ok ? `<div class="fw-warn"><b>Phones and the kiosk can't reach this PC.</b>
+      <span>Windows Firewall: ${esc(fw.reason)} on this ${esc(fw.network.toLowerCase())} network.</span>
+      <button class="btn primary" id="fwFix">Let them in</button><small>Windows asks for permission once.</small></div>` : ''}
+    <p class="hint" style="margin:0">Pilots' phones (the QR codes open this): <code>http://${esc(info.addresses[0] ?? info.hostname)}:${info.port}/me</code></p>
+    <p class="hint" style="margin:0">On the kiosk PC, run <b>kiosk.sh</b> / <b>kiosk.bat</b> with this PC's address. Or open one of these in the browser:</p>
     ${urls.map((u) => `<code>${esc(u)}</code>`).join('')}
-    <p class="hint" style="margin:0">Both PCs must be on the same wired network.</p>`;
-}).catch(() => {});
+    <p class="hint" style="margin:0">Phones and the kiosk must be on the same network as this PC.</p>`;
+  $('fwFix')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    e.target.textContent = 'Check the Windows prompt…';
+    try {
+      const r = await post('/api/firewall/allow');
+      toast(r.firewall?.ok ? 'Done: phones and the kiosk can get in now.' : r.accepted ? 'Still blocked: check Windows Firewall settings.' : 'Windows said no: nothing changed.', !!r.firewall?.ok);
+      showInfo({ ...info, firewall: r.firewall });
+    } catch (err) { toast(err.message); e.target.disabled = false; }
+  });
+}
+fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {});
+// The firewall check takes a few seconds after start: look again.
+setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 
 // ---------- live ----------
 connect({

@@ -105,6 +105,49 @@ while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) {
   } catch {
   }
 }
+function psAsync(script, timeout = 3e4) {
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  return new Promise((done) => {
+    (0, import_node_child_process.execFile)(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-EncodedCommand", encoded],
+      { windowsHide: true, timeout },
+      (err, out) => done(err ? "" : String(out ?? "").trim())
+    );
+  });
+}
+async function firewallStatus() {
+  if (process.platform !== "win32") return null;
+  const q = (x) => `'${x.replace(/'/g, "''")}'`;
+  const out = await psAsync(`$ErrorActionPreference = 'SilentlyContinue'
+$cat = [string](Get-NetConnectionProfile | Where-Object { $_.IPv4Connectivity -ne 'Disconnected' } | Select-Object -First 1).NetworkCategory
+if (-not $cat) { $cat = 'Public' }
+$prof = if ($cat -eq 'DomainAuthenticated') { 'Domain' } else { $cat }
+$on = [string](Get-NetFirewallProfile -Name $prof).Enabled
+$rules = @(Get-NetFirewallApplicationFilter -Program ${q(process.execPath)} | Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' })
+$hit = { param($r) $p = [string]$r.Profile; $p -eq 'Any' -or $p -match $prof }
+$allow = @($rules | Where-Object { $_.Action -eq 'Allow' -and (& $hit $_) }).Count
+$block = @($rules | Where-Object { $_.Action -eq 'Block' -and (& $hit $_) }).Count
+"$prof|$on|$allow|$block"`);
+  const m = out.match(/^(\w+)\|(\w*)\|(\d+)\|(\d+)$/m);
+  if (!m) return null;
+  const [, network, on, allow, block] = m;
+  if (on === "False") return { ok: true, network, reason: "firewall off" };
+  if (Number(block) > 0) return { ok: false, network, reason: "a firewall rule blocks FlyDay" };
+  if (Number(allow) === 0) return { ok: false, network, reason: "no firewall rule lets FlyDay in" };
+  return { ok: true, network, reason: "allowed" };
+}
+async function firewallAllow() {
+  if (process.platform !== "win32") return false;
+  const q = (x) => `'${x.replace(/'/g, "''")}'`;
+  const inner = `$exe = ${q(process.execPath)}
+Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Action -eq 'Block' } | Remove-NetFirewallRule
+Get-NetFirewallRule -DisplayName 'TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName 'TGI FlyDay' -Description 'Phones and the pilot kiosk reach TGI FlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
+  const encoded = Buffer.from(inner, "utf16le").toString("base64");
+  const out = await psAsync(`try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; 'yes' } catch { 'no' }`, 12e4);
+  return out.endsWith("yes");
+}
 function relaunch(args) {
   if (process.platform === "win32") {
     const q = (x) => `'${x.replace(/'/g, "''")}'`;
@@ -215,7 +258,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2204" : "dev";
+var VERSION = true ? "2026.11.05-2210" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -1996,7 +2039,12 @@ data: ${JSON.stringify(engine.snapshot(Date.now()))}
     const name = url.searchParams.get("name") ?? "";
     return json(res, 200, known[knownKey(name)] ?? {});
   }
-  if (path === "/api/info" && req.method === "GET") return json(res, 200, { hostname: (0, import_node_os.hostname)(), port: PORT, addresses: lanAddresses(), version: VERSION });
+  if (path === "/api/info" && req.method === "GET") return json(res, 200, { hostname: (0, import_node_os.hostname)(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall });
+  if (path === "/api/firewall/allow" && req.method === "POST") {
+    const accepted = await firewallAllow();
+    firewall = await firewallStatus();
+    return json(res, 200, { ok: true, result: { accepted, firewall } });
+  }
   if (path === "/api/update" && req.method === "POST") {
     if (!IN_EXE) return json(res, 200, { ok: true, result: { status: "dev", version: VERSION } });
     if (updating) return json(res, 200, { ok: true, result: { status: "busy", version: VERSION } });
@@ -2093,11 +2141,25 @@ var server = (0, import_node_http.createServer)((req, res) => {
   });
 });
 function lanAddresses() {
-  return Object.values((0, import_node_os.networkInterfaces)()).flat().filter((i) => i && i.family === "IPv4" && !i.internal).map((i) => i.address);
+  const VIRTUAL = /vEthernet|WSL|Hyper-?V|Default Switch|VirtualBox|VMware|vmnet|vbox|docker|br-|veth|Loopback|Bluetooth|Tailscale|ZeroTier|Npcap|TAP|TUN|VPN|Hamachi|Radmin/i;
+  const REAL = /Wi-?Fi|WLAN|Wireless|Ethernet|Local Area Connection|^eth|^en|^wl/i;
+  const score = (name, a) => {
+    let s = 0;
+    if (VIRTUAL.test(name)) s -= 100;
+    if (REAL.test(name)) s += 10;
+    if (a.startsWith("169.254.")) s -= 200;
+    if (a.startsWith("192.168.56.")) s -= 50;
+    if (a.startsWith("192.168.")) s += 3;
+    else if (a.startsWith("10.")) s += 2;
+    else if (/^172\.(1[6-9]|2\d|3[01])\./.test(a)) s += 1;
+    return s;
+  };
+  return Object.entries((0, import_node_os.networkInterfaces)()).flatMap(([name, list]) => (list ?? []).filter((i) => i.family === "IPv4" && !i.internal).map((i) => ({ a: i.address, s: score(name, i.address) }))).sort((x, y) => y.s - x.s).map((x) => x.a);
 }
 var AFTER_UPDATE = process.argv.includes("--after-update");
 var OPEN_WINDOWS = process.platform === "win32" && (IN_EXE || process.argv.includes("--open")) && !AFTER_UPDATE;
 var updating = false;
+var firewall = null;
 function restartIntoUpdate() {
   store.now();
   relaunch(["--after-update"]);
@@ -2128,6 +2190,12 @@ server.listen(PORT, "0.0.0.0", () => {
   }
   if (process.platform === "win32" && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
   keepAwake();
+  firewallStatus().then((f) => {
+    firewall = f;
+    if (f && !f.ok) console.log(`
+  Phones and the kiosk can't reach this PC: ${f.reason} (${f.network} network).
+  Fix it in the RD console: "Let them in".`);
+  });
   if (IN_EXE) setTimeout(() => tidy(ROOT, [VERSION]), 1e4);
   const lan = lanAddresses();
   console.log(`

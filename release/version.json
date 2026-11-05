@@ -1,9 +1,9 @@
 {
- "version": "2026.11.05-2204",
+ "version": "2026.11.05-2210",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "bb29564b8fd22102eb0407d1decae467619186e69753fe3c46db38323a3ed2e3"
+   "sha256": "263ea7df7299ea8718670e0f81bc33ea5ec4ac9cb22a555a92c4f16f44d9d742"
   },
   {
    "path": "web/assets/common.js",
@@ -83,7 +83,7 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "d73e9cc205e24ee21d8fd63797eca434c836961a47bc545a3189e994d0153bce"
+   "sha256": "058170daa7230d67881057a10344097a98a3e96ad683a2d5bef6ade20a5b646a"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
@@ -91,7 +91,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "fa8bcf2fa9a3cd9a5b099ad5a20adda90688a69d3ba66566a48f6b6088cb4521"
+   "sha256": "606aeeff2ab6cfa8558da893232f4c72f8144ff6e86b983f1bf81d7e7bae001b"
   },
   {
    "path": "web/index.html",
