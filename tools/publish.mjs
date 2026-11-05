@@ -48,4 +48,11 @@ const files = [];
   }
 })(join(OUT, 'app'));
 writeFileSync(join(OUT, 'version.json'), JSON.stringify({ version, files }, null, 1));
+// Every release file must reach GitHub: refuse if .gitignore would leave any out.
+try {
+  const ignored = execFileSync('git', ['check-ignore', '--no-index', ...files.map((f) => `release/app/${f.path}`)], { cwd: ROOT, encoding: 'utf8' }).trim();
+  if (ignored) throw new Error(`.gitignore would keep these out of GitHub, so updates would fail:\n${ignored}`);
+} catch (err) {
+  if (err.status !== 1) throw err; // git check-ignore exits 1 when nothing is ignored: all good
+}
 console.log(`release/ ready: version ${version}, ${files.length} files. Commit and push it.`);
