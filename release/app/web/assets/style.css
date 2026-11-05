@@ -771,3 +771,26 @@ img.avatar { filter: brightness(0.55) saturate(0.8); }
 .td-board .td-name .logo { font-size: calc(5.4 * var(--u)); }
 .pb.car-day .meta, .pb.car-day .pb-qr, .pb.car-day .pb-signin { visibility: hidden; }
 .td-board .td-name .label { font-family: var(--display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em; }
+
+/* End of the day: "Still flying?" */
+.night-prompt { position: fixed; z-index: 150; display: grid; place-items: center; }
+.night-prompt .np-box { display: grid; justify-items: center; gap: 12px; text-align: center; background: #111; border: 3px solid var(--accent); border-radius: 6px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.8); }
+.night-prompt b { font-family: var(--display); font-weight: 900; text-transform: uppercase; line-height: 1; }
+.night-prompt span { color: var(--muted); }
+.night-prompt em { font-style: normal; font-family: var(--stencil); color: var(--text); }
+.night-prompt .np-yes { font-family: var(--display); font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; background: #22c55e; color: #000; border: 0; border-radius: 4px; cursor: pointer; }
+.night-prompt.big { inset: 0; background: rgba(0, 0, 0, 0.6); }
+.night-prompt.big .np-box { padding: 5vh 6vw; gap: 3vh; }
+.night-prompt.big b { font-size: 12vh; }
+.night-prompt.big span { font-size: 3.4vh; max-width: 60vw; }
+.night-prompt.big em { font-size: 4.4vh; }
+.night-prompt.big .np-yes { font-size: 6vh; padding: 2.4vh 5vw; }
+.night-prompt.bar { left: 50%; top: 70px; transform: translateX(-50%); }
+.night-prompt.bar .np-box { grid-auto-flow: column; padding: 12px 18px; gap: 16px; }
+.night-prompt.bar b { font-size: 26px; }
+.night-prompt.bar .np-yes { font-size: 18px; padding: 10px 18px; }
+.night-prompt.card { left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); }
+.night-prompt.card .np-box { padding: 18px; width: 100%; box-sizing: border-box; }
+.night-prompt.card b { font-size: 34px; }
+.night-prompt.card .np-yes { font-size: 22px; padding: 16px; width: 100%; }
+.input.inline { display: inline-block; width: auto; padding: 2px 6px; margin: 0 2px; font-size: inherit; }

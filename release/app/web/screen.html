@@ -32,7 +32,7 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
@@ -123,10 +123,14 @@ function payCard() {
 
 function render() {
   if (!state) return;
+  nightPrompt(state, 'big');
   const c = state.clock;
   const screen = $('screen');
   screen.classList.toggle('pay-view', view === 'pay');
   $('wmWord').textContent = view === 'pay' ? 'Track' : 'Fly';
+  const mark = view === 'pay' ? '/assets/mark-car-small.svg' : '/assets/mark-small.svg';
+  const markImg = document.querySelector('#viewToggle img');
+  if (!markImg.src.endsWith(mark)) markImg.src = mark;
   // TrackDay is for the RC cars: no drone bits in the header (sign in, the phone QR).
   screen.classList.toggle('car-day', view === 'pay');
   document.title = view === 'pay' ? 'TGI TrackDay' : 'TGI FlyDay · Spectator view';

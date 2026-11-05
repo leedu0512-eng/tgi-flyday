@@ -33,7 +33,7 @@
 <script type="module">
 // A pilot's own page on their phone (QR code on the kiosk and the big screen):
 // who am I, my heat and channel, am I flying, and Leave. Lap times come here later.
-import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark, faceOf } from '/assets/common.js';
+import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark, faceOf, nightPrompt } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'flyday.me';
@@ -320,7 +320,7 @@ function contact(online) {
 }
 
 connect({
-  onState(s) { state = s; contact(true); render(); buzz(); refreshLaps(); },
+  onState(s) { state = s; contact(true); render(); buzz(); refreshLaps(); if (pilot()) nightPrompt(state, 'card'); },
   onStatus(online) { document.body.classList.toggle('offline', !online); contact(online); },
 });
 </script>

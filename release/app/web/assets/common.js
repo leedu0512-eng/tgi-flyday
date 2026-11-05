@@ -584,3 +584,37 @@ export function faceOf(state, p, wide = false) {
   const animal = animals.map.get(p.callsign.toLowerCase()) ?? assignAnimals([p.callsign]).get(p.callsign.toLowerCase());
   return { src: avatarDataUrl(p.callsign, animal, wide), avatar: true };
 }
+
+// ---------- end of the day: "still flying?" ----------
+
+/**
+ * When the session asks if anyone is still flying (state.night), show a prompt with a
+ * countdown and a Still flying button; gone again once answered or over. kind: 'big' for
+ * the big screen, 'bar' for the RD console, 'card' for phones.
+ */
+export function nightPrompt(state, kind = 'big') {
+  let el = document.getElementById('nightPrompt');
+  const night = state?.night;
+  if (!night) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'nightPrompt';
+    el.className = `night-prompt ${kind}`;
+    el.innerHTML = `<div class="np-box"><b>Still flying?</b>
+      <span>Practice ends for today in <em class="np-left num"></em> unless someone taps below.</span>
+      <button class="np-yes">Yes, still flying</button></div>`;
+    el.querySelector('.np-yes').addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      try { await post('/api/still-flying'); } catch {}
+    });
+    document.body.appendChild(el);
+    const tick = () => {
+      if (!document.body.contains(el)) return;
+      const left = Math.max(0, (el.dataset.deadline ?? 0) - now());
+      el.querySelector('.np-left').textContent = fmt(left);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  el.dataset.deadline = night.deadline;
+}

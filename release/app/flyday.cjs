@@ -259,7 +259,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2329" : "dev";
+var VERSION = true ? "2026.11.05-2338" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -272,6 +272,8 @@ var DEFAULT_CONFIG = {
   dropAfterMissed: 2,
   freeFlight: true,
   autoStart: true,
+  nightStop: true,
+  nightStopAt: 20 * 60 + 30,
   timer: { enabled: false, host: "", user: "admin", password: "rotorhazard" },
   callouts: {
     sessionStartStop: true,
@@ -300,6 +302,9 @@ var DEFAULT_CONFIG = {
       freeFlightEnd: "Free flight is over. Please land.",
       freeFlightOpen: "Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.",
       heatsForm: "More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.",
+      nightAsk: "Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.",
+      nightSnooze: "OK, carry on. I will ask again in an hour.",
+      nightEnd: "Practice is over for today. Thanks for flying, good night.",
       gatePass: "{name}, {laptime}",
       paused: "Paused.",
       resumed: "Resumed."
@@ -370,6 +375,8 @@ function pilotTimes(pilotId, slot, passes) {
 // server/engine.ts
 var FINISH_WINDOW_MS = 3e4;
 var MIN_LAP_MS = 2e3;
+var NIGHT_GRACE_MS = 5 * 6e4;
+var NIGHT_SNOOZE_MS = 60 * 6e4;
 var EngineError = class extends Error {
 };
 var MAX_HEATS = 40;
@@ -435,6 +442,9 @@ var Engine = class {
   pilots = /* @__PURE__ */ new Map();
   heats = [];
   autoStartPending = false;
+  /** End of the day: the "still flying?" question is up until this time (ms), or null. */
+  night = null;
+  nightSnoozeUntil = 0;
   clock = {
     phase: "stopped",
     heat: 0,
@@ -715,6 +725,51 @@ var Engine = class {
     this.startTiming(now, true);
     const co = this.config.callouts;
     if (co.sessionStartStop || co.freeFlight) this.say(fillText(co.texts.freeFlightOpen, { heat: c.heat + 1 }));
+  }
+  /**
+   * End of the day, called with local time (minutes after midnight): from config.nightStopAt
+   * until 05:00 a running session asks once if anyone is still flying. "Still flying" puts the
+   * question off for an hour; no answer for NIGHT_GRACE_MS stops the session and takes
+   * everyone off the list, as if they had all gone home.
+   */
+  nightTick(now, localMinutes) {
+    const c = this.clock;
+    if (c.phase === "stopped" || !this.config.nightStop) {
+      if (this.night) {
+        this.night = null;
+        this.onChange();
+      }
+      return;
+    }
+    if (this.night) {
+      if (now >= this.night.deadline) this.endOfDay();
+      return;
+    }
+    const late = localMinutes >= this.config.nightStopAt || localMinutes < 5 * 60;
+    if (!late || now < this.nightSnoozeUntil) return;
+    if (c.startedAt != null && now - c.startedAt < NIGHT_SNOOZE_MS) return;
+    this.night = { deadline: now + NIGHT_GRACE_MS };
+    this.say(this.config.callouts.texts.nightAsk);
+    this.onChange();
+  }
+  /** Someone tapped "Still flying": carry on, ask again in an hour. */
+  stillFlying(now) {
+    if (!this.night) return;
+    this.night = null;
+    this.nightSnoozeUntil = now + NIGHT_SNOOZE_MS;
+    this.say(this.config.callouts.texts.nightSnooze);
+    this.onChange();
+  }
+  /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
+  endOfDay() {
+    this.night = null;
+    this.nightSnoozeUntil = 0;
+    this.closeTiming(true);
+    this.clock.startedAt = null;
+    this.setPhase("stopped", null);
+    for (const id of [...this.pilots.keys()]) this.deletePilot(id);
+    this.say(this.config.callouts.texts.nightEnd);
+    this.onChange();
   }
   /** A new session: lap history and session bests start over. */
   newSessionTimes() {
@@ -1477,6 +1532,8 @@ var Engine = class {
     if (patch.channels !== void 0) this.checkChannels(patch.channels);
     if (patch.freeFlight !== void 0) next.freeFlight = Boolean(patch.freeFlight);
     if (patch.autoStart !== void 0) next.autoStart = Boolean(patch.autoStart);
+    if (patch.nightStop !== void 0) next.nightStop = Boolean(patch.nightStop);
+    if (patch.nightStopAt !== void 0 && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== void 0) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.callouts !== void 0) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== void 0) next.sound = cleanSound(patch.sound, next.sound);
@@ -1569,6 +1626,7 @@ var Engine = class {
       calloutChoices: { changeover: CHANGEOVER_CALLOUT_CHOICES, heat: HEAT_CALLOUT_CHOICES },
       allChannels: ALL_CHANNELS,
       channelMhz: CHANNEL_MHZ,
+      night: this.night,
       timing: {
         timer: this.timer,
         timedSlots: this.timedSlots(),
@@ -2034,6 +2092,8 @@ try {
 }
 setInterval(() => {
   engine.tick(Date.now());
+  const d = /* @__PURE__ */ new Date();
+  engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
   if (stateDirty) {
     stateDirty = false;
     broadcast("state", engine.snapshot(Date.now()));
@@ -2085,6 +2145,7 @@ var API2 = {
     rememberChannel(r.pilot.id);
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
+  "/api/still-flying": () => engine.stillFlying(Date.now()),
   "/api/leave": (b) => {
     rememberPhoto(String(b.pilotId));
     engine.leave(String(b.pilotId));

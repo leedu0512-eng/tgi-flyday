@@ -1,9 +1,9 @@
 {
- "version": "2026.11.05-2329",
+ "version": "2026.11.05-2338",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "cfe3e04ca68b59a66a73763e2ecec4d30d9135e208e4181ec72e3c8dad9b5dd5"
+   "sha256": "9b7cc90c17f8dadc95caff824515045706ce7e784fe30b2034779da8bf040bb3"
   },
   {
    "path": "web/assets/avatars.js",
@@ -11,7 +11,7 @@
   },
   {
    "path": "web/assets/common.js",
-   "sha256": "561a85a17f5199c32d2189c973f70e3ee90b111b1301e3163d9c308d920e63be"
+   "sha256": "adf792b51a205e7f3959cf6778034da69174ba28c8aa77fb0d4d1bc0ec7d7048"
   },
   {
    "path": "web/assets/favicon.svg",
@@ -78,6 +78,14 @@
    "sha256": "6b09446d1c6a1f4edfb9b148e443574ad887d9c6e81fa94892782449b49e64eb"
   },
   {
+   "path": "web/assets/mark-car-small.svg",
+   "sha256": "8cc2b8c405865d3677493ee242df389d35fe691c1e703905914f9dc731910976"
+  },
+  {
+   "path": "web/assets/mark-car.svg",
+   "sha256": "e0d534d54fd54035f553bc977336fd4da430db52a2907897722aed7f10c75bc0"
+  },
+  {
    "path": "web/assets/mark-small.svg",
    "sha256": "071d4b6f186f21ffbc7316609dc00ee0810f94f948be548859035e189e4ed908"
   },
@@ -87,7 +95,7 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "55e2a286af37e54bedfc553cba691de41e118c69a0db75dc589809842664ec95"
+   "sha256": "f05febf42682c85ac0fff054906783efbc09ffe3a81815282cd63c8f0feba67e"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
@@ -95,7 +103,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "f20d481763b2c068aead5e5b194e9f8a325419ff810f3af9f0ae217e869ed22b"
+   "sha256": "144168b311526e4d5c575a2ad2dd8c87b4e0150c57c0479d4c2a22663d112147"
   },
   {
    "path": "web/index.html",
@@ -107,7 +115,7 @@
   },
   {
    "path": "web/me.html",
-   "sha256": "50bbe4fc51b18a15fcaa4055234288bb8ec9502ae698e67387bd8c5487339d35"
+   "sha256": "bad8ab4505f85f0eda8388c370eb89f9053847b9bff36f4d9d1ec68da91c573f"
   },
   {
    "path": "web/mobile.html",
@@ -115,7 +123,7 @@
   },
   {
    "path": "web/screen.html",
-   "sha256": "cee0506c28f86968896853b36dde18ca458f3d5b730ad6a661742fb664be6b23"
+   "sha256": "676fee912e9875139e7aa23b908b43dfd976738c822be9d05fda4704a89003a3"
   }
  ]
 }

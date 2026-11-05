@@ -49,6 +49,7 @@
           <div class="field wide"><label>Channels in every heat</label>
             <div id="slotChannels" class="slot-channels"></div></div>
           <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
+          <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes stops practice and takes everyone off the list.</span></label>
           <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
           <div class="wide presets">
             <button class="btn small" data-preset="R1 R2 F2 F4 R7 R8">IMD6C · 6 pilots</button>
@@ -128,7 +129,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt } from '/assets/common.js';
 setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
 
 const $ = (id) => document.getElementById(id);
@@ -413,6 +414,8 @@ function renderSetup() {
   if (document.activeElement !== $('perHeat')) $('perHeat').value = cfg.channels.length;
   $('freeFlight').checked = cfg.freeFlight;
   $('autoStart').checked = cfg.autoStart !== false;
+  $('nightStop').checked = cfg.nightStop !== false;
+  if (document.activeElement !== $('nightStopAt')) $('nightStopAt').value = String(cfg.nightStopAt ?? 1230);
   const box = $('slotChannels');
   if (!box.contains(document.activeElement)) {
     box.innerHTML = cfg.channels.map((ch, i) =>
@@ -424,6 +427,11 @@ for (const id of ['heatSeconds', 'changeoverSeconds']) {
 }
 $('freeFlight').onchange = (e) => act('/api/config', { freeFlight: e.target.checked });
 $('autoStart').onchange = (e) => act('/api/config', { autoStart: e.target.checked });
+$('nightStop').onchange = (e) => act('/api/config', { nightStop: e.target.checked });
+// 18:00 to 23:30, every half hour.
+$('nightStopAt').innerHTML = Array.from({ length: 12 }, (_, i) => 18 * 60 + i * 30)
+  .map((m) => `<option value="${m}">${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}</option>`).join('');
+$('nightStopAt').onchange = (e) => act('/api/config', { nightStopAt: Number(e.target.value) });
 $('heatCount').onchange = (e) => act('/api/config', { heatCount: Number(e.target.value) }).then(() => renderSetup());
 const placedNote = (res) => res?.placed?.length ? ' ' + res.placed.map((x) => `${NAME(x.pilot.callsign)} moved to heat ${x.heat + 1} ${x.channel}`).join(' · ') : '';
 $('perHeat').onchange = async (e) => {
@@ -816,6 +824,7 @@ connect({
     renderSetup();
     renderHeats();
     refreshTimes();
+    nightPrompt(state, 'bar');
     renderPilotsPanel();
     sound.apply(state.config.sound);
     renderDrawer();
