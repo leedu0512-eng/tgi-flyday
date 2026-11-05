@@ -1174,8 +1174,8 @@ export class Engine {
    * RD, between heats: pack everyone into as few heats as possible, so the loop is shorter.
    * Every heat counts, also the one up next. Pilots keep their channel wherever possible;
    * when that would cost an extra heat, they move to another channel (listed so the RD can
-   * tell them). Shared quads stay apart. Emptied heats are skipped by the loop.
-   * While a heat is on it refuses: use "Pause after this heat" first.
+   * tell them). Shared quads stay apart. Empty heats are removed and the rest renumbered
+   * 1, 2, 3… from the one up next. While a heat is on it refuses: use "Pause after this heat" first.
    */
   compact(): { moved: number; channelChanges: { pilot: Pilot; heat: number; channel: string }[]; heatsInUse: number } {
     if (this.heatIsLive()) throw new EngineError('A heat is on. Compact the heats between heats: press Pause after this heat first.');
@@ -1204,13 +1204,18 @@ export class Engine {
     for (const x of left) this.seat(x.p, x.from, this.heats[x.from].indexOf(null)); // can't happen: its heat is empty again
     const before = new Map(pending.map((x) => [x.p.id, x]));
     const moved = out.filter((o) => o.heat !== o.from || o.channel !== before.get(o.pilot.id)!.ch).length;
-    if (c.phase === 'changeover') {
-      // The heat up next may have been emptied: the changeover is now for the first heat with pilots.
-      if (this.heatIsEmpty(c.heat)) { const h = this.nextHeat(c.heat); if (h >= 0) c.heat = h; }
-      if ([...this.heats[c.heat]].join() !== nextBefore) {
-        if (c.paused) this.lineupPending = true;
-        else this.announceLineup(c.heat);
-      }
+    // Empty heats in between go: the heats with pilots become heat 1, 2, 3… in the order they
+    // fly, starting with the one up next. (Laps already flown keep their heat number.)
+    const used = order.filter((h) => !this.heatIsEmpty(h));
+    if (used.length) {
+      this.heats = used.map((h) => this.heats[h]);
+      this.heatChannels = used.map((h) => this.heatChannels[h]);
+      this.config = { ...this.config, heatCount: used.length };
+      c.heat = 0;
+    }
+    if (c.phase === 'changeover' && used.length && [...this.heats[0]].join() !== nextBefore) {
+      if (c.paused) this.lineupPending = true;
+      else this.announceLineup(0);
     }
     this.onChange();
     return {

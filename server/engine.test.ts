@@ -285,6 +285,7 @@ test('compact between heats: every heat counts, also the one up next; channels k
   e.action('start', 0);
   const res = e.compact();
   assert.equal(res.heatsInUse, 2, '6 pilots on 4 channels: 2 heats');
+  assert.equal(e.config.heatCount, 2, 'empty heats are gone: heat 1 and heat 2');
   assert.ok(e.heats[0].includes(a.id), 'pilots in a kept heat stay put');
   assert.equal(e.clock.heat, 0, 'the changeover is still for heat 1');
   const chan = (id: string) => { for (let h = 0; h < 5; h++) { const s = e.heats[h].indexOf(id); if (s >= 0) return e.channelOf(h, s); } };
@@ -300,8 +301,32 @@ test('compact also empties the heat up next when that saves a heat; the changeov
   assert.equal(e.clock.heat, 0);
   const res = e.compact();
   assert.equal(res.heatsInUse, 1, 'everyone fits in one heat');
-  assert.equal(e.clock.heat, 1, 'the changeover is now for heat 2');
+  assert.equal(e.config.heatCount, 1, 'it is heat 1 now');
+  assert.equal(e.clock.heat, 0);
+  assert.equal(e.heats[0].filter(Boolean).length, 4);
   assert.equal(e.clock.phase, 'changeover');
+});
+
+test('compact renumbers: heats 1 and 5 with pilots become heats 1 and 2', () => {
+  const { e } = setup(); // R1 R2 F2 F4
+  e.setConfig({ heatCount: 5 });
+  ['A', 'B', 'C', 'D'].forEach((n, s) => e.join(n, 0, s)); // heat 1 full
+  const x = e.join('X', 4, 0);                              // heat 5
+  e.compact();
+  assert.equal(e.config.heatCount, 2);
+  assert.equal(e.heats.length, 2);
+  assert.ok(e.heats[1].includes(x.id), 'X is in heat 2 now');
+  // While a session runs, the heat up next becomes heat 1.
+  const f = setup().e;
+  f.setConfig({ heatCount: 4 });
+  f.join('P', 0, 0); f.join('Q', 2, 1); f.join('R', 3, 2); f.join('S', 3, 3);
+  f.action('start', 0);
+  run(f, 0, 120_000 + 10_000 + 180_000 + 100); // heat 1 flown: changeover for heat 3
+  assert.equal(f.clock.heat, 2);
+  f.action('pause', 400_000);
+  f.compact();
+  assert.equal(f.config.heatCount, 1, 'four pilots on four channels: one heat');
+  assert.equal(f.clock.heat, 0);
 });
 
 test('compact waits while a heat is on; "Pause after this heat" stops in the changeover, line-up on resume', () => {
