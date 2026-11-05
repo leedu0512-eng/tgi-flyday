@@ -140,11 +140,21 @@ function meView(p) {
       <div><small>Heat</small><b>${seat.heat + 1}</b></div>
       <div class="me-ch" style="background:${SLOT_COLORS[seat.slot]}"><small>Channel</small><b>${esc(seat.channel)}${timerMark(state, seat.slot)}</b></div>
     </div>` : ''}
+    ${clubLine(p)}
     <div class="me-status ${st.cls}"><b>${st.big}</b><span>${st.small}</span>${st.clock ? '<em id="clock" class="num"></em>' : ''}</div>
     ${lapsView()}
     ${mates.length ? `<h2>In your heat</h2><div class="me-mates">${mates.map(({ s, i, q }) =>
       `<span><i class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}${timerMark(state, i)}</i>${esc(NAME(q.callsign))}</span>`).join('')}</div>` : ''}
     <button class="big me-leave" data-leave>Going home<small>Free up your slot</small></button>`;
+}
+
+/** Flying a club quad: which one, and who shares it (with their heats). */
+function clubLine(p) {
+  const q = (state.config.clubQuads ?? []).find((c) => c.name.toLowerCase() === p.quad?.toLowerCase());
+  if (!q) return '';
+  const mates = state.pilots.filter((x) => x.id !== p.id && x.quad?.toLowerCase() === q.name.toLowerCase())
+    .map((x) => { const st = seatOf(state, x.id); return `${esc(NAME(x.callsign))}${st ? ` (heat ${st.heat + 1})` : ''}`; });
+  return `<div class="me-club"><small>Club quad</small><b>${esc(q.name)}</b>${mates.length ? `<span>Shared with ${mates.join(', ')}</span>` : ''}</div>`;
 }
 
 // ---------- laps ----------

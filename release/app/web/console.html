@@ -23,6 +23,7 @@
       <button class="si" id="timerSi" type="button" data-view="timer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 20v-9h8v9"/><path d="M12 14l1.5 2"/><circle cx="12" cy="14" r="0.6"/></svg></button>
       <button class="si" id="videoSi" type="button" data-view="video"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg></button>
       <button class="si" id="spectrumSi" type="button" data-view="spectrum"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 17v-3M8 17V9M11 17v-6M14 17V5M17 17v-8M20 17v-4"/></svg></button>
+      <button class="si" id="clubSi" type="button" data-view="club"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="5.5" r="3"/><circle cx="18.5" cy="5.5" r="3"/><circle cx="5.5" cy="18.5" r="3"/><circle cx="18.5" cy="18.5" r="3"/><path d="M7.6 7.6l3 3M16.4 7.6l-3 3M7.6 16.4l3-3M16.4 16.4l-3-3"/><rect x="10" y="10" width="4" height="4" rx="1"/></svg><span id="clubCount" class="num"></span></button>
       <button class="si" id="openPilots" type="button" title="Pilots"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M7 7h10"/></svg><span id="pilotCount" class="num">0</span><span id="waitingCount" class="count waiting" title="Signed in, not in a heat"></span></button>
     </div>
   </div>
@@ -159,6 +160,15 @@
     <p class="hint">{name} the pilot, {lap} lap number, {laptime} lap time.</p>
   </section>
 </section>
+<section id="clubView" class="card drawer view" hidden aria-label="Club quads">
+  <div class="drawer-head"><h2>Club quads</h2><button class="btn small" data-close>Back to heats</button></div>
+  <section class="drawer-sec">
+    <p class="hint">For pilots without their own quad. At the kiosk they tap <b>I don't have my own quad</b> and get the first free club quad that isn't broken, on its channel. When every working one is taken, the one with the fewest pilots is shared: each of them flies a different heat, on that quad's channel. FlyDay remembers who flew a club quad and offers it again next time.</p>
+    <div id="clubList" class="club-list"></div>
+    <div><button id="clubAdd" class="btn small">+ Add a club quad</button></div>
+    <p class="hint">Marking a quad <b>Broken</b> moves its pilots to another club quad straight away, and the voice tells them to check the big screen. Up to 8 club quads.</p>
+  </section>
+</section>
 <section id="videoView" class="card drawer view" hidden aria-label="Video">
   <div class="drawer-head"><h2>Video</h2><button class="btn small" data-close>Back to heats</button></div>
   <section class="drawer-sec"><div id="vStatus" class="dev-status"></div></section>
@@ -237,6 +247,8 @@ function renderDevices() {
   devStatus($('vStatus'), v.state === 'online' ? 'ok' : 'bad', v.state === 'online' ? 'Online' : 'Not online', v.state === 'online' ? '' : 'No video inputs yet.');
   devStatus($('sStatus'), sp.state === 'connected' ? 'ok' : 'bad', sp.state === 'connected' ? 'Connected' : 'Not connected', sp.state === 'connected' ? '' : 'No analyser cabled to this PC yet.');
   renderTimerView();
+  renderClubIcon();
+  renderClubView();
 }
 
 // ---------- sound ----------
@@ -318,8 +330,8 @@ function renderCallouts() {
 const drawer = $('drawer');
 const pilotsDrawer = $('pilotsDrawer');
 // Pages in the main area: Heats and Times, or one opened from the status icons (no flyouts).
-const VIEWS = { sound: drawer, pilots: pilotsDrawer, timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
-const ICONS = { sound: $('openDrawer'), pilots: $('openPilots'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
+const VIEWS = { sound: drawer, pilots: pilotsDrawer, club: $('clubView'), timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
+const ICONS = { sound: $('openDrawer'), pilots: $('openPilots'), club: $('clubSi'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
 let view = 'heats';
 function showView(v) {
   view = VIEWS[v] ? v : 'heats';
@@ -329,16 +341,80 @@ function showView(v) {
   if (view === 'sound') renderDrawer(true);
   if (view === 'pilots') renderPilotsPanel(true);
   if (view === 'timer') renderTimerView(true);
+  if (view === 'club') renderClubView(true);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 const toggleView = (v) => showView(view === v ? 'heats' : v);
 const closeDrawer = () => showView('heats');
 $('openDrawer').onclick = () => toggleView('sound');
 $('openPilots').onclick = () => toggleView('pilots');
-for (const id of ['timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
+for (const id of ['clubSi', 'timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
 $('closeDrawer').onclick = closeDrawer;
 for (const b of document.querySelectorAll('.view [data-close]')) b.onclick = closeDrawer;
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.matches('input, textarea, select')) closeDrawer(); });
+
+// ---------- club quads page ----------
+const clubQuads = () => state.config.clubQuads ?? [];
+const onClubQuad = (q) => state.pilots.filter((p) => p.quad?.toLowerCase() === q.name.toLowerCase());
+function renderClubIcon() {
+  const qs = clubQuads(), working = qs.filter((q) => !q.broken);
+  const used = working.filter((q) => onClubQuad(q).length).length;
+  const shared = working.some((q) => onClubQuad(q).length > 1);
+  const broken = qs.length - working.length;
+  $('clubCount').textContent = qs.length ? `${used}/${working.length}` : '0';
+  $('clubSi').className = `si${broken ? ' warn' : ''}${view === 'club' ? ' active' : ''}`;
+  $('clubSi').title = !qs.length ? 'Club quads: none set up'
+    : `Club quads: ${used} of ${working.length} working in use${shared ? ', some shared' : ''}${broken ? `, ${broken} broken` : ''}`;
+}
+function renderClubView(force = false) {
+  if (!state || $('clubView').hidden) return;
+  const list = $('clubList');
+  if (!force && list.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
+  const all = state.allChannels ?? [];
+  list.innerHTML = clubQuads().map((q, i) => {
+    const pilots = onClubQuad(q).map((p) => { const st = seatOf(p.id); return `<span class="club-pilot">${esc(NAME(p.callsign))}${st ? ` <small>heat ${st.heat + 1}</small>` : ' <small>no heat</small>'}</span>`; }).join('');
+    return `<div class="club-row ${q.broken ? 'broken' : ''}" data-i="${i}">
+      <input class="input" data-f="name" value="${esc(q.name)}" maxlength="30" aria-label="Name">
+      <select class="input" data-f="channel" aria-label="Channel">${all.map((c) => `<option ${c === q.channel ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <button class="btn small ${q.broken ? 'danger' : ''}" data-f="broken" title="${q.broken ? 'Fixed? Click to put it back in use' : 'Out of action: its pilots get another club quad'}">${q.broken ? 'Broken' : 'Working'}</button>
+      <button class="btn small" data-f="remove" title="Remove this club quad">Remove</button>
+      <div class="club-pilots">${pilots || '<span class="hint">Free</span>'}</div>
+    </div>`;
+  }).join('') || '<p class="hint">No club quads yet.</p>';
+  $('clubAdd').disabled = clubQuads().length >= 8;
+  $('clubAdd').title = clubQuads().length >= 8 ? 'Up to 8 club quads: remove one first' : 'Add another club quad';
+}
+async function saveClub(quads) {
+  const res = await act('/api/club-quads', { quads });
+  if (res?.moved?.length) toast(res.moved.map((m) => `${NAME(m.pilot.callsign)} → ${m.quad ? `${m.quad}, heat ${m.heat + 1}` : 'no club quad left: waiting'}`).join(' · '), true);
+}
+$('clubList').addEventListener('change', (e) => {
+  const row = e.target.closest('[data-i]');
+  if (!row) return;
+  const quads = clubQuads().map((q) => ({ ...q }));
+  const q = quads[Number(row.dataset.i)];
+  q[e.target.dataset.f] = e.target.value;
+  e.target.blur();
+  saveClub(quads);
+});
+$('clubList').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-f]');
+  const row = e.target.closest('[data-i]');
+  if (!b || !row) return;
+  const i = Number(row.dataset.i);
+  let quads = clubQuads().map((q) => ({ ...q }));
+  if (b.dataset.f === 'broken') quads[i].broken = !quads[i].broken;
+  if (b.dataset.f === 'remove') quads = quads.filter((_, j) => j !== i);
+  saveClub(quads);
+});
+$('clubAdd').onclick = () => {
+  const quads = clubQuads().map((q) => ({ ...q }));
+  const used = new Set(quads.map((q) => q.channel));
+  const channel = state.config.channels.find((c) => !used.has(c)) ?? state.config.channels[0];
+  let n = quads.length + 1;
+  while (quads.some((q) => q.name.toLowerCase() === `club ${n}`)) n++;
+  saveClub([...quads, { name: `Club ${n}`, channel, broken: false }]);
+};
 
 // ---------- lap timer page ----------
 function devStatus(el, kind, head, text) {
@@ -654,8 +730,9 @@ function seatOf(id) {
 /** Shared quads, from the pilots who have one: name, channel, members. */
 function sharedQuads() {
   const groups = new Map();
+  const club = new Set((state.config.clubQuads ?? []).map((q) => q.name.toLowerCase()));
   for (const p of state.pilots) {
-    if (!p.quad) continue;
+    if (!p.quad || club.has(p.quad.toLowerCase())) continue; // club quads have their own page
     const k = p.quad.toLowerCase();
     if (!groups.has(k)) groups.set(k, { name: p.quad, members: [] });
     groups.get(k).members.push(p);

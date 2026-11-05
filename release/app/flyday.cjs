@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.06-0043" : "dev";
+var VERSION = true ? "2026.11.06-0056" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -275,6 +275,12 @@ var DEFAULT_CONFIG = {
   autoStart: true,
   nightStop: true,
   nightStopAt: 20 * 60 + 30,
+  clubQuads: [
+    { name: "Club 1", channel: "R1", broken: false },
+    { name: "Club 2", channel: "R2", broken: false },
+    { name: "Club 3", channel: "F2", broken: false },
+    { name: "Club 4", channel: "F4", broken: false }
+  ],
   timer: { enabled: false, host: "", user: "admin", password: "rotorhazard" },
   callouts: {
     sessionStartStop: true,
@@ -303,6 +309,7 @@ var DEFAULT_CONFIG = {
       freeFlight: "Free flight. Only heat {heat} is left, fly as you like.",
       freeFlightEnd: "Free flight is over. Please land.",
       heatsChanged: "Attention pilots, your heats and channels may have changed. Check the big screen.",
+      clubQuadBroken: "{quad} is out of action. {pilots}, check the big screen for your new quad and heat.",
       freeFlightOpen: "Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.",
       heatsForm: "More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.",
       nightAsk: "Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.",
@@ -1174,16 +1181,33 @@ var Engine = class {
    * seat (on their usual channel when that heat has it free), or in a new heat at the end
    * of the loop when every heat is full. Someone already in a heat stays where they are.
    */
-  walkIn(name, usual) {
+  walkIn(name, usual, club = false) {
     const pilot = this.findOrCreatePilot(cleanName(name));
+    const onClub = !!this.clubQuadOf(pilot);
+    if (!club && onClub) pilot.quad = void 0;
     for (let h2 = 0; h2 < this.heats.length; h2++) {
       const s = this.heats[h2].indexOf(pilot.id);
+      if (s >= 0 && club && !onClub) {
+        this.heats[h2][s] = null;
+        break;
+      }
       if (s >= 0) {
         this.onChange();
-        return { pilot, heat: h2, slot: s, added: false, already: true };
+        return { pilot, heat: h2, slot: s, added: false, already: true, ...this.clubInfo(pilot) };
       }
     }
-    const order = this.clock.phase === "freeflight" ? [this.clock.heat, ...this.loopOrder().filter((h2) => h2 !== this.clock.heat)] : this.loopOrder();
+    if (club) {
+      const q = this.pickClubQuad();
+      if (!q) {
+        this.onChange();
+        throw new EngineError("No club quad is working right now. Ask the race director.");
+      }
+      const r = this.seatOnQuad(pilot, q);
+      this.signedIn();
+      this.onChange();
+      return { pilot, ...r, already: false, ...this.clubInfo(pilot) };
+    }
+    const order = this.fillOrder();
     let heat = order.find((h2) => this.slotAny(pilot, h2) >= 0);
     const added = heat === void 0;
     if (heat === void 0) heat = this.addHeat();
@@ -1198,6 +1222,105 @@ var Engine = class {
     this.signedIn();
     this.onChange();
     return { pilot, heat: h, slot, added, already: false };
+  }
+  /** Heats in the order a newcomer fills them: the one up next first, the one flying now last.
+   *  In free flight the flying heat fills up first: only a full heat makes a second one. */
+  fillOrder() {
+    return this.clock.phase === "freeflight" ? [this.clock.heat, ...this.loopOrder().filter((h) => h !== this.clock.heat)] : this.loopOrder();
+  }
+  // ---------- club quads ----------
+  /** The club quad a pilot is flying, if any. */
+  clubQuadOf(p) {
+    const k = p.quad?.toLowerCase();
+    return k ? this.config.clubQuads.find((q) => q.name.toLowerCase() === k) : void 0;
+  }
+  onQuad(q) {
+    const k = q.name.toLowerCase();
+    return [...this.pilots.values()].filter((p) => p.quad?.toLowerCase() === k);
+  }
+  heatOf(id) {
+    return this.heats.findIndex((row) => row.includes(id));
+  }
+  /** For the kiosk and the phone: the pilot's club quad and who shares it (with their heats). */
+  clubInfo(p) {
+    const q = this.clubQuadOf(p);
+    if (!q) return {};
+    return { quad: q.name, mates: this.onQuad(q).filter((m) => m.id !== p.id).map((m) => ({ callsign: m.callsign, heat: this.heatOf(m.id) })) };
+  }
+  /**
+   * A club quad for a pilot without one: the first working quad nobody is on; when all are
+   * taken, the working one with the fewest pilots (a random one of those), which is then shared.
+   */
+  pickClubQuad() {
+    const working = this.config.clubQuads.filter((q) => !q.broken);
+    if (!working.length) return void 0;
+    const free = working.find((q) => this.onQuad(q).length === 0);
+    if (free) return free;
+    const least = Math.min(...working.map((q) => this.onQuad(q).length));
+    const ties = working.filter((q) => this.onQuad(q).length === least);
+    return ties[Math.min(ties.length - 1, Math.floor(this.random() * ties.length))];
+  }
+  /** Put the pilot on club quad q: its channel, in the first heat to fly where that fits (not with a quad-mate). */
+  seatOnQuad(p, q) {
+    p.quad = q.name;
+    let heat = this.fillOrder().find((h) => this.slotKeeping(p, h, q.channel) >= 0);
+    const added = heat === void 0;
+    if (heat === void 0) heat = this.addHeat();
+    if (heat === void 0) throw new EngineError(`All ${MAX_HEATS} heats are full. Ask the race director.`);
+    const slot = this.slotKeeping(p, heat, q.channel);
+    this.seat(p, heat, slot, q.channel);
+    return { heat, slot, added };
+  }
+  /**
+   * RD: the club quads (up to 8): name, channel, broken. A quad that is renamed keeps its
+   * pilots; one that changed channel re-seats its pilots on the new channel. Pilots on a quad
+   * that broke or was removed get another working club quad (shared if need be), and the
+   * voice tells them; with no working quad left they wait without a heat.
+   */
+  setClubQuads(list) {
+    if (!Array.isArray(list)) throw new EngineError("Club quads: a list, please.");
+    if (list.length > 8) throw new EngineError("Up to 8 club quads.");
+    const next = list.map((x, i) => ({
+      name: cleanQuad(x?.name) || `Club ${i + 1}`,
+      channel: cleanChannel(x?.channel),
+      broken: Boolean(x?.broken)
+    }));
+    const names = next.map((q) => q.name.toLowerCase());
+    if (new Set(names).size !== names.length) throw new EngineError("Every club quad needs its own name.");
+    const before = this.config.clubQuads;
+    before.forEach((old, i) => {
+      const q = next[i];
+      if (!q || q.name === old.name) return;
+      for (const p of this.onQuad(old)) p.quad = q.name;
+    });
+    this.config = { ...this.config, clubQuads: next };
+    const moved = [];
+    const gone = [];
+    before.forEach((old, i) => {
+      const q = next[i];
+      const pilots = q ? this.onQuad(q) : this.pilots.size ? [...this.pilots.values()].filter((p) => p.quad?.toLowerCase() === old.name.toLowerCase()) : [];
+      if (!pilots.length) return;
+      if (!q || q.broken && !old.broken) {
+        gone.push(q?.name ?? old.name);
+        for (const p of pilots) {
+          this.removeFromSlots(p.id);
+          p.quad = void 0;
+          const other = this.pickClubQuad();
+          if (other) this.seatOnQuad(p, other);
+          moved.push(p);
+        }
+      } else if (q.channel !== old.channel) {
+        for (const p of pilots) {
+          this.removeFromSlots(p.id);
+          this.seatOnQuad(p, q);
+        }
+      }
+    });
+    if (moved.length && this.config.callouts.heatsChanged) {
+      this.say(fillText(this.config.callouts.texts.clubQuadBroken, { quad: gone.join(" and "), pilots: moved.map((p) => p.spokenName || p.callsign).join(", ") }));
+    }
+    this.onChange();
+    return { moved: moved.map((p) => ({ pilot: p, ...this.clubInfo(p), heat: this.heatOf(p.id) })) };
   }
   /** Kiosk: a pilot goes home. They're gone from the session, also from the Pilots list. */
   leave(pilotId) {
@@ -2069,12 +2192,14 @@ var knownKey = (callsign) => callsign.trim().toLowerCase();
 function rememberChannel(pilotId) {
   const p = engine.pilots.get(pilotId);
   if (!p) return;
+  const k = knownKey(p.callsign);
+  const club = !!engine.clubQuadOf(p);
   for (const [h, slots] of engine.heats.entries()) {
     const i = slots.indexOf(pilotId);
     if (i < 0) continue;
-    const channel = engine.channelOf(h, i);
-    if (known[knownKey(p.callsign)]?.channel === channel) return;
-    known[knownKey(p.callsign)] = { channel };
+    const channel = club ? known[k]?.channel : engine.channelOf(h, i);
+    if (known[k]?.channel === channel && !!known[k]?.club === club) return;
+    known[k] = { ...channel ? { channel } : {}, ...club ? { club } : {} };
     try {
       (0, import_node_fs4.mkdirSync)((0, import_node_path4.resolve)(KNOWN_FILE, ".."), { recursive: true });
       (0, import_node_fs4.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
@@ -2196,7 +2321,8 @@ var API2 = {
     return pilot;
   },
   "/api/walkin": (b) => {
-    const r = engine.walkIn(b.name, known[knownKey(String(b.name ?? ""))]?.channel);
+    const k = known[knownKey(String(b.name ?? ""))];
+    const r = engine.walkIn(b.name, k?.channel, b.club === void 0 ? !!k?.club : !!b.club);
     rememberChannel(r.pilot.id);
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
@@ -2227,6 +2353,7 @@ var API2 = {
   },
   "/api/config": (b) => engine.setConfig(b),
   "/api/compact": () => engine.compact(),
+  "/api/club-quads": (b) => engine.setClubQuads(b.quads),
   "/api/arm-measured": (b) => engine.setArmMeasured(b.text, b.ms),
   "/api/pilots-per-heat": (b) => engine.setPilotsPerHeat(Number(b.count)),
   "/api/slot-channel": (b) => engine.setSlotChannel(Number(b.slot), String(b.channel)),

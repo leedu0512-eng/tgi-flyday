@@ -1,9 +1,9 @@
 {
- "version": "2026.11.06-0043",
+ "version": "2026.11.06-0056",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "dd2fb958538af474b7190f102984b827dce05e1be41e6ea7d15b5c14a3a075a7"
+   "sha256": "bbdff24380e5e5ef0ab436c466b602d56d8d2e488fc3f03d478208ff6fe1c108"
   },
   {
    "path": "web/assets/avatars.js",
@@ -95,7 +95,7 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "09cb67a81867d5fa76fc6bf468e2b5bbaddbd6f0a1ca4d57f4d39161a7d8b552"
+   "sha256": "6634d0ec700b952f4ea38eaf58071c0a716164589386ca97f633e6b050f31b86"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
@@ -103,7 +103,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "320d35b3b97d23c30aeed9074fc36c891b8c7a5985200e96d455b4cfb877732b"
+   "sha256": "b0a09a6d7e4fc9bba8e954d8ee3b3228a982cb16da4ae20fd0bf23ed28edd570"
   },
   {
    "path": "web/index.html",
@@ -111,11 +111,11 @@
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "4613e00c6c8e7657a531936e77d1722a5eaf88c5f7421283c4132c93fd23bb53"
+   "sha256": "f7199467c10c066e74ebb79ba8cc402f422efff432a69fd0d628f7f0336addc7"
   },
   {
    "path": "web/me.html",
-   "sha256": "bad8ab4505f85f0eda8388c370eb89f9053847b9bff36f4d9d1ec68da91c573f"
+   "sha256": "8b7005bcd1469301320f7565038f316d7e58505713094a7abc7c59e3dc6df50d"
   },
   {
    "path": "web/mobile.html",

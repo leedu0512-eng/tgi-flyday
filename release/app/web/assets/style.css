@@ -878,3 +878,27 @@ details.more .more-body { display: grid; gap: 14px; padding-top: 10px; }
 .pb.view-leave #main, .pb.view-leave #next { opacity: 0; transform: translateY(1.2vh) scale(.985); filter: blur(6px); }
 .pb.view-leave .pb-head > :not(.wallclock) { opacity: 0; transform: translateY(-.6vh); }
 @media (prefers-reduced-motion: reduce) { .pb.view-leave #main, .pb.view-leave #next, .pb.view-leave .pb-head > :not(.wallclock) { transform: none; filter: none; } }
+
+/* Kiosk: "I don't have my own quad" (club quads). */
+.kiosk .club-toggle { display: flex; align-items: center; gap: 18px; width: 100%; margin-top: 16px; padding: 16px 22px; border-radius: 12px; border: 2px solid var(--line); background: var(--panel-2); color: var(--text); text-align: left; cursor: pointer; font: 700 24px var(--font); }
+.kiosk .club-toggle i { flex: none; width: 34px; height: 34px; border-radius: 8px; border: 3px solid var(--muted); position: relative; }
+.kiosk .club-toggle span { display: grid; gap: 2px; }
+.kiosk .club-toggle small { font-size: 17px; font-weight: 500; color: var(--muted); }
+.kiosk .club-toggle.on { border-color: var(--accent); background: rgba(255,107,0,.12); }
+.kiosk .club-toggle.on i { border-color: var(--accent); background: var(--accent); }
+.kiosk .club-toggle.on i::after { content: ''; position: absolute; left: 9px; top: 3px; width: 8px; height: 16px; border: solid #000; border-width: 0 4px 4px 0; transform: rotate(45deg); }
+.kiosk .club-toggle:active { transform: scale(0.99); }
+body.embedded .kiosk .club-toggle { font-size: 20px; padding: 12px 16px; }
+
+/* RD console: club quads page. */
+.club-list { display: grid; gap: 10px; }
+.club-row { display: grid; grid-template-columns: minmax(140px, 1fr) 110px auto auto; gap: 8px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+.club-row.broken { border-color: rgba(255,59,48,.5); background: rgba(255,59,48,.06); }
+.club-row .club-pilots { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.club-pilot { padding: 4px 10px; border-radius: 999px; background: var(--line); font-weight: 700; font-size: 14px; }
+.club-pilot small { color: var(--muted); font-weight: 600; margin-left: 4px; }
+.me-club { display: grid; gap: 2px; margin-top: 12px; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--accent); background: rgba(255,107,0,.08); }
+.me-club small { font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.me-club b { font-family: var(--display); font-size: 26px; font-weight: 800; text-transform: uppercase; }
+.me-club span { color: var(--muted); font-size: 15px; }
+.club-row [data-f="broken"] { min-width: 92px; }

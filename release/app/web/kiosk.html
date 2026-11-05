@@ -37,6 +37,8 @@ let leaving = null; // pilot id
 let flow = 'join';  // 'join': signing in; 'move': changing channel
 let mover = null;   // the pilot changing channel
 let usual = null;   // the channel this pilot flew last time
+let club = null;    // "I don't have my own quad": null = as last time (remembered by name), else tapped
+let knownClub = false; // this name flew a club quad last time
 let doneMsg = null;
 let idleTimer;
 let me = null;      // the pilot who just signed in, for the photo step
@@ -86,6 +88,7 @@ function nameView() {
   return `<div class="name-view"><button class="btn back" data-go="home">← Back</button>
     <h1>Your pilot name</h1>
     <input class="input name-input" id="nameInput" value="${esc(name)}" maxlength="24" autocomplete="off" inputmode="none" placeholder="Callsign">
+    ${clubButton()}
     <div class="suggest">${known.map((p) => `<button data-pick="${esc(p.callsign)}">${esc(NAME(p.callsign))}</button>`).join('')}</div>
     <div class="keyboard">
       ${KEYS.map((row) => `<div class="krow">${[...row].map((k) => `<button data-key="${k}">${k}</button>`).join('')}</div>`).join('')}
@@ -96,6 +99,32 @@ function nameView() {
         <button class="go" data-next>Next →</button>
       </div>
     </div></div>`;
+}
+
+// ---------- club quads: "I don't have my own quad" ----------
+const clubAvailable = () => flow === 'join' && (state?.config.clubQuads ?? []).some((q) => !q.broken);
+const clubOn = () => club ?? knownClub;
+function clubButton() {
+  if (!clubAvailable()) return '';
+  return `<button class="club-toggle ${clubOn() ? 'on' : ''}" data-club><i></i><span>I don't have my own quad<small>${clubOn() ? 'You get one of the club quads' : 'Tap to fly a club quad'}</small></span></button>`;
+}
+function updateClub() {
+  const b = document.querySelector('[data-club]');
+  if (b) b.outerHTML = clubButton();
+}
+/** What we remember about the name typed so far: flew a club quad last time? (pre-ticks the button) */
+let knownTimer;
+function lookUpKnown() {
+  clearTimeout(knownTimer);
+  knownTimer = setTimeout(async () => {
+    const asked = name.trim();
+    try {
+      const k = asked ? await (await fetch(`/api/known?name=${encodeURIComponent(asked)}`)).json() : {};
+      if (name.trim() !== asked) return;
+      knownClub = !!k.club;
+      updateClub();
+    } catch {}
+  }, 250);
 }
 
 // Phone-style capitals: the first letter of each word is a capital unless Shift says otherwise.
@@ -361,7 +390,7 @@ setInterval(() => {
 // ---------- input ----------
 
 $('view').addEventListener('input', (e) => {
-  if (e.target.id === 'nameInput') { name = e.target.value; refreshSuggestions(); updateKeys(); }
+  if (e.target.id === 'nameInput') { name = e.target.value; refreshSuggestions(); updateKeys(); lookUpKnown(); }
 });
 $('view').addEventListener('keydown', (e) => {
   if (e.target.id === 'nameInput' && e.key === 'Enter') toSlots();
@@ -382,11 +411,14 @@ async function toSlots() {
   if (busy) return;
   busy = true;
   try {
-    const r = await post('/api/walkin', { name });
+    const r = await post('/api/walkin', { name, ...(club === null || !clubAvailable() ? {} : { club }) });
     const ch = esc(r.channel);
+    const mates = r.mates?.length ? ` You share it with ${r.mates.map((m) => `${esc(NAME(m.callsign))}${m.heat >= 0 ? ` (heat ${m.heat + 1})` : ''}`).join(', ')}.` : '';
     signedIn(r.pilot, {
       title: r.already ? `You're already in heat ${r.heat + 1}` : `Heat ${r.heat + 1} · ${ch}`,
-      text: `${esc(NAME(r.pilot.callsign))}, set your video to <b>${ch}</b>.${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}<br><small>Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.</small>`,
+      text: r.quad
+        ? `${esc(NAME(r.pilot.callsign))}, you fly club quad <b>${esc(r.quad)}</b>, video on <b>${ch}</b>.${mates}${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}`
+        : `${esc(NAME(r.pilot.callsign))}, set your video to <b>${ch}</b>.${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}<br><small>Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.</small>`,
     });
   } catch (err) { toast(err.message); }
   finally { busy = false; }
@@ -409,7 +441,7 @@ $('view').addEventListener('click', async (e) => {
   idleTimer = setTimeout(() => { name = ''; go('home'); }, 45000);
 
   if (t.dataset.go) { if (t.dataset.go === 'home') { name = ''; mover = null; } leaving = null; return go(t.dataset.go); }
-  if (t.dataset.flow) { flow = t.dataset.flow; name = ''; mover = null; usual = null; return go(flow === 'move' ? 'move' : 'name'); }
+  if (t.dataset.flow) { flow = t.dataset.flow; name = ''; mover = null; usual = null; club = null; knownClub = false; return go(flow === 'move' ? 'move' : 'name'); }
   if (t.dataset.mover) {
     mover = state.pilots.find((p) => p.id === t.dataset.mover);
     return go('slot');
@@ -425,8 +457,10 @@ $('view').addEventListener('click', async (e) => {
     input.focus();
     refreshSuggestions();
     updateKeys();
+    lookUpKnown();
     return;
   }
+  if (t.hasAttribute('data-club')) { club = !clubOn(); return updateClub(); }
   if (t.dataset.pick !== undefined) { name = t.dataset.pick; return toSlots(); }
   if (t.hasAttribute('data-next')) return toSlots();
   if (t.dataset.heat !== undefined) {
