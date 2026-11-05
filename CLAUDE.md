@@ -56,5 +56,5 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 ## TrackDay (RC cars)
 
-- The big screen has a second view (tap the logo): **TGI TrackDay**, for the RC car days in the arena. The clock stays (time of day when no drone practice runs), the plates make way for QR cards (`CARDS` in screen.html; first: pay for the track day, 15 EUR, Montonio link). The header's drone bits (Sign in, the phone QR, Practice) never show in TrackDay.
+- The big screen has a second view (tap the logo): **TGI TrackDay** (mark: the calendar page with an RC buggy, mark-car.svg / mark-car-small.svg), for the RC car days in the arena. The clock stays (time of day when no drone practice runs), the plates make way for QR cards (`CARDS` in screen.html; first: pay for the track day, 15 EUR, Montonio link). The header's drone bits (Sign in, the phone QR, Practice) never show in TrackDay.
 - Switches to TrackDay by itself every Wednesday, Saturday and Sunday at 09:00 local time, once a day (tapping back to FlyDay that day sticks). The view is remembered per screen (localStorage).

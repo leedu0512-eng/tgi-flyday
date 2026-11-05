@@ -127,6 +127,9 @@ function render() {
   const screen = $('screen');
   screen.classList.toggle('pay-view', view === 'pay');
   $('wmWord').textContent = view === 'pay' ? 'Track' : 'Fly';
+  const mark = view === 'pay' ? '/assets/mark-car-small.svg' : '/assets/mark-small.svg';
+  const markImg = document.querySelector('#viewToggle img');
+  if (!markImg.src.endsWith(mark)) markImg.src = mark;
   // TrackDay is for the RC cars: no drone bits in the header (sign in, the phone QR).
   screen.classList.toggle('car-day', view === 'pay');
   document.title = view === 'pay' ? 'TGI TrackDay' : 'TGI FlyDay · Spectator view';
