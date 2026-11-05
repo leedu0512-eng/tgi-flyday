@@ -71,4 +71,6 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 ## TrackDay (RC cars)
 
 - The big screen has a second view (tap the logo): **TGI TrackDay** (mark: the calendar page with an RC buggy, mark-car.svg / mark-car-small.svg), for the RC car days in the arena. The clock stays (time of day when no drone practice runs), the plates make way for QR cards (`CARDS` in screen.html) on one panel that flips in 3D: pay for the track day (15 EUR, Montonio link) for 30 s, then join the club (hobizone.org/liitu, "Track days for free ;)") for 15 s. The panel element is kept across renders (`placeCard`), so a flip is never cut short. The header's drone bits (Sign in, the phone QR, Practice) never show in TrackDay.
+- Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over, pause) switches TrackDay back to the FlyDay view (`backToWork` in screen.html). Stopped or waiting: TrackDay stays.
+- Views never jump: `setView` fades the board, the panel and the header extras out (blur, settle), swaps while hidden, fades back in (`.view-leave`, 0.42 s each way). The header clock stays put.
 - Switches to TrackDay by itself every Wednesday, Saturday and Sunday at 09:00 local time, once a day (tapping back to FlyDay that day sticks). The view is remembered per screen (localStorage).
