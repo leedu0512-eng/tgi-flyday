@@ -13,7 +13,7 @@
 <div id="screen" class="pb">
   <div class="chequer"></div>
   <header class="pb-head">
-    <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+    <div class="logo" id="viewToggle" title="Switch view"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
     <span id="meta" class="meta">Practice</span>
     <span id="wallclock" class="wallclock num"></span>
     <div class="pb-qr" title="Your heat on your phone"><span>Your heat<br>on your phone</span><i id="meQr"></i></div>
@@ -63,18 +63,53 @@ function plates(heat, pm) {
   }).join('')}</div>`;
 }
 
+// ---------- second view: the clock and a QR code (tap the logo to switch) ----------
+
+/** QR cards for the second view. More can follow; for now: paying for the track day. */
+const CARDS = [
+  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo' },
+];
+let view = (() => { try { return localStorage.getItem('flyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
+const cardQr = new Map();
+$('viewToggle').addEventListener('click', () => {
+  view = view === 'plates' ? 'pay' : 'plates';
+  try { localStorage.setItem('flyday.screen.view', view); } catch {}
+  render();
+});
+
+function payCard() {
+  const card = CARDS[0];
+  if (!cardQr.has(card.url)) {
+    cardQr.set(card.url, '');
+    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); const el = document.querySelector('.pay-qr'); if (el) el.innerHTML = svg; });
+  }
+  return `<div class="pay-card">
+    <h2>${esc(card.title)}</h2>
+    <div class="pay-qr">${cardQr.get(card.url)}</div>
+    <p class="pay-price">${esc(card.price)}</p>
+    <p class="pay-cta">${esc(card.cta)}</p>
+  </div>`;
+}
+
 function render() {
   if (!state) return;
   const c = state.clock;
   const screen = $('screen');
+  screen.classList.toggle('pay-view', view === 'pay');
   $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}`;
 
   if (c.phase === 'stopped' || c.phase === 'waiting') {
     screen.classList.add('no-next');
     $('next').innerHTML = '';
     const msg = c.phase === 'waiting' ? 'Waiting for pilots · join a heat at the kiosk' : 'Practice is not running';
+    const idle = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
+    if (view === 'pay') {
+      $('main').className = 'pb-main';
+      $('main').innerHTML = `<div class="pb-idle">${idle}</div>${payCard()}`;
+      return;
+    }
     $('main').className = 'pb-idle';
-    $('main').innerHTML = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
+    $('main').innerHTML = idle;
     return;
   }
   const pm = pilotMap(state);
@@ -86,7 +121,7 @@ function render() {
       <div class="plank clock-plank"><span id="bigclock" class="bigclock num"></span></div>
       <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
     </div>
-    ${plates(state.heats[c.heat], pm)}`;
+    ${view === 'pay' ? payCard() : plates(state.heats[c.heat], pm)}`;
   renderNext(pm);
   tick();
 }
