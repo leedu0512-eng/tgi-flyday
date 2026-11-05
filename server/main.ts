@@ -10,7 +10,7 @@ import { hostname, networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as sea from 'node:sea';
-import { closeOldWindows, openRdWindows, relaunch, tameConsole } from './launch.ts';
+import { closeOldWindows, keepAwake, openRdWindows, relaunch, tameConsole } from './launch.ts';
 import { install, latest } from './update.ts';
 import { VERSION } from './version.ts';
 import { Engine, EngineError } from './engine.ts';
@@ -420,6 +420,7 @@ server.on('error', (err: any) => {
 server.listen(PORT, '0.0.0.0', () => {
   if (OPEN_WINDOWS) { closeOldWindows(); openRdWindows(PORT); }
   if (process.platform === 'win32' && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
+  keepAwake(); // the RD PC must not fall asleep mid-session
   const lan = lanAddresses();
   console.log(`\nTGI FlyDay ${VERSION} is running.${AFTER_UPDATE ? ' (just updated)' : ''}\n`);
   console.log(`  RD console      http://localhost:${PORT}/console`);

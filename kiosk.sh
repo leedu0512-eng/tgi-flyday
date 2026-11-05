@@ -35,13 +35,24 @@ profile() {
 # A kiosk that is still open: close it, so there's never two.
 pkill -f "tgi-flyday-kiosk" 2>/dev/null && sleep 2
 
+# Keep the screen on: no blanking, no screensaver, no power saving (X11).
+if [ -n "$DISPLAY" ] && command -v xset >/dev/null 2>&1; then
+  xset s off; xset s noblank; xset -dpms
+fi
+# Don't let the PC go idle or sleep while the kiosk browser is open (systemd).
+INHIBIT=""
+# Only if this PC allows it: otherwise the kiosk still starts, just without the sleep block.
+if command -v systemd-inhibit >/dev/null 2>&1 && systemd-inhibit --what=idle:sleep --who=TGI-FlyDay --why=Kiosk --mode=block true >/dev/null 2>&1; then
+  INHIBIT="systemd-inhibit --what=idle:sleep --who=TGI-FlyDay --why=Kiosk --mode=block"
+fi
+
 echo "Waiting for TGI FlyDay on $RDPC ..."
 until (exec 3<>"/dev/tcp/$RDPC/$PORT") 2>/dev/null; do sleep 3; done
 
 if [ -n "$BROWSER" ]; then
   DIR=$(profile "$BROWSER")
   mkdir -p "$DIR"
-  nohup "$BROWSER" --kiosk "$URL/$PAGE" \
+  nohup $INHIBIT "$BROWSER" --kiosk "$URL/$PAGE" \
     --user-data-dir="$DIR" \
     --unsafely-treat-insecure-origin-as-secure="$URL" \
     --use-fake-ui-for-media-stream \
@@ -62,6 +73,6 @@ user_pref("browser.shell.checkDefaultBrowser", false);
 user_pref("browser.sessionstore.resume_from_crash", false);
 user_pref("datareporting.policy.dataSubmissionPolicyBypassNotification", true);
 PREFS
-  nohup "$FIREFOX" --kiosk --no-remote --profile "$DIR" "$URL/$PAGE" >/dev/null 2>&1 &
+  nohup $INHIBIT "$FIREFOX" --kiosk --no-remote --profile "$DIR" "$URL/$PAGE" >/dev/null 2>&1 &
 fi
 echo "Kiosk open. Close it with Alt+F4."

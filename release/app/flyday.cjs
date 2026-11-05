@@ -83,6 +83,28 @@ $h = $k::GetStdHandle(-10); $m = 0
 if ($k::GetConsoleMode($h, [ref]$m)) { [void]$k::SetConsoleMode($h, (($m -band (-bnot 0x40)) -bor 0x80)) }
 [void]$k::ShowWindow($k::GetConsoleWindow(), 6)`, true);
 }
+function keepAwake() {
+  if (process.platform !== "win32") return;
+  const script = `$sig = '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+$k = Add-Type -MemberDefinition $sig -Name FlyDayAwake -Namespace W -PassThru
+# ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) {
+  [void]$k::SetThreadExecutionState([uint32]2147483651)
+  Start-Sleep -Seconds 20
+}
+[void]$k::SetThreadExecutionState([uint32]2147483648)`;
+  try {
+    const child = (0, import_node_child_process.spawn)(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")],
+      { stdio: "ignore", windowsHide: true }
+    );
+    child.on("error", () => {
+    });
+    child.unref();
+  } catch {
+  }
+}
 function relaunch(args) {
   if (process.platform === "win32") {
     const q = (x) => `'${x.replace(/'/g, "''")}'`;
@@ -151,7 +173,7 @@ async function install(dir, release, commit) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2023" : "dev";
+var VERSION = true ? "2026.11.05-2028" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2058,6 +2080,7 @@ server.listen(PORT, "0.0.0.0", () => {
     openRdWindows(PORT);
   }
   if (process.platform === "win32" && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
+  keepAwake();
   const lan = lanAddresses();
   console.log(`
 TGI FlyDay ${VERSION} is running.${AFTER_UPDATE ? " (just updated)" : ""}

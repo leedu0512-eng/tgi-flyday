@@ -530,3 +530,19 @@ export async function qrSvg(text) {
   q.make();
   return q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
 }
+
+// ---------- keep the screen on ----------
+
+/**
+ * The console, the big screen and the kiosk keep their screen awake (no dimming, no
+ * screensaver) while they're open. Phones don't, to save batteries. The browser lets go
+ * when the page is hidden, so it asks again when it comes back.
+ */
+(function stayAwake() {
+  if (typeof document === 'undefined' || !navigator.wakeLock) return;
+  const here = location.pathname.replace(/\/$/, '') || '/';
+  if (here === '/mobile' || here === '/me' || window.top !== window) return;
+  const ask = () => { if (document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(() => {}); };
+  document.addEventListener('visibilitychange', ask);
+  ask();
+})();

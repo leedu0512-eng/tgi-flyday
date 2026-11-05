@@ -95,6 +95,8 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 
 **Pilots' phones (`/me`).** A QR code on the kiosk's "you're in" screen opens the pilot's own page, already as them; a small QR code in the big screen's header opens it too ("Who are you?": tap your name, or type it to sign in). It shows your heat and channel, whether you're flying, up next, arming, or how many heats away, who's in your heat, a **Take your photo** button (the phone's own camera) and **Going home**. Lap times will show here once the timer is in. Phones must be on a network that reaches the RD PC: a Wi-Fi access point on the venue's wired network. **Add to Home Screen** gives a FlyDay app icon.
 
+**Stays awake.** While FlyDay runs, the RD PC doesn't sleep or switch its screens off. The console, big screen and kiosk pages also keep their screen on (phones don't, to save batteries). On the Linux kiosk, kiosk.sh switches off screen blanking and, where the PC allows it, blocks sleep while the kiosk is open.
+
 **Kiosk.** Three buttons: **Fly today**, **Change channel**, **Going home**.
 - *Fly today:* type your name, that's all. FlyDay puts you in the first heat to fly that has a free seat, on your usual channel (the one you flew last time) when that heat has it free, and adds a new heat when every heat is full. The screen says your heat, your channel and how many heats are before yours.
 - *Change channel:* tap your name, then a free slot on the heat board (your current seat is outlined).

@@ -65,6 +65,28 @@ if ($k::GetConsoleMode($h, [ref]$m)) { [void]$k::SetConsoleMode($h, (($m -band (
 [void]$k::ShowWindow($k::GetConsoleWindow(), 6)`, true);
 }
 
+/**
+ * Windows: keep the PC and its screens awake while FlyDay runs (no sleep, no screen off).
+ * A hidden PowerShell holds the request and lets go by itself when FlyDay exits.
+ */
+export function keepAwake() {
+  if (process.platform !== 'win32') return;
+  const script = `$sig = '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
+$k = Add-Type -MemberDefinition $sig -Name FlyDayAwake -Namespace W -PassThru
+# ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) {
+  [void]$k::SetThreadExecutionState([uint32]2147483651)
+  Start-Sleep -Seconds 20
+}
+[void]$k::SetThreadExecutionState([uint32]2147483648)`;
+  try {
+    const child = spawn('powershell', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
+      { stdio: 'ignore', windowsHide: true });
+    child.on('error', () => {});
+    child.unref();
+  } catch {}
+}
+
 /** Start this program again (after an update), in its own minimised window on Windows. */
 export function relaunch(args: string[]) {
   if (process.platform === 'win32') {
