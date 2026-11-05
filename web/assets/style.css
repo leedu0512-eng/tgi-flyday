@@ -767,3 +767,7 @@ img.avatar { filter: brightness(0.55) saturate(0.8); }
 .pay-card .pay-price { margin: 0; font-family: var(--stencil); font-weight: 900; font-size: calc(7 * var(--u)); line-height: 1; color: var(--accent); text-transform: uppercase; }
 .pay-card .pay-cta { margin: 0; font-family: var(--display); font-weight: 800; font-size: calc(2.6 * var(--u)); letter-spacing: 0.14em; text-transform: uppercase; color: #555; }
 .pb-main > .pb-idle .logo { font-size: calc(9 * var(--u)); }
+.td-board .td-name { justify-content: center; }
+.td-board .td-name .logo { font-size: calc(5.4 * var(--u)); }
+.pb.car-day .meta, .pb.car-day .pb-qr, .pb.car-day .pb-signin { visibility: hidden; }
+.td-board .td-name .label { font-family: var(--display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em; }

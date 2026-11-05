@@ -53,3 +53,8 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 ## Default avatars
 
 - No photo: a badly drawn animal in FPV goggles (web/assets/avatars.js, SVG drawn in code, 20 animals × goggle/antenna/mouth/hat/background variations, seeded by the pilot's name). `assignAnimals` gives everyone in the session a different animal while there are animals left; `faceOf(state, pilot, wide)` in common.js returns a photo or the avatar. Avatars are always shown darkened (`img.avatar`), so real photos stand out. Images are data: URLs, so the SVG must be strict XML (no duplicate attributes).
+
+## TrackDay (RC cars)
+
+- The big screen has a second view (tap the logo): **TGI TrackDay**, for the RC car days in the arena. The clock stays (time of day when no drone practice runs), the plates make way for QR cards (`CARDS` in screen.html; first: pay for the track day, 15 EUR, Montonio link). Drone bits in the header hide on a car day.
+- Switches to TrackDay by itself every Wednesday, Saturday and Sunday at 09:00 local time, once a day (tapping back to FlyDay that day sticks). The view is remembered per screen (localStorage).
