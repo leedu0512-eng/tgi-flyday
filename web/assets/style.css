@@ -847,3 +847,7 @@ details.more .more-body { display: grid; gap: 14px; padding-top: 10px; }
 .screen-link code { overflow-wrap: anywhere; }
 .screen-link .hint { margin: 0; font-size: 13px; }
 .kiosk-info code.plain { font-size: 13px; color: var(--text); }
+
+/* Console columns: cards spaced by a gap, so a hidden card (Heats while a page is open) leaves no space. */
+.console .grid > div { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.console .grid > div > .card + .card { margin-top: 0; }
