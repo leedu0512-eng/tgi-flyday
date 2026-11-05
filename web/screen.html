@@ -32,7 +32,7 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
@@ -53,9 +53,11 @@ function plates(heat, pm) {
     const p = s.pilotId ? pm.get(s.pilotId) : null;
     const c = `--c:${SLOT_COLORS[i]}`;
     if (!p) return '';
-    const img = photoUrl(p);
-    return `<div class="plate ${img ? 'photo' : ''}" style="${c}">
-      ${img ? `<img src="${img}" alt="">` : ''}
+    // A photo, or the pilot's goggled animal (darkened).
+    const face = faceOf(state, p, true);
+    const img = face.src;
+    return `<div class="plate ${img ? 'photo' : ''} ${face.avatar ? 'avatar' : ''}" style="${c}">
+      ${img ? `<img src="${img}" alt="" ${face.avatar ? 'class="avatar"' : ''}>` : ''}
       <span class="ch">${esc(s.channel)}${timerMark(state, i)}</span><span class="nm">${esc(NAME(p.callsign))}</span>
     </div>`;
   }).join('')}</div>`;

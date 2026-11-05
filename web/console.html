@@ -128,7 +128,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf } from '/assets/common.js';
 setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
 
 const $ = (id) => document.getElementById(id);
@@ -554,7 +554,7 @@ function renderPilotsPanel(force = false) {
         <div class="field"><label>Spoken name, what the voice says</label>
           <div class="wording-row"><input class="input" data-field="spokenName" value="${esc(p.spokenName)}" maxlength="60"><button class="btn small" data-say>Hear</button></div></div>
         <div class="field"><label>Photo, shown on the pilot's plate on the big screen</label>
-          <div class="photo-row">${photoUrl(p) ? `<img class="thumb" src="${photoUrl(p)}" alt="">` : '<span class="thumb none">No photo</span>'}
+          <div class="photo-row"><img class="thumb ${p.photo ? '' : 'avatar'}" src="${faceOf(state, p).src}" alt="">
             <label class="btn small">${photoUrl(p) ? 'Change photo' : 'Add photo'}<input type="file" accept="image/*" data-photo hidden></label>
             ${photoUrl(p) ? '<button class="btn small" data-photo-del>Remove photo</button>' : ''}</div></div>
         <div class="pactions">

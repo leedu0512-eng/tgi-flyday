@@ -749,3 +749,10 @@ body.me .pbsb.is-sb { background: var(--sb); color: #fff; }
 .me-run .sum b { font-weight: 700; color: var(--text); }
 .times .laps span.t-sb { outline: 1px solid var(--sb); }
 .times .laps span.t-pb { outline: 1px solid var(--pb); }
+
+/* Default avatars (a goggled animal instead of a photo): darkened, so real photos stand out. */
+img.avatar { filter: brightness(0.55) saturate(0.8); }
+.me-face img.avatar { filter: brightness(0.55) saturate(0.8); }
+/* On a plate the avatar fits above the name bar, whole, instead of filling the plate like a photo. */
+.plate.avatar { background: #000; }
+.plate.avatar img { bottom: auto; height: 71%; object-fit: cover; object-position: center 40%; }

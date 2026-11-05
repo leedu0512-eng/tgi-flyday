@@ -33,7 +33,7 @@
 <script type="module">
 // A pilot's own page on their phone (QR code on the kiosk and the big screen):
 // who am I, my heat and channel, am I flying, and Leave. Lap times come here later.
-import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark } from '/assets/common.js';
+import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark, faceOf } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'flyday.me';
@@ -130,7 +130,7 @@ function meView(p) {
   }
   return `<div class="me-head">
       <label class="me-face ${p.photo ? '' : 'empty'}">
-        ${p.photo ? `<img src="${photoUrl(p)}" alt="">` : '<span>+ Photo</span>'}
+        <img src="${faceOf(state, p).src}" alt="" ${p.photo ? '' : 'class="avatar"'}>
         <input type="file" accept="image/*" capture="user" data-photo hidden>
       </label>
       <div><h1>${esc(NAME(p.callsign))}</h1><button class="link" data-switch>Not you?</button></div>

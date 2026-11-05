@@ -49,3 +49,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 - Best 3 consecutive laps: **3C** ("Best 3C"). Never "3 in a row": pilots learn the real terms here.
 - PB = a pilot's own best (green, #22C55E), SB = the best of everyone this session (purple), F1 style: the times themselves are coloured. CSS classes t-pb / t-sb, never .pb (that is the pit board). The phone's top tiles only mark SB (a pilot's best is obviously their PB); the round holding their best is marked PB, or SB.
+
+## Default avatars
+
+- No photo: a badly drawn animal in FPV goggles (web/assets/avatars.js, SVG drawn in code, 20 animals × goggle/antenna/mouth/hat/background variations, seeded by the pilot's name). `assignAnimals` gives everyone in the session a different animal while there are animals left; `faceOf(state, pilot, wide)` in common.js returns a photo or the avatar. Avatars are always shown darkened (`img.avatar`), so real photos stand out. Images are data: URLs, so the SVG must be strict XML (no duplicate attributes).
