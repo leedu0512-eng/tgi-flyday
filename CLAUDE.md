@@ -61,7 +61,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 ## Compact heats
 
-- `engine.compact()` only between heats (`heatIsLive()`: arming, running, free flight → refused, the button greys out). It packs every heat, the one up next too (loop order from it), then removes the empty heats and renumbers the rest 1, 2, 3… from the one up next (`config.heatCount` shrinks; the changeover is for heat 1). Laps already flown keep their old heat number. `clock.pauseAfter` (action `pauseAfter`, button "Pause after this heat" in the clock box) makes the next changeover start paused with its full time; its line-up is held until Resume (`lineupPending`). `to20` always sets 20 s, also when less is left.
+- `engine.compact()` only between heats (`heatIsLive()`: arming, running, free flight → refused, the button greys out). It packs every heat, the one up next too (loop order from it), then removes the empty heats and renumbers the rest 1, 2, 3… from the one up next (`config.heatCount` shrinks; the changeover is for heat 1). Laps already flown keep their old heat number. If anyone moved or a heat was renumbered it says `texts.heatsChanged` (callout `heatsChanged`), before the line-up. `clock.pauseAfter` (action `pauseAfter`, button "Pause after this heat" in the clock box) makes the next changeover start paused with its full time; its line-up is held until Resume (`lineupPending`). `to20` always sets 20 s, also when less is left.
 
 ## End of the day
 

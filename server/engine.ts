@@ -1207,6 +1207,8 @@ export class Engine {
     // Empty heats in between go: the heats with pilots become heat 1, 2, 3… in the order they
     // fly, starting with the one up next. (Laps already flown keep their heat number.)
     const used = order.filter((h) => !this.heatIsEmpty(h));
+    const renumbered = used.some((h, i) => h !== i);
+    if ((moved > 0 || renumbered) && this.config.callouts.heatsChanged) this.say(this.config.callouts.texts.heatsChanged);
     if (used.length) {
       this.heats = used.map((h) => this.heats[h]);
       this.heatChannels = used.map((h) => this.heatChannels[h]);
@@ -1502,7 +1504,7 @@ function cleanTimer(patch: Partial<TimerConfig>, current: TimerConfig): TimerCon
 
 function cleanCallouts(patch: Partial<Config['callouts']>, current: Config['callouts']): Config['callouts'] {
   const out = { ...current };
-  for (const k of ['sessionStartStop', 'lineup', 'arm', 'readyBeeps', 'finalBeeps', 'timeUp', 'pauseResume', 'freeFlight', 'gatePassBeep', 'gatePassVoice'] as const) {
+  for (const k of ['sessionStartStop', 'lineup', 'arm', 'readyBeeps', 'finalBeeps', 'timeUp', 'pauseResume', 'freeFlight', 'heatsChanged', 'gatePassBeep', 'gatePassVoice'] as const) {
     if (patch[k] !== undefined) out[k] = Boolean(patch[k]);
   }
   if (patch.texts && typeof patch.texts === 'object') {

@@ -77,6 +77,8 @@ export interface CalloutSettings {
   pauseResume: boolean;
   /** When free flight starts and ends. */
   freeFlight: boolean;
+  /** Compact heats moved pilots or renumbered heats: tell everyone to check. */
+  heatsChanged: boolean;
   /** Lap timer: a short beep on every gate pass. */
   gatePassBeep: boolean;
   /** Lap timer: say the lap on every gate pass (wording: texts.gatePass). */
@@ -104,6 +106,8 @@ export interface CalloutTexts {
   freeFlight: string;
   /** Free flight ends (switched off). */
   freeFlightEnd: string;
+  /** Compact heats moved pilots or renumbered heats. */
+  heatsChanged: string;
   /** The first sign-in started the session, straight into free flight. {heat} */
   freeFlightOpen: string;
   /** Free flight ends because another heat has pilots: what happens now. {heats} {next} */
@@ -226,6 +230,7 @@ export const DEFAULT_CONFIG: Config = {
     timeUp: true,
     pauseResume: true,
     freeFlight: true,
+    heatsChanged: true,
     gatePassBeep: false,
     gatePassVoice: true,
     texts: {
@@ -240,6 +245,7 @@ export const DEFAULT_CONFIG: Config = {
       timeUp: 'Time.',
       freeFlight: 'Free flight. Only heat {heat} is left, fly as you like.',
       freeFlightEnd: 'Free flight is over. Please land.',
+      heatsChanged: 'Attention pilots, your heats and channels may have changed. Check the big screen.',
       freeFlightOpen: 'Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.',
       heatsForm: 'More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.',
       nightAsk: 'Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.',

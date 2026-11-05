@@ -307,12 +307,14 @@ test('compact also empties the heat up next when that saves a heat; the changeov
   assert.equal(e.clock.phase, 'changeover');
 });
 
-test('compact renumbers: heats 1 and 5 with pilots become heats 1 and 2', () => {
-  const { e } = setup(); // R1 R2 F2 F4
+test('compact renumbers: heats 1 and 5 with pilots become heats 1 and 2, and says so', () => {
+  const { e, said } = setup(); // R1 R2 F2 F4
+  const said0 = (_: Engine) => said();
   e.setConfig({ heatCount: 5 });
   ['A', 'B', 'C', 'D'].forEach((n, s) => e.join(n, 0, s)); // heat 1 full
   const x = e.join('X', 4, 0);                              // heat 5
   e.compact();
+  assert.ok(said0(e).includes('Attention pilots, your heats and channels may have changed. Check the big screen.'));
   assert.equal(e.config.heatCount, 2);
   assert.equal(e.heats.length, 2);
   assert.ok(e.heats[1].includes(x.id), 'X is in heat 2 now');
@@ -362,6 +364,10 @@ test('compact keeps a channel by switching a free slot to it when that heat does
   const res = e.compact();
   assert.equal(res.heatsInUse, 1, 'everyone fits in one heat');
   assert.equal(res.channelChanges.length, 0, 'nobody had to change channel');
+  const quiet = setup();
+  quiet.e.join('A', 0, 0); quiet.e.join('B', 0, 1);
+  quiet.e.compact();
+  assert.ok(!quiet.said().some((x) => /Attention pilots/.test(x)), 'nothing changed: nothing said');
   const s = e.heats[0].indexOf(b.id);
   assert.equal(e.channelOf(0, s), 'R5', 'B keeps R5: a free slot in heat 1 switched to it');
 });
