@@ -23,7 +23,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl, meUrl, qrSvg } from '/assets/common.js';
+import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl, meUrl, qrSvg, timerMark } from '/assets/common.js';
 setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
 
 const $ = (id) => document.getElementById(id);
@@ -158,7 +158,7 @@ function moveView() {
   return `<button class="btn back" data-go="home">← Back</button>
     <h1>Tap your name</h1>
     <div class="leave-list">${list.length ? list.map(({ p, seat }) => `<button data-mover="${p.id}">
-        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}</span>` : '<span class="chip none">–</span>'}
+        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}${timerMark(state, seat.slot)}</span>` : '<span class="chip none">–</span>'}
         <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
       </button>`).join('') : '<p class="hint" style="font-size:22px">Nobody has signed in yet.</p>'}</div>`;
 }
@@ -190,7 +190,7 @@ function board(pickable) {
         const mine = pickable && flow === 'move' && p && p.id === mover?.id;
         const attrs = pickable && free ? `data-heat="${h.index}" data-slot="${i}"` : 'disabled';
         return `<button class="slotbtn ${free ? 'free' : 'taken'} ${mine ? 'mine' : ''}" ${attrs}>
-          <span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</span>
+          <span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}${timerMark(state, i)}</span>
           <span>${p ? esc(NAME(p.callsign)) : 'Free'}</span>
         </button>`;
       }).join('')}
@@ -217,7 +217,7 @@ function leaveView() {
   return `<button class="btn back" data-go="home">← Back</button>
     <h1>Tap your name</h1>
     <div class="leave-list">${seated.length ? seated.map((x) => `<button data-leave="${x.p.id}">
-        <span class="chip" style="background:${SLOT_COLORS[x.slot]}">${esc(x.ch)}</span>
+        <span class="chip" style="background:${SLOT_COLORS[x.slot]}">${esc(x.ch)}${timerMark(state, x.slot)}</span>
         <span>${esc(NAME(x.p.callsign))}</span><small>Heat ${x.heat + 1}</small>
       </button>`).join('') : '<p class="hint" style="font-size:22px">Nobody is in a heat right now.</p>'}</div>`;
 }

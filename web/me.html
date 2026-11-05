@@ -33,7 +33,7 @@
 <script type="module">
 // A pilot's own page on their phone (QR code on the kiosk and the big screen):
 // who am I, my heat and channel, am I flying, and Leave. Lap times come here later.
-import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf } from '/assets/common.js';
+import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'flyday.me';
@@ -88,7 +88,7 @@ function pickRest() {
     .filter((x) => !search || x.p.callsign.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => a.p.callsign.localeCompare(b.p.callsign));
   return `<div class="me-list">${flying.map(({ p, seat }) => `<button data-me="${esc(p.callsign)}">
-        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}</span>` : '<span class="chip none">–</span>'}
+        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}${timerMark(state, seat.slot)}</span>` : '<span class="chip none">–</span>'}
         <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
       </button>`).join('') || `<p class="hint">${search ? 'Nobody by that name yet.' : 'Nobody has signed in yet.'}</p>`}</div>
     ${search.trim() ? `<button class="big primary" data-signin>Sign in as ${esc(NAME(search.trim()))}<small>FlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
@@ -135,11 +135,11 @@ function meView(p) {
     ${p.photo ? '' : `<label class="big me-photo-cta">Take your photo<small>For your plate on the big screen</small><input type="file" accept="image/*" capture="user" data-photo hidden></label>`}
     ${seat ? `<div class="me-seat">
       <div><small>Heat</small><b>${seat.heat + 1}</b></div>
-      <div class="me-ch" style="background:${SLOT_COLORS[seat.slot]}"><small>Channel</small><b>${esc(seat.channel)}</b></div>
+      <div class="me-ch" style="background:${SLOT_COLORS[seat.slot]}"><small>Channel</small><b>${esc(seat.channel)}${timerMark(state, seat.slot)}</b></div>
     </div>` : ''}
     <div class="me-status ${st.cls}"><b>${st.big}</b><span>${st.small}</span>${st.clock ? '<em id="clock" class="num"></em>' : ''}</div>
     ${mates.length ? `<h2>In your heat</h2><div class="me-mates">${mates.map(({ s, i, q }) =>
-      `<span><i class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</i>${esc(NAME(q.callsign))}</span>`).join('')}</div>` : ''}
+      `<span><i class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}${timerMark(state, i)}</i>${esc(NAME(q.callsign))}</span>`).join('')}</div>` : ''}
     <button class="big me-leave" data-leave>Going home<small>Free up your slot</small></button>`;
 }
 

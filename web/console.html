@@ -127,7 +127,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark } from '/assets/common.js';
 setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
 
 const $ = (id) => document.getElementById(id);
@@ -457,8 +457,8 @@ function renderHeats() {
       <header><span>Heat ${h.index + 1}</span><span class="tag">${tag}</span>
         ${empty ? '' : `<button class="btn small" data-empty="${h.index}" title="Move this heat's pilots into other heats">Empty</button>`}</header>
       ${h.slots.map((s, i) => `<div class="slot">
-        <select class="chip-select ${s.own ? 'own' : ''}" data-heat-ch="${h.index}" data-slot="${i}" style="background:${SLOT_COLORS[i]}"
-          title="${s.own ? 'Channel changed for this heat only' : 'Change the channel for this heat only'}" aria-label="Heat ${h.index + 1} channel">${heatChOptions(h, i)}</select>
+        <span class="ch-cell"><select class="chip-select ${s.own ? 'own' : ''}" data-heat-ch="${h.index}" data-slot="${i}" style="background:${SLOT_COLORS[i]}"
+          title="${s.own ? 'Channel changed for this heat only' : 'Change the channel for this heat only'}" aria-label="Heat ${h.index + 1} channel">${heatChOptions(h, i)}</select>${timerMark(state, i)}</span>
         <select class="input" data-heat="${h.index}" data-slot="${i}">${options(s.pilotId)}</select>
       </div>`).join('')}
     </div>`;

@@ -68,7 +68,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME, timerMark } from '/assets/common.js';
 
 // RD remote for a phone. Controls the same session as the console, but makes no sound:
 // callouts always come from the RD PC.
@@ -142,7 +142,7 @@ function renderStatus() {
   const h = quiet(c) ? null : state.heats[c.heat];
   $('lineupTitle').textContent = h ? `Heat ${h.index + 1}` : 'Line-up';
   $('lineup').innerHTML = h
-    ? h.slots.map((s, i) => `<div class="m-row"><span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</span>
+    ? h.slots.map((s, i) => `<div class="m-row"><span class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}${timerMark(state, i)}</span>
         <span class="${s.pilotId ? '' : 'muted'}">${s.pilotId ? esc(NAME(pm.get(s.pilotId)?.callsign)) : 'empty'}</span></div>`).join('')
     : `<p class="muted">Shows the heat that's on once the session runs.</p>`;
 }

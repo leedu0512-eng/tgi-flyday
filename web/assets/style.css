@@ -103,7 +103,7 @@ button, input, select { font: inherit; color: inherit; }
 .pill.stopped { color: var(--stopped); }
 
 .chip {
-  display: inline-grid; place-items: center; min-width: 46px; height: 30px; padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center; min-width: 46px; height: 30px; padding: 0 8px;
   border-radius: 8px; font-weight: 800; font-size: 15px; color: #0b0d10;
 }
 
@@ -669,3 +669,13 @@ body.embedded .kiosk .done-qr #doneQr { width: 200px; height: 200px; }
 .fw-warn { display: grid; gap: 6px; padding: 14px; margin-bottom: 12px; border: 2px solid var(--accent); border-radius: 4px; background: rgba(255, 107, 0, 0.08); }
 .fw-warn span, .fw-warn small { color: var(--muted); }
 .fw-warn .btn { justify-self: start; margin-top: 4px; }
+/* Lap-timed slot: a small stopwatch after the channel. */
+.timed { display: inline-flex; vertical-align: -0.12em; margin-left: 0.3em; font-style: normal; }
+.timed svg { width: 0.85em; height: 0.85em; }
+.timed.down { opacity: 0.35; }
+.slot-channels .timed, .heat-card .timed { color: var(--text); }
+.slot { grid-template-columns: 74px 1fr; }
+.slot .ch-cell { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.slot .ch-cell .chip-select { flex: 1; min-width: 0; }
+.chip .timed { margin-left: 0.25em; }
+.me-seat .timed svg { width: 0.45em; height: 0.45em; }
