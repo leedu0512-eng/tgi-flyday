@@ -11,7 +11,7 @@ import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:
 import { fileURLToPath } from 'node:url';
 import * as sea from 'node:sea';
 import { closeOldWindows, keepAwake, openRdWindows, relaunch, tameConsole } from './launch.ts';
-import { install, latest } from './update.ts';
+import { install, latest, tidy, why } from './update.ts';
 import { VERSION } from './version.ts';
 import { Engine, EngineError } from './engine.ts';
 import { load, saver } from './store.ts';
@@ -145,7 +145,9 @@ timerLink = new RotorHazardLink(engine, (m) => console.log(new Date().toLocaleTi
 let webVersion = String(Date.now());
 let reloadTimer: NodeJS.Timeout | null = null;
 try {
-  if (WEB_FROM_DISK) watch(WEB, { recursive: true }, () => {
+  // Not for an installed update: a watch keeps its folder open, and Windows then refuses
+  // to touch it. Those pages only change with the next update anyway.
+  if (WEB_FROM_DISK && !APP_DIR) watch(WEB, { recursive: true }, () => {
     // Wait until the files stop changing: Dropbox brings an update in one file at a time.
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
@@ -301,8 +303,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
       return;
     } catch (err: any) {
       updating = false;
-      console.log(`Update check failed (carrying on with ${VERSION}): ${err?.message ?? err}`);
-      return json(res, 200, { ok: true, result: { status: 'offline', version: VERSION, error: String(err?.message ?? err) } });
+      console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
+      return json(res, 200, { ok: true, result: { status: 'offline', version: VERSION, error: why(err) } });
     }
   }
 
@@ -421,6 +423,8 @@ server.listen(PORT, '0.0.0.0', () => {
   if (OPEN_WINDOWS) { closeOldWindows(); openRdWindows(PORT); }
   if (process.platform === 'win32' && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
   keepAwake(); // the RD PC must not fall asleep mid-session
+  // Old update folders: keep only the one running now (and nothing older).
+  if (IN_EXE) setTimeout(() => tidy(ROOT, [VERSION]), 10_000);
   const lan = lanAddresses();
   console.log(`\nTGI FlyDay ${VERSION} is running.${AFTER_UPDATE ? ' (just updated)' : ''}\n`);
   console.log(`  RD console      http://localhost:${PORT}/console`);

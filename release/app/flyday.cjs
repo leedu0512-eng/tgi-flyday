@@ -131,10 +131,29 @@ function openRdWindows(port) {
 var import_node_crypto = require("node:crypto");
 var import_node_fs2 = require("node:fs");
 var import_node_path2 = require("node:path");
+var tls = __toESM(require("node:tls"), 1);
 var REPO = process.env.FLYDAY_REPO ?? "leedu0512-eng/tgi-flyday";
 var API = process.env.FLYDAY_UPDATE_API ?? `https://api.github.com/repos/${REPO}`;
 var RAW = process.env.FLYDAY_UPDATE_RAW ?? `https://raw.githubusercontent.com/${REPO}`;
+var systemCertsAdded = false;
+function trustSystemCerts() {
+  if (systemCertsAdded) return;
+  systemCertsAdded = true;
+  try {
+    const t = tls;
+    if (typeof t.getCACertificates === "function" && typeof t.setDefaultCACertificates === "function") {
+      t.setDefaultCACertificates([.../* @__PURE__ */ new Set([...t.getCACertificates("default"), ...t.getCACertificates("system")])]);
+    }
+  } catch {
+  }
+}
+function why(err) {
+  const c = err?.cause;
+  const cause = c ? c.code ? `${c.code}${c.hostname ? ` ${c.hostname}` : ""}` : c.message : "";
+  return [err?.message ?? String(err), cause].filter(Boolean).join(": ");
+}
 async function get(url, accept) {
+  trustSystemCerts();
   const res = await fetch(url, {
     headers: { Accept: accept, "User-Agent": "TGI-FlyDay-updater" },
     signal: AbortSignal.timeout(2e4)
@@ -155,8 +174,10 @@ async function latest() {
 }
 var safe = (p) => /^[A-Za-z0-9._/-]+$/.test(p) && !p.split("/").includes("..");
 async function install(dir, release, commit) {
-  const fresh = (0, import_node_path2.join)(dir, "app.new");
-  (0, import_node_fs2.rmSync)(fresh, { recursive: true, force: true });
+  if (!/^[0-9A-Za-z.-]+$/.test(release.version)) throw new Error(`Odd version: ${release.version}`);
+  const versions = (0, import_node_path2.join)(dir, "versions");
+  const target = (0, import_node_path2.join)(versions, release.version);
+  const fresh = `${target}.new-${Date.now()}`;
   for (const f of release.files) {
     if (!safe(f.path)) throw new Error(`Odd file name in the release: ${f.path}`);
     const data = await get(`${RAW}/${commit}/release/app/${f.path}`, "*/*");
@@ -166,14 +187,35 @@ async function install(dir, release, commit) {
     (0, import_node_fs2.writeFileSync)(out, data);
   }
   (0, import_node_fs2.writeFileSync)((0, import_node_path2.join)(fresh, "version.json"), JSON.stringify(release, null, 1));
-  const app = (0, import_node_path2.join)(dir, "app"), old = (0, import_node_path2.join)(dir, "app.old");
-  (0, import_node_fs2.rmSync)(old, { recursive: true, force: true });
-  if ((0, import_node_fs2.existsSync)(app)) (0, import_node_fs2.renameSync)(app, old);
-  (0, import_node_fs2.renameSync)(fresh, app);
+  if ((0, import_node_fs2.existsSync)(target)) (0, import_node_fs2.rmSync)(target, { recursive: true, force: true });
+  (0, import_node_fs2.renameSync)(fresh, target);
+  const pointer = (0, import_node_path2.join)(dir, "app.json");
+  (0, import_node_fs2.writeFileSync)(`${pointer}.tmp`, JSON.stringify({ version: release.version, dir: `versions/${release.version}` }, null, 1));
+  (0, import_node_fs2.renameSync)(`${pointer}.tmp`, pointer);
+}
+function tidy(dir, keep) {
+  const versions = (0, import_node_path2.join)(dir, "versions");
+  let names = [];
+  try {
+    names = (0, import_node_fs2.readdirSync)(versions);
+  } catch {
+    return;
+  }
+  for (const n of names) {
+    if (keep.includes(n)) continue;
+    try {
+      (0, import_node_fs2.rmSync)((0, import_node_path2.join)(versions, n), { recursive: true, force: true });
+    } catch {
+    }
+  }
+  for (const old of ["app.new", "app.old"]) try {
+    (0, import_node_fs2.rmSync)((0, import_node_path2.join)(dir, old), { recursive: true, force: true });
+  } catch {
+  }
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2028" : "dev";
+var VERSION = true ? "2026.11.05-2032" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -1819,7 +1861,7 @@ timerLink = new RotorHazardLink(engine, (m) => console.log((/* @__PURE__ */ new 
 var webVersion = String(Date.now());
 var reloadTimer = null;
 try {
-  if (WEB_FROM_DISK) (0, import_node_fs4.watch)(WEB, { recursive: true }, () => {
+  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs4.watch)(WEB, { recursive: true }, () => {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       webVersion = String(Date.now());
@@ -1968,8 +2010,8 @@ Updating TGI FlyDay ${VERSION} -> ${release.version} ...`);
       return;
     } catch (err) {
       updating = false;
-      console.log(`Update check failed (carrying on with ${VERSION}): ${err?.message ?? err}`);
-      return json(res, 200, { ok: true, result: { status: "offline", version: VERSION, error: String(err?.message ?? err) } });
+      console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
+      return json(res, 200, { ok: true, result: { status: "offline", version: VERSION, error: why(err) } });
     }
   }
   if (path === "/api/pilot/photo" && req.method === "POST") {
@@ -2081,6 +2123,7 @@ server.listen(PORT, "0.0.0.0", () => {
   }
   if (process.platform === "win32" && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
   keepAwake();
+  if (IN_EXE) setTimeout(() => tidy(ROOT, [VERSION]), 1e4);
   const lan = lanAddresses();
   console.log(`
 TGI FlyDay ${VERSION} is running.${AFTER_UPDATE ? " (just updated)" : ""}

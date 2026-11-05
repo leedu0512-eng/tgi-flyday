@@ -474,8 +474,11 @@ async function restart() {
     }
     return location.reload();
   }
-  say('Restarting', r?.status === 'current' ? `Up to date (${r.version}).` : r?.status === 'offline' ? 'No updates reachable right now.' : '');
-  setTimeout(() => location.reload(), 1200);
+  // Say why, so a problem can be reported: no internet, or something on this PC.
+  say('Restarting', r?.status === 'current' ? `Up to date (${r.version}).`
+    : r?.status === 'offline' ? `No update installed: ${r.error || 'no answer from GitHub'}`
+    : r ? '' : 'FlyDay on the RD PC did not answer.');
+  setTimeout(() => location.reload(), r?.status === 'offline' ? 6000 : 1200);
 }
 
 // ---------- where a pilot stands (kiosk, personal phone page) ----------
