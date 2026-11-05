@@ -78,10 +78,27 @@ const CARDS = [
 ];
 let view = (() => { try { return localStorage.getItem('flyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
 const cardQr = new Map();
+/**
+ * Switch between FlyDay and TrackDay with a transition, never a jump: the board, the panel
+ * and the header's logo and extras fade and settle out, the view changes while they're
+ * hidden, then they come back in. The clock in the header stays put.
+ */
+const VIEW_FADE_MS = 420;
+let switching = false;
 function setView(v) {
-  view = v;
-  try { localStorage.setItem('flyday.screen.view', view); } catch {}
-  render();
+  if (v === view || switching) return;
+  try { localStorage.setItem('flyday.screen.view', v); } catch {}
+  switching = true;
+  $('screen').classList.add('view-leave');
+  setTimeout(() => {
+    view = v;
+    render();
+    // Let the new view lay out hidden, then bring it in.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      $('screen').classList.remove('view-leave');
+      setTimeout(() => { switching = false; }, VIEW_FADE_MS);
+    }));
+  }, VIEW_FADE_MS);
 }
 $('viewToggle').addEventListener('click', () => setView(view === 'plates' ? 'pay' : 'plates'));
 
@@ -150,10 +167,24 @@ setInterval(() => {
   cardEl?.classList.toggle('flipped', cardSide === 1);
 }, 500);
 
+/**
+ * Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over)
+ * brings TrackDay back to the FlyDay view. Not on the first state after loading the page.
+ */
+let lastPhase = null;
+function backToWork(c) {
+  const phase = `${c.phase}|${c.heat}|${c.paused}`;
+  const changed = lastPhase !== null && phase !== lastPhase;
+  lastPhase = phase;
+  const running = c.phase !== 'stopped' && c.phase !== 'waiting';
+  if (changed && running && view === 'pay') setTimeout(() => setView('plates'), 0);
+}
+
 function render() {
   if (!state) return;
   nightPrompt(state, 'big');
   const c = state.clock;
+  backToWork(c);
   const screen = $('screen');
   screen.classList.toggle('pay-view', view === 'pay');
   $('wmWord').textContent = view === 'pay' ? 'Track' : 'Fly';
