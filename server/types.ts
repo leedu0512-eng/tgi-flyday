@@ -159,6 +159,17 @@ export type AudioEvent =
   | { kind: 'say'; text: string }
   | { kind: 'tone'; tone: 'ready' | 'start' | 'tick' | 'end' };
 
+/** One timed heat (or free flight): everyone's laps, by name (pilot ids change when people come back). */
+export interface TimedRun {
+  round: number;
+  heat: number;
+  /** Free flight: laps without a heat timer. */
+  free: boolean;
+  /** Start BEEP, server clock (ms). */
+  at: number;
+  laps: { name: string; laps: number[] }[];
+}
+
 export interface SavedData {
   config: Config;
   pilots: Pilot[];
@@ -170,6 +181,8 @@ export interface SavedData {
   version?: number;
   /** The session clock, so a server restart carries on where it was. */
   clock?: ClockState;
+  /** This session's timed heats, so lap history survives a restart or an update. */
+  runs?: TimedRun[];
 }
 
 export const DEFAULT_CONFIG: Config = {

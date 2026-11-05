@@ -740,3 +740,71 @@ test('after Stop, the session stays stopped until someone new signs in; autoStar
   e.tick(6000);
   assert.equal(e.clock.phase, 'stopped');
 });
+
+test('lap history: every timed heat by round and heat, free flight timed too, PB and SB', () => {
+  const cmds: any[] = [];
+  const e = new Engine(
+    { config: { heatSeconds: 180, changeoverSeconds: 120, heatCount: 3, channels: ['R1', 'R2', 'F2', 'F4'], freeFlight: true, timer: { enabled: true, host: 'x', user: 'a', password: 'b' } } as any },
+    { random: () => 0.5, onAudio() {}, onTimer: (c: any) => cmds.push(c) },
+  );
+  e.setTimerStatus({ state: 'connected', nodes: 4 });
+  // First sign-in: practice starts in free flight, and free flight is timed.
+  e.walkIn('Ghost');
+  e.walkIn('Chirp');
+  e.tick(1000);
+  assert.equal(e.clock.phase, 'freeflight');
+  for (const at of [2000, 22000, 41000, 61000]) e.recordPass(0, at); // Ghost: 20, 19, 20
+  for (const at of [3000, 21000, 39000, 57000]) e.recordPass(1, at); // Chirp: 18, 18, 18
+  let r = e.lapReport('ghost');
+  assert.equal(r.runs.length, 1);
+  assert.equal(r.runs[0].live, true);
+  assert.equal(r.runs[0].free, true);
+  assert.deepEqual(r.runs[0].laps, [20000, 19000, 20000]);
+  // A second heat forms: free flight ends, its laps go into the history.
+  for (const n of ['A', 'B', 'C']) e.walkIn(n);
+  e.walkIn('Second heat');
+  run(e, 62_000, 60_000); // past the finish window
+  r = e.lapReport('Ghost');
+  assert.equal(r.runs.length, 1);
+  assert.equal(r.runs[0].live, false);
+  assert.equal(r.runs[0].round, 1);
+  assert.equal(r.runs[0].heat, 0);
+  assert.equal(r.best3!.ms, 59000);
+  assert.equal(r.best3!.sb, false, "Chirp's 54.0 is the session best");
+  assert.equal(r.pbRun, 0);
+  assert.equal(r.pbIsSb, false);
+  assert.equal(r.runs[0].best3At, 0);
+  const chirp = e.lapReport('Chirp');
+  assert.equal(chirp.best3!.sb, true);
+  assert.equal(chirp.bestLap!.sb, true);
+  assert.equal(chirp.pbIsSb, true);
+  // Saved with the session, and a new session starts the history over.
+  assert.equal(e.toSaved().runs!.length, 1);
+  const back = new Engine(e.toSaved(), { onAudio() {} });
+  assert.equal(back.lapReport('Ghost').runs.length, 1);
+  e.action('stop', 200_000);
+  e.action('start', 201_000);
+  assert.equal(e.lapReport('Ghost').runs.length, 0);
+});
+
+test('bestWindow finds where the best 3 in a row start', async () => {
+  const { bestWindow } = await import('./timing.ts');
+  assert.equal(bestWindow([30, 20, 21, 22, 40]), 1);
+  assert.equal(bestWindow([10, 10, 10, 30]), 0);
+  assert.equal(bestWindow([10, 10]), -1);
+});
+
+test('times report: leaderboard by best 3 in a row, every run with everyone', () => {
+  const e = new Engine({ runs: [
+    { round: 1, heat: 0, free: false, at: 1, laps: [{ name: 'Ghost', laps: [20000, 19000, 20000] }, { name: 'Chirp', laps: [18000, 18000, 18000, 17000] }] },
+    { round: 2, heat: 0, free: false, at: 2, laps: [{ name: 'Ghost', laps: [16000] }] },
+  ] } as any, { onAudio() {} });
+  const t = e.timesReport();
+  assert.deepEqual(t.leaders.map((l) => l.name), ['Chirp', 'Ghost']);
+  assert.equal(t.leaders[1].bestLap, 16000);
+  assert.equal(t.leaders[1].heats, 2);
+  assert.equal(t.sb.lap, 16000);
+  assert.equal(t.sb.best3, 53000);
+  assert.equal(t.runs[0].pilots[0].name, 'Chirp');
+  assert.equal(t.runs[0].pilots[0].best3At, 1);
+});

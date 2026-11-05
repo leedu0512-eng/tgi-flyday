@@ -19,6 +19,18 @@ export function bestConsecutive(laps: number[], n = 3): number | null {
   return best;
 }
 
+/** Where the fastest `n` laps in a row start (index into laps); -1 when there aren't enough. */
+export function bestWindow(laps: number[], n = 3): number {
+  if (laps.length < n) return -1;
+  let sum = laps.slice(0, n).reduce((a, b) => a + b, 0);
+  let best = sum, at = 0;
+  for (let i = n; i < laps.length; i++) {
+    sum += laps[i] - laps[i - n];
+    if (sum < best) { best = sum; at = i - n + 1; }
+  }
+  return at;
+}
+
 export function bestLap(laps: number[]): number | null {
   return laps.length ? Math.min(...laps) : null;
 }

@@ -67,10 +67,11 @@
     <div>
       <section class="card">
         <div class="card-head">
-          <h2>Heats</h2>
+          <div class="tabs" id="rightTabs"><button data-tab="heats" class="on">Heats</button><button data-tab="times">Times</button></div>
           <button id="compact" class="btn small primary" title="Pack pilots into as few heats as possible">Compact heats</button>
         </div>
         <div id="heats" class="heats"></div>
+        <div id="times" class="times" hidden></div>
       </section>
 
     </div>
@@ -737,6 +738,70 @@ fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {});
 // The firewall check takes a few seconds after start: look again.
 setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 
+// ---------- times: every heat's laps this session ----------
+
+let tab = 'heats';
+let times = null;
+const openTimes = new Set(), closedTimes = new Set();
+$('rightTabs').onclick = (e) => {
+  const b = e.target.closest('[data-tab]');
+  if (!b) return;
+  tab = b.dataset.tab;
+  for (const x of $('rightTabs').children) x.classList.toggle('on', x === b);
+  $('heats').hidden = tab !== 'heats';
+  $('compact').hidden = tab !== 'heats';
+  $('times').hidden = tab !== 'times';
+  if (tab === 'times') refreshTimes(true);
+};
+
+/** 23456 → "23.46"; a minute or more → "1:02.35". */
+const lapTime = (ms) => ms == null ? '–' : ms >= 60000 ? `${Math.floor(ms / 60000)}:${((ms % 60000) / 1000).toFixed(2).padStart(5, '0')}` : (ms / 1000).toFixed(2);
+
+function renderTimes() {
+  const t = times;
+  if (!t) return;
+  if (!t.runs.length) {
+    $('times').innerHTML = `<p class="hint">${state?.config.timer?.enabled ? 'No laps yet this session. Every timed heat shows up here as soon as pilots cross the gate.' : 'The lap timer is off. Once it is connected, every heat\'s laps show up here.'}</p>`;
+    return;
+  }
+  const sb = (v, best) => v != null && v === best ? '<em class="sbm">SB</em>' : '';
+  const board = `<h3>Session bests</h3><table class="lb"><thead><tr><th></th><th>Pilot</th><th>Best 3 in a row</th><th>Best lap</th><th>Laps</th><th>Heats</th></tr></thead><tbody>
+    ${t.leaders.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(NAME(l.name))}</td><td>${lapTime(l.best3)}${sb(l.best3, t.sb.best3)}</td><td>${lapTime(l.bestLap)}${sb(l.bestLap, t.sb.lap)}</td><td>${l.laps}</td><td>${l.heats}</td></tr>`).join('')}</tbody></table>`;
+  const runs = [...t.runs].reverse().map((r, i) => {
+    const key = `${r.round}-${r.heat}-${r.at}`;
+    const open = !closedTimes.has(key) && (openTimes.has(key) || r.live || i === 0);
+    return `<details class="trun ${r.live ? 'live' : ''}" data-key="${key}" ${open ? 'open' : ''}>
+      <summary><b>Round ${r.round}, heat ${r.heat + 1}</b>${r.free ? '<span>free flight</span>' : ''}${r.live ? '<span class="now">flying</span>' : ''}<span class="cnt">${r.pilots.length} pilot${r.pilots.length === 1 ? '' : 's'}</span></summary>
+      <table><tbody>${r.pilots.map((p) => `<tr>
+        <td class="nm">${esc(NAME(p.name))}</td>
+        <td class="laps">${p.laps.map((ms, j) => `<span class="${p.best3At >= 0 && j >= p.best3At && j < p.best3At + 3 ? 'b3' : ''} ${ms === p.bestLap ? 'best' : ''}">${lapTime(ms)}</span>`).join('')}</td>
+        <td class="tot"><small>3 in a row</small>${lapTime(p.best3)}${sb(p.best3, t.sb.best3)}</td>
+        <td class="tot"><small>best</small>${lapTime(p.bestLap)}${sb(p.bestLap, t.sb.lap)}</td></tr>`).join('')}</tbody></table>
+    </details>`;
+  }).join('');
+  $('times').innerHTML = board + `<h3>Heats</h3>` + runs;
+}
+$('times').addEventListener('toggle', (e) => {
+  const d = e.target.closest?.('details[data-key]');
+  if (!d) return;
+  (d.open ? openTimes : closedTimes).add(d.dataset.key);
+  (d.open ? closedTimes : openTimes).delete(d.dataset.key);
+}, true);
+
+// Only while the tab is open; every gate pass changes the state, so at most every 1.5 s.
+let timesAt = 0, timesTimer = null;
+function refreshTimes(now = false) {
+  if (tab !== 'times') return;
+  clearTimeout(timesTimer);
+  timesTimer = setTimeout(async () => {
+    timesAt = Date.now();
+    try {
+      const next = await (await fetch('/api/times')).json();
+      if (JSON.stringify(next) !== JSON.stringify(times)) { times = next; renderTimes(); }
+    } catch {}
+  }, now ? 0 : Math.max(0, timesAt + 1500 - Date.now()));
+}
+
 // ---------- live ----------
 connect({
   // The console plays the sound: never reload in the middle of a start sequence or a callout.
@@ -748,6 +813,7 @@ connect({
     renderStatus();
     renderSetup();
     renderHeats();
+    refreshTimes();
     renderPilotsPanel();
     sound.apply(state.config.sound);
     renderDrawer();

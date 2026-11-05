@@ -285,6 +285,10 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     res.setHeader('set-cookie', `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
     return json(res, 200, { ok: true, result: null });
   }
+  // RD console, Times tab: everyone's laps this session.
+  if (path === '/api/times' && req.method === 'GET') return json(res, 200, engine.timesReport());
+  // Pilot's phone page: their laps this session (every timed heat, bests, PB / SB).
+  if (path === '/api/laps' && req.method === 'GET') return json(res, 200, engine.lapReport(url.searchParams.get('name') ?? ''));
   // Kiosk: what we remember about a pilot name (their usual channel).
   if (path === '/api/known' && req.method === 'GET') {
     const name = url.searchParams.get('name') ?? '';
