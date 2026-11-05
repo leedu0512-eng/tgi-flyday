@@ -46,6 +46,10 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - The restart cover shows a progress bar: GET /api/update/progress (stage check / download with files done of total / restart); the page creeps on to 100 % while waiting for FlyDay to answer again. `FLYDAY_FAKE_UPDATE=1` (dev) walks through a fake update to see it.
 - The restart item lives in the view picker (common.js `restart()`); test with FLYDAY_UPDATE_API / FLYDAY_UPDATE_RAW pointing at a fake server.
 
+## Timed channels
+
+- `timerMark(state, slot)` in common.js: the little stopwatch next to a channel, only while the lap timer is connected and only on the slots it times (`timing.timedSlots`). Timer off, connecting or down: no stopwatch anywhere.
+
 ## Words
 
 - Best 3 consecutive laps: **3C** ("Best 3C"). Never "3 in a row": pilots learn the real terms here.
