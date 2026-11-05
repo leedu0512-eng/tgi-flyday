@@ -259,7 +259,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2218" : "dev";
+var VERSION = true ? "2026.11.05-2305" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -331,6 +331,19 @@ function bestConsecutive(laps, n = 3) {
     best = Math.min(best, sum);
   }
   return best;
+}
+function bestWindow(laps, n = 3) {
+  if (laps.length < n) return -1;
+  let sum = laps.slice(0, n).reduce((a, b) => a + b, 0);
+  let best = sum, at = 0;
+  for (let i = n; i < laps.length; i++) {
+    sum += laps[i] - laps[i - n];
+    if (sum < best) {
+      best = sum;
+      at = i - n + 1;
+    }
+  }
+  return at;
 }
 function bestLap(laps) {
   return laps.length ? Math.min(...laps) : null;
@@ -447,6 +460,8 @@ var Engine = class {
   lastTimes = null;
   /** Each pilot's best of the session. */
   sessionBest = /* @__PURE__ */ new Map();
+  /** This session's timed heats, oldest first (saved with the session). */
+  runs = [];
   /** Per-heat channel choices: heatChannels[heat][slot], null = the session's channel for that slot. */
   heatChannels = [];
   calloutsDone = /* @__PURE__ */ new Set();
@@ -474,6 +489,7 @@ var Engine = class {
     for (const p of data.pilots ?? []) this.pilots.set(p.id, { ...p });
     this.heats = data.heats ?? [];
     this.heatChannels = data.heatChannels ?? [];
+    this.runs = Array.isArray(data.runs) ? data.runs.filter((r) => r && Array.isArray(r.laps)) : [];
     this.random = opts.random ?? Math.random;
     this.newId = opts.newId ?? (() => Math.random().toString(36).slice(2, 10));
     this.onAudio = opts.onAudio ?? (() => {
@@ -486,7 +502,7 @@ var Engine = class {
   }
   // ---------- saved data ----------
   toSaved() {
-    return { config: this.config, pilots: [...this.pilots.values()], heats: this.heats, heatChannels: this.heatChannels, clock: this.clock, version: SAVE_VERSION };
+    return { config: this.config, pilots: [...this.pilots.values()], heats: this.heats, heatChannels: this.heatChannels, clock: this.clock, runs: this.runs, version: SAVE_VERSION };
   }
   /**
    * After a server restart: carry on with the session that was running. A phase that
@@ -689,14 +705,23 @@ var Engine = class {
   autoStart(now) {
     const c = this.clock;
     if (!(this.config.freeFlight && this.heatsInUse() === 1)) return this.action("start", now);
+    this.newSessionTimes();
     c.round = 1;
     c.heatsRun = 0;
     c.startedAt = now;
     c.heat = this.nextHeat(0);
     this.setPhase("freeflight", null);
     c.freeSince = now;
+    this.startTiming(now, true);
     const co = this.config.callouts;
     if (co.sessionStartStop || co.freeFlight) this.say(fillText(co.texts.freeFlightOpen, { heat: c.heat + 1 }));
+  }
+  /** A new session: lap history and session bests start over. */
+  newSessionTimes() {
+    this.closeTiming(true);
+    this.runs = [];
+    this.sessionBest.clear();
+    this.lastTimes = null;
   }
   /** A pilot got a seat: if the session is stopped, the next tick starts it (when autoStart is on). */
   signedIn() {
@@ -706,6 +731,7 @@ var Engine = class {
   enterFreeFlight(now) {
     this.setPhase("freeflight", null);
     this.clock.freeSince = now;
+    if (!this.live || this.live.heat !== this.clock.heat || this.live.endAt !== null) this.startTiming(now, true);
     if (this.config.callouts.freeFlight) this.say(fillText(this.config.callouts.texts.freeFlight, { heat: this.clock.heat + 1 }));
   }
   /** True when free flight is on and heat h is the only heat with pilots. */
@@ -803,13 +829,13 @@ var Engine = class {
     this.onChange();
   }
   /** At the arm call: put the timed slots' channels on the receivers and start timing at the BEEP. */
-  startTiming(beepAt) {
+  startTiming(beepAt, free = false) {
     this.closeTiming(false);
     const n = this.timedSlots();
     if (!n || !this.config.timer.enabled) return;
     const heat = this.clock.heat;
     const timed = Array.from({ length: n }, (_, s) => ({ slot: s, pilotId: this.heats[heat]?.[s] ?? null }));
-    this.live = { heat, startAt: beepAt, endAt: null, timed, passes: /* @__PURE__ */ new Map(), finished: /* @__PURE__ */ new Set() };
+    this.live = { heat, round: this.clock.round, free, startAt: beepAt, endAt: null, timed, passes: /* @__PURE__ */ new Map(), finished: /* @__PURE__ */ new Set() };
     const frequencies = Array.from({ length: this.timer.nodes }, (_, i) => i < n ? CHANNEL_MHZ[this.channelOf(heat, i)] ?? 0 : 0);
     this.onTimer({ type: "start", beepAt, frequencies });
   }
@@ -827,8 +853,98 @@ var Engine = class {
     this.live = null;
     const rows = this.timesOf(live);
     if (rows.some((r) => r.passes)) this.lastTimes = { heat: live.heat, rows };
+    const run = this.runOf(live);
+    if (run.laps.length) {
+      this.runs.push(run);
+      if (this.runs.length > 2e3) this.runs.splice(0, this.runs.length - 2e3);
+    }
     if (stopTimer) this.onTimer({ type: "stop" });
     this.onChange();
+  }
+  /** A timing run as kept in the history: laps by pilot name, only pilots with laps. */
+  runOf(live) {
+    return {
+      round: live.round,
+      heat: live.heat,
+      free: live.free,
+      at: live.startAt,
+      laps: this.timesOf(live).filter((r) => r.laps.length).map((r) => ({ name: this.pilots.get(r.pilotId)?.callsign ?? "?", laps: r.laps }))
+    };
+  }
+  /**
+   * A pilot's laps this session, for their phone: every run they have laps in (the one
+   * flying now included), their best lap and best 3 consecutive, and whether those are
+   * also the best of everyone this session (SB) or only their own (PB).
+   */
+  lapReport(name) {
+    const key = String(name ?? "").trim().toLowerCase();
+    const liveRun = this.live ? this.runOf(this.live) : null;
+    const all = liveRun ? [...this.runs, liveRun] : this.runs;
+    const min = (a, x) => a === null ? x : x === null ? a : Math.min(a, x);
+    let sbLap = null, sb3 = null;
+    for (const r of all) for (const e of r.laps) {
+      sbLap = min(sbLap, bestLap(e.laps));
+      sb3 = min(sb3, bestConsecutive(e.laps, 3));
+    }
+    const runs = all.flatMap((r) => {
+      const mine = r.laps.find((e) => e.name.toLowerCase() === key);
+      if (!mine) return [];
+      return [{
+        round: r.round,
+        heat: r.heat,
+        free: r.free,
+        at: r.at,
+        live: r === liveRun,
+        laps: mine.laps,
+        bestLap: bestLap(mine.laps),
+        best3: bestConsecutive(mine.laps, 3),
+        best3At: bestWindow(mine.laps, 3)
+      }];
+    });
+    let myLap = null, my3 = null;
+    for (const r of runs) {
+      myLap = min(myLap, r.bestLap);
+      my3 = min(my3, r.best3);
+    }
+    const pbRun = my3 !== null ? runs.findIndex((r) => r.best3 === my3) : myLap !== null ? runs.findIndex((r) => r.bestLap === myLap) : -1;
+    return {
+      runs,
+      pbRun,
+      bestLap: myLap === null ? null : { ms: myLap, sb: myLap === sbLap },
+      best3: my3 === null ? null : { ms: my3, sb: my3 === sb3 },
+      pbIsSb: pbRun >= 0 && (my3 !== null ? my3 === sb3 : myLap === sbLap)
+    };
+  }
+  /**
+   * The RD's view of this session's laps: a leaderboard (best 3 consecutive, then best lap)
+   * and every timed heat with each pilot's laps, the one flying now included.
+   */
+  timesReport() {
+    const liveRun = this.live ? this.runOf(this.live) : null;
+    const all = liveRun ? [...this.runs, liveRun] : this.runs;
+    const min = (a, x) => a === null ? x : x === null ? a : Math.min(a, x);
+    const board = /* @__PURE__ */ new Map();
+    const runs = all.map((r) => ({
+      round: r.round,
+      heat: r.heat,
+      free: r.free,
+      at: r.at,
+      live: r === liveRun,
+      pilots: r.laps.map((e) => {
+        const row = { name: e.name, laps: e.laps, bestLap: bestLap(e.laps), best3: bestConsecutive(e.laps, 3), best3At: bestWindow(e.laps, 3) };
+        const key = e.name.toLowerCase();
+        const b = board.get(key) ?? { name: e.name, bestLap: null, best3: null, laps: 0, heats: 0 };
+        board.set(key, { name: e.name, bestLap: min(b.bestLap, row.bestLap), best3: min(b.best3, row.best3), laps: b.laps + e.laps.length, heats: b.heats + 1 });
+        return row;
+      }).sort((a, b) => (a.best3 ?? Infinity) - (b.best3 ?? Infinity) || (a.bestLap ?? Infinity) - (b.bestLap ?? Infinity))
+    }));
+    const leaders = [...board.values()].sort((a, b) => (a.best3 ?? Infinity) - (b.best3 ?? Infinity) || (a.bestLap ?? Infinity) - (b.bestLap ?? Infinity));
+    let sbLap = null, sb3 = null;
+    for (const l of leaders) {
+      sbLap = min(sbLap, l.bestLap);
+      sb3 = min(sb3, l.best3);
+    }
+    return { runs, leaders, sb: { lap: sbLap, best3: sb3 } };
   }
   timesOf(live) {
     const row = this.heats[live.heat] ?? [];
@@ -880,6 +996,7 @@ var Engine = class {
     switch (type) {
       case "start":
         if (c.phase !== "stopped") throw new EngineError("Session is already running.");
+        this.newSessionTimes();
         c.round = 1;
         c.heatsRun = 0;
         c.startedAt = now;
@@ -2036,6 +2153,8 @@ data: ${JSON.stringify(engine.snapshot(Date.now()))}
     res.setHeader("set-cookie", `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
     return json(res, 200, { ok: true, result: null });
   }
+  if (path === "/api/times" && req.method === "GET") return json(res, 200, engine.timesReport());
+  if (path === "/api/laps" && req.method === "GET") return json(res, 200, engine.lapReport(url.searchParams.get("name") ?? ""));
   if (path === "/api/known" && req.method === "GET") {
     const name = url.searchParams.get("name") ?? "";
     return json(res, 200, known[knownKey(name)] ?? {});

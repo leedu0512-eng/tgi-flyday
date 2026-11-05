@@ -33,7 +33,7 @@
 <script type="module">
 // A pilot's own page on their phone (QR code on the kiosk and the big screen):
 // who am I, my heat and channel, am I flying, and Leave. Lap times come here later.
-import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf } from '/assets/common.js';
+import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'flyday.me';
@@ -41,6 +41,9 @@ let state = null;
 let search = '';
 let confirmLeave = false;
 let left = false;
+let laps = null;          // this pilot's lap report from the RD PC
+const openRuns = new Set(); // rounds the pilot opened or closed by hand: their choice sticks
+const closedRuns = new Set();
 
 // Who this phone belongs to: from the QR code (?name=), else remembered on the phone.
 const store = {
@@ -88,7 +91,7 @@ function pickRest() {
     .filter((x) => !search || x.p.callsign.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => a.p.callsign.localeCompare(b.p.callsign));
   return `<div class="me-list">${flying.map(({ p, seat }) => `<button data-me="${esc(p.callsign)}">
-        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}</span>` : '<span class="chip none">–</span>'}
+        ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}${timerMark(state, seat.slot)}</span>` : '<span class="chip none">–</span>'}
         <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
       </button>`).join('') || `<p class="hint">${search ? 'Nobody by that name yet.' : 'Nobody has signed in yet.'}</p>`}</div>
     ${search.trim() ? `<button class="big primary" data-signin>Sign in as ${esc(NAME(search.trim()))}<small>FlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
@@ -135,13 +138,80 @@ function meView(p) {
     ${p.photo ? '' : `<label class="big me-photo-cta">Take your photo<small>For your plate on the big screen</small><input type="file" accept="image/*" capture="user" data-photo hidden></label>`}
     ${seat ? `<div class="me-seat">
       <div><small>Heat</small><b>${seat.heat + 1}</b></div>
-      <div class="me-ch" style="background:${SLOT_COLORS[seat.slot]}"><small>Channel</small><b>${esc(seat.channel)}</b></div>
+      <div class="me-ch" style="background:${SLOT_COLORS[seat.slot]}"><small>Channel</small><b>${esc(seat.channel)}${timerMark(state, seat.slot)}</b></div>
     </div>` : ''}
     <div class="me-status ${st.cls}"><b>${st.big}</b><span>${st.small}</span>${st.clock ? '<em id="clock" class="num"></em>' : ''}</div>
+    ${lapsView()}
     ${mates.length ? `<h2>In your heat</h2><div class="me-mates">${mates.map(({ s, i, q }) =>
-      `<span><i class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}</i>${esc(NAME(q.callsign))}</span>`).join('')}</div>` : ''}
+      `<span><i class="chip" style="background:${SLOT_COLORS[i]}">${esc(s.channel)}${timerMark(state, i)}</i>${esc(NAME(q.callsign))}</span>`).join('')}</div>` : ''}
     <button class="big me-leave" data-leave>Going home<small>Free up your slot</small></button>`;
 }
+
+// ---------- laps ----------
+
+/** 23456 → "23.46"; a minute or more → "1:02.35". */
+function lapTime(ms) {
+  if (ms == null) return '–';
+  const s = ms / 1000;
+  return s >= 60 ? `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}` : s.toFixed(2);
+}
+
+function badge(sb) { return `<em class="pbsb ${sb ? 'is-sb' : 'is-pb'}">${sb ? 'SB' : 'PB'}</em>`; }
+/** F1 colours: green = this pilot's best, purple = the best of everyone this session. */
+const tone = (ms, best) => (ms != null && best && ms === best.ms ? (best.sb ? 't-sb' : 't-pb') : '');
+
+/**
+ * Best lap and best 3 consecutive (3C) on top, marked SB when nobody this session beat it,
+ * then every timed heat, oldest first, collapsible. The best 3 consecutive laps in each are
+ * highlighted; the round with the pilot's best is marked PB (or SB).
+ */
+function lapsView() {
+  if (!laps || !laps.runs.length) {
+    return state.config.timer?.enabled ? '<h2>Your laps</h2><p class="hint">Your lap times show here once you cross the gate.</p>' : '';
+  }
+  const runs = laps.runs.map((r, i) => {
+    const key = `${r.round}-${r.heat}-${r.at}`;
+    const latest = i === laps.runs.length - 1;
+    const open = !closedRuns.has(key) && (openRuns.has(key) || r.live || latest);
+    const title = r.free ? `Round ${r.round}, heat ${r.heat + 1} · free flight` : `Round ${r.round}, heat ${r.heat + 1}`;
+    return `<details class="me-run ${r.live ? 'live' : ''}" data-run="${key}" ${open ? 'open' : ''}>
+      <summary><span>${title}${r.live ? ' <i class="now">flying</i>' : ''}</span>
+        <span class="sum">${r.best3 != null ? `3C <b class="${tone(r.best3, laps.best3)}">${lapTime(r.best3)}</b>` : `${r.laps.length} lap${r.laps.length === 1 ? '' : 's'}`}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
+      <ol>${r.laps.map((ms, j) => `<li class="${r.best3At >= 0 && j >= r.best3At && j < r.best3At + 3 ? 'b3' : ''} ${tone(ms, laps.bestLap)}">
+        <span>Lap ${j + 1}</span><b>${lapTime(ms)}</b></li>`).join('')}</ol>
+    </details>`;
+  }).join('');
+  return `<h2>Your laps</h2>
+    <div class="me-bests">
+      <div><small>Best lap</small><b class="${tone(laps.bestLap?.ms, laps.bestLap)}">${lapTime(laps.bestLap?.ms)}</b>${laps.bestLap?.sb ? badge(true) : ''}</div>
+      <div><small>Best 3C</small><b class="${tone(laps.best3?.ms, laps.best3)}">${lapTime(laps.best3?.ms)}</b>${laps.best3?.sb ? badge(true) : ''}</div>
+    </div>
+    <div class="me-runs">${runs}</div>`;
+}
+
+// Fetch this pilot's laps when something changed (every gate pass does), at most every 1.5 s.
+let lapsAt = 0, lapsTimer = null;
+function refreshLaps() {
+  const p = pilot();
+  if (!p || left) { laps = null; return; }
+  const wait = Math.max(0, lapsAt + 1500 - Date.now());
+  clearTimeout(lapsTimer);
+  lapsTimer = setTimeout(async () => {
+    lapsAt = Date.now();
+    try {
+      const next = await (await fetch(`/api/laps?name=${encodeURIComponent(p.callsign)}`)).json();
+      if (JSON.stringify(next) !== JSON.stringify(laps)) { laps = next; if (!confirmLeave) render(); }
+    } catch {}
+  }, wait);
+}
+
+// Remember which rounds the pilot opened or closed, so updates don't undo it.
+$('view').addEventListener('toggle', (e) => {
+  const d = e.target.closest?.('details[data-run]');
+  if (!d) return;
+  (d.open ? openRuns : closedRuns).add(d.dataset.run);
+  (d.open ? closedRuns : openRuns).delete(d.dataset.run);
+}, true);
 
 function goneView() {
   return `<div class="me-confirm"><h1>See you next time</h1><p>Your slot is free again.</p>
@@ -216,7 +286,7 @@ async function signIn(name) {
 $('view').addEventListener('click', async (e) => {
   const t = e.target.closest('button');
   if (!t) return;
-  if (t.dataset.me) { me = t.dataset.me; store.set(me); remember(me); left = false; return render(); }
+  if (t.dataset.me) { me = t.dataset.me; store.set(me); remember(me); left = false; laps = null; refreshLaps(); return render(); }
   if (t.hasAttribute('data-last')) {
     const back = state.pilots.find((p) => p.callsign.toLowerCase() === last.toLowerCase());
     if (back) { me = back.callsign; store.set(me); left = false; return render(); }
@@ -250,7 +320,7 @@ function contact(online) {
 }
 
 connect({
-  onState(s) { state = s; contact(true); render(); buzz(); },
+  onState(s) { state = s; contact(true); render(); buzz(); refreshLaps(); },
   onStatus(online) { document.body.classList.toggle('offline', !online); contact(online); },
 });
 </script>

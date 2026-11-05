@@ -549,3 +549,20 @@ export async function qrSvg(text) {
   document.addEventListener('visibilitychange', ask);
   ask();
 })();
+
+// ---------- lap-timed slots ----------
+
+const STOPWATCH = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="9.3" r="5.4" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M6 1.5h4M8 1.5v2.3M8 9.3V6.4M12.4 4.6l1.3-1.3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>';
+
+/**
+ * A small stopwatch after a slot's channel when that slot is lap-timed (the first ones,
+ * one per timer receiver). Faint when the timer is switched on but not connected.
+ */
+export function timerMark(state, slot) {
+  const t = state?.timing;
+  if (!state?.config?.timer?.enabled || !t) return '';
+  const live = t.timer?.state === 'connected';
+  const n = live ? t.timedSlots : Math.min(t.timer?.nodes || 4, state.config.channels.length);
+  if (slot >= n) return '';
+  return `<i class="timed ${live ? '' : 'down'}" title="${live ? 'Lap timed' : 'Lap timer not connected'}">${STOPWATCH}</i>`;
+}

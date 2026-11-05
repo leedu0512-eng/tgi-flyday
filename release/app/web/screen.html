@@ -32,7 +32,7 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
@@ -56,7 +56,7 @@ function plates(heat, pm) {
     const img = photoUrl(p);
     return `<div class="plate ${img ? 'photo' : ''}" style="${c}">
       ${img ? `<img src="${img}" alt="">` : ''}
-      <span class="ch">${esc(s.channel)}</span><span class="nm">${esc(NAME(p.callsign))}</span>
+      <span class="ch">${esc(s.channel)}${timerMark(state, i)}</span><span class="nm">${esc(NAME(p.callsign))}</span>
     </div>`;
   }).join('')}</div>`;
 }
@@ -93,12 +93,12 @@ function render() {
 function renderNext(pm) {
   const c = state.clock;
   const n = c.phase === 'running' && state.nextHeat != null ? state.heats[state.nextHeat] : null;
-  const pilots = n ? n.slots.map((s) => ({ p: s.pilotId ? pm.get(s.pilotId) : null, ch: s.channel })).filter((x) => x.p) : [];
+  const pilots = n ? n.slots.map((s, i) => ({ p: s.pilotId ? pm.get(s.pilotId) : null, ch: s.channel, i })).filter((x) => x.p) : [];
   $('screen').classList.toggle('no-next', !pilots.length);
   if (!pilots.length) { $('next').innerHTML = ''; return; }
   $('next').innerHTML = `
     <div class="tag"><span>GET READY</span><b>${n.index === c.heat ? 'SAME HEAT' : `HEAT ${n.index + 1}`}</b></div>
-    <div class="list">${pilots.map((x) => `<div class="who"><span>${esc(x.ch)}</span><b>${esc(NAME(x.p.callsign))}</b></div>`).join('')}</div>`;
+    <div class="list">${pilots.map((x) => `<div class="who"><span>${esc(x.ch)}${timerMark(state, x.i)}</span><b>${esc(NAME(x.p.callsign))}</b></div>`).join('')}</div>`;
 }
 
 function tick() {
