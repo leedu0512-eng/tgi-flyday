@@ -158,13 +158,19 @@ if ($o.Count) { [string]$o[0].Bounds.X + ',' + $o[0].Bounds.Y } else { 'none' }`
   return /^-?\d+,-?\d+$/.test(out) ? out : null;
 }
 
-/** RD PC: the console (with sound allowed) and the spectator view, full screen on a second monitor. */
+/**
+ * RD PC: the console (with sound allowed) and the spectator view, full screen on a second
+ * monitor. Both may show the kiosk (the big screen's Sign in, or the view picker), so the
+ * webcam is allowed without asking: in a full-screen window Edge's question never shows.
+ * Fresh profile folders ("-2"), so an earlier "Block" answer doesn't stick.
+ */
 export function openRdWindows(port: number) {
   const base = `http://localhost:${port}`;
-  edge([`--app=${base}/console`, '--autoplay-policy=no-user-gesture-required', ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'console')}`]);
+  const cam = '--use-fake-ui-for-media-stream';
+  edge([`--app=${base}/console`, '--autoplay-policy=no-user-gesture-required', cam, ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'console-2')}`]);
   const second = secondMonitor();
-  if (second) edge(['--kiosk', `${base}/screen`, '--edge-kiosk-type=fullscreen', `--window-position=${second}`, ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'screen')}`]);
-  else edge([`--app=${base}/screen`, ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'screen')}`]);
+  if (second) edge(['--kiosk', `${base}/screen`, '--edge-kiosk-type=fullscreen', `--window-position=${second}`, cam, ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'screen-2')}`]);
+  else edge([`--app=${base}/screen`, cam, ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'screen-2')}`]);
 }
 
 function reachable(host: string, port: number): Promise<boolean> {

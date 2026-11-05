@@ -27,10 +27,11 @@ start "TGI FlyDay server" /min cmd /k node --disable-warning=ExperimentalWarning
 timeout /t 2 /nobreak >nul
 
 rem Edge: never reopen last time's windows, never ask to restore them.
+rem The webcam is allowed without asking (the big screen's Sign in takes pilot photos).
 set EDGEFLAGS=--no-first-run --hide-crash-restore-bubble --disable-session-crashed-bubble
 
 rem RD console: autoplay allowed, so callouts work without clicking first.
-start "" msedge --app=http://localhost:8080/console --autoplay-policy=no-user-gesture-required %EDGEFLAGS% --user-data-dir="%PROFILES%\console"
+start "" msedge --app=http://localhost:8080/console --autoplay-policy=no-user-gesture-required --use-fake-ui-for-media-stream %EDGEFLAGS% --user-data-dir="%PROFILES%\console-2"
 
 rem Find a second monitor. Prints its top-left corner as X,Y, or "none".
 set SECOND=none
@@ -39,11 +40,11 @@ for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Add-Type -Ass
 if "%SECOND%"=="none" goto onescreen
 
 rem Spectator view: full screen on the second monitor (the HDMI splitter feeds both TVs).
-start "" msedge --kiosk http://localhost:8080/screen --edge-kiosk-type=fullscreen --window-position=%SECOND% %EDGEFLAGS% --user-data-dir="%PROFILES%\screen"
+start "" msedge --kiosk http://localhost:8080/screen --edge-kiosk-type=fullscreen --window-position=%SECOND% --use-fake-ui-for-media-stream %EDGEFLAGS% --user-data-dir="%PROFILES%\screen-2"
 goto end
 
 :onescreen
 rem Only one monitor: open the spectator view as a normal window instead of taking over the screen.
-start "" msedge --app=http://localhost:8080/screen %EDGEFLAGS% --user-data-dir="%PROFILES%\screen"
+start "" msedge --app=http://localhost:8080/screen --use-fake-ui-for-media-stream %EDGEFLAGS% --user-data-dir="%PROFILES%\screen-2"
 
 :end
