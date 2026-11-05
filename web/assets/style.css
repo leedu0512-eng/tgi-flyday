@@ -830,3 +830,20 @@ img.avatar { filter: brightness(0.55) saturate(0.8); }
 .dev-status.warn { border-color: rgba(255,107,0,.6); background: rgba(255,107,0,.1); } .dev-status.warn b { color: var(--accent); }
 .dev-status.bad { border-color: rgba(255,59,48,.5); background: rgba(255,59,48,.08); } .dev-status.bad b { color: #FF3B30; }
 .dev-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* RD console: folds ("More", "All screens") and the screens' addresses with QR codes. */
+details.more > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-weight: 700; font-size: 14px; padding: 6px 0; user-select: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: ''; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
+details.more[open] > summary::before { transform: rotate(45deg); }
+details.more > summary:hover { color: var(--text); }
+details.more .more-body { display: grid; gap: 14px; padding-top: 10px; }
+.screen-link { display: grid; grid-template-columns: 76px 1fr; gap: 14px; align-items: center; }
+.screen-link.main { grid-template-columns: 116px 1fr; }
+.screen-link .qr { background: #fff; border-radius: 6px; padding: 4px; line-height: 0; }
+.screen-link .qr svg { width: 100%; height: auto; }
+.screen-link > div:last-child { display: grid; gap: 2px; min-width: 0; }
+.screen-link b { font-family: var(--display); font-size: 17px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.screen-link code { overflow-wrap: anywhere; }
+.screen-link .hint { margin: 0; font-size: 13px; }
+.kiosk-info code.plain { font-size: 13px; color: var(--text); }

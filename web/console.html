@@ -55,19 +55,24 @@
             <select id="perHeat" class="input"></select></div>
           <div class="field wide"><label>Channels in every heat</label>
             <div id="slotChannels" class="slot-channels"></div></div>
-          <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
-          <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes stops practice and takes everyone off the list.</span></label>
-          <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
           <div class="wide presets">
             <button class="btn small" data-preset="R1 R2 F2 F4 R7 R8">IMD6C · 6 pilots</button>
             <button class="btn small" data-preset="R1 R2 R3 R4 R5 R6 R7 R8">Raceband · 8 pilots</button>
           </div>
+          <details class="more wide" id="setupMore">
+            <summary>More</summary>
+            <div class="more-body">
+              <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
+              <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes stops practice and takes everyone off the list.</span></label>
+              <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
+            </div>
+          </details>
           <p class="hint wide" id="setupHint">All of this can change during a session. To change a channel in one heat only, click the channel on that heat's card.</p>
         </div>
       </section>
 
       <section class="card">
-        <h2>Phones and kiosk</h2>
+        <h2>Phones and screens</h2>
         <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
       </section>
     </div>
@@ -180,7 +185,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt, qrSvg } from '/assets/common.js';
 setInterval(() => {
   const [time, session] = wallClock(state).split(' · session ');
   $('wallclock').textContent = time;
@@ -833,18 +838,45 @@ async function addPilot() {
 $('addPilot').onclick = addPilot;
 $('newPilot').onkeydown = (e) => { if (e.key === 'Enter') addPilot(); };
 
-// ---------- kiosk address ----------
-function showInfo(info) {
-  const urls = [`http://${info.hostname}:${info.port}/kiosk`, ...info.addresses.map((a) => `http://${a}:${info.port}/kiosk`)];
+// ---------- phones and screens: their addresses, with QR codes ----------
+const SCREENS = [
+  ['/me', 'Pilots\' phones', 'Each pilot\'s own page: heat, channel, laps, Going home.'],
+  ['/screen', 'Big screen', 'The pit board for the hall.'],
+  ['/kiosk', 'Kiosk', 'Sign in, change channel, going home. On the kiosk PC, kiosk.sh / kiosk.bat opens it with the camera allowed.'],
+  ['/mobile', 'RD phone', 'The race director\'s console on a phone.'],
+  ['/console', 'RD console', 'This page, from another PC.'],
+];
+const qrCache = new Map();
+async function qrFor(url) {
+  if (!qrCache.has(url)) qrCache.set(url, await qrSvg(url));
+  return qrCache.get(url);
+}
+async function showInfo(info) {
+  const host = info.addresses[0] ?? info.hostname;
+  const url = (path) => `http://${host}:${info.port}${path}`;
   const fw = info.firewall;
+  let open = $('screensMore')?.open;
+  if (open == null) { try { open = !!localStorage.getItem('flyday.more.screensMore'); } catch { open = false; } }
+  const qrs = await Promise.all(SCREENS.map(([path]) => qrFor(url(path))));
   $('kioskInfo').innerHTML = `
     ${fw && !fw.ok ? `<div class="fw-warn"><b>Phones and the kiosk can't reach this PC.</b>
       <span>Windows Firewall: ${esc(fw.reason)} on this ${esc(fw.network.toLowerCase())} network.</span>
       <button class="btn primary" id="fwFix">Let them in</button><small>Windows asks for permission once.</small></div>` : ''}
-    <p class="hint" style="margin:0">Pilots' phones (the QR codes open this): <code>http://${esc(info.addresses[0] ?? info.hostname)}:${info.port}/me</code></p>
-    <p class="hint" style="margin:0">On the kiosk PC, run <b>kiosk.sh</b> / <b>kiosk.bat</b> with this PC's address. Or open one of these in the browser:</p>
-    ${urls.map((u) => `<code>${esc(u)}</code>`).join('')}
-    <p class="hint" style="margin:0">Phones and the kiosk must be on the same network as this PC.</p>`;
+    <div class="screen-link main">
+      <div class="qr">${qrs[0]}</div>
+      <div><b>${SCREENS[0][1]}</b><code>${esc(url('/me'))}</code><span class="hint">${SCREENS[0][2]} The big screen and the kiosk show this QR code too.</span></div>
+    </div>
+    <details class="more" id="screensMore"${open ? ' open' : ''}>
+      <summary>All screens</summary>
+      <div class="more-body">
+        ${SCREENS.slice(1).map(([path, name, text], i) => `<div class="screen-link">
+          <div class="qr">${qrs[i + 1]}</div>
+          <div><b>${name}</b><code>${esc(url(path))}</code><span class="hint">${text}</span></div>
+        </div>`).join('')}
+        ${info.addresses.length > 1 ? `<p class="hint">This PC also answers on ${info.addresses.slice(1).map((a) => `<code class="plain">${esc(a)}</code>`).join(', ')}.</p>` : ''}
+        <p class="hint">Phones and the kiosk must be on the same network as this PC.</p>
+      </div>
+    </details>`;
   $('fwFix')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     e.target.textContent = 'Check the Windows prompt…';
@@ -856,6 +888,13 @@ function showInfo(info) {
   });
 }
 fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {});
+// "More" folds are remembered on this PC.
+document.addEventListener('toggle', (e) => {
+  const d = e.target;
+  if (!(d instanceof HTMLDetailsElement) || !d.id || !d.classList.contains('more')) return;
+  try { localStorage.setItem(`flyday.more.${d.id}`, d.open ? '1' : ''); } catch {}
+}, true);
+try { if (localStorage.getItem('flyday.more.setupMore')) $('setupMore').open = true; } catch {}
 // The firewall check takes a few seconds after start: look again.
 setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 
