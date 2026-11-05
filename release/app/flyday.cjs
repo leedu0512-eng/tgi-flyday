@@ -215,7 +215,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.05-2032" : "dev";
+var VERSION = true ? "2026.11.05-2204" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -1987,6 +1987,11 @@ data: ${JSON.stringify(engine.snapshot(Date.now()))}
     return;
   }
   if (path === "/api/state" && req.method === "GET") return json(res, 200, engine.snapshot(Date.now()));
+  if (path === "/api/remember-me" && req.method === "POST") {
+    const name = String((await readBody(req)).name ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
+    res.setHeader("set-cookie", `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
+    return json(res, 200, { ok: true, result: null });
+  }
   if (path === "/api/known" && req.method === "GET") {
     const name = url.searchParams.get("name") ?? "";
     return json(res, 200, known[knownKey(name)] ?? {});
