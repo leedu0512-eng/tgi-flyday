@@ -977,7 +977,7 @@ test('club quad breaks: its pilots get another one and are told; none left: they
   assert.throws(() => e.setClubQuads([...eight, { name: 'Q9', channel: 'F1', broken: false }]), /Up to 8/);
 });
 
-test('drag and drop on the heat board: move to an empty slot, swap; club-quad pilots stay put', () => {
+test('drag and drop on the heat board: move to an empty slot, swap; club-quad pilots move but keep their channel', () => {
   const { e } = setup(0); // R1 R2 F2 F4, 3 heats
   const a = e.join('A', 0, 0);  // heat 1 R1
   const b = e.join('B', 1, 1);  // heat 2 R2
@@ -991,11 +991,22 @@ test('drag and drop on the heat board: move to an empty slot, swap; club-quad pi
   e.setClubQuads([{ name: 'Club 1', channel: 'R1', broken: false }, { name: 'Club 2', channel: 'R5', broken: false }]);
   const c = e.walkIn('Cid', undefined, true); // Club 1, R1
   const hc = e.heats.findIndex((r) => r.includes(c.pilot.id)), sc = e.heats[hc].indexOf(c.pilot.id);
-  assert.throws(() => e.movePilot(c.pilot.id, 2, 2), /club quad Club 1/);
-  assert.throws(() => e.movePilot(a.id, hc, sc), /club quad Club 1/, 'nobody swaps with them either');
-  assert.throws(() => e.setSlot(hc, sc, null), /club quad/);
+  // Dragged to another heat: they go, on their quad's channel.
+  const target = hc === 2 ? 0 : 2;
+  e.movePilot(c.pilot.id, target, 2);
+  const hm = e.heats.findIndex((r) => r.includes(c.pilot.id));
+  assert.equal(hm, target, 'moved to the heat they were dropped in');
+  assert.equal(e.channelOf(hm, e.heats[hm].indexOf(c.pilot.id)), 'R1', 'still on Club 1\'s channel');
+  // Not where R1 is already flown.
+  const r1 = e.join('Rex', 1, 0); // heat 2, R1
+  assert.throws(() => e.movePilot(c.pilot.id, 1, 3), /R1, and that channel is already in use in heat 2/);
+  e.setSlot(1, 0, null); e.deletePilot(r1.id);
+  e.movePilot(c.pilot.id, hc, sc);
+  const hc2 = e.heats.findIndex((r) => r.includes(c.pilot.id));
+  // By hand otherwise (menus, channel, kiosk): still no.
+  assert.throws(() => e.setSlot(hc2, e.heats[hc2].indexOf(c.pilot.id), null), /club quad/);
   assert.throws(() => e.setSlot(2, 0, c.pilot.id), /club quad/);
-  assert.throws(() => e.setHeatChannel(hc, sc, 'R3'), /another channel/);
+  assert.throws(() => e.setHeatChannel(hc2, e.heats[hc2].indexOf(c.pilot.id), 'R3'), /another channel/);
   assert.throws(() => e.join('Cid', 2, 0), /club quad/);
   // They move when their quad changes channel, or on the Club quads page.
   e.assignClubQuad(c.pilot.id, 'Club 2');

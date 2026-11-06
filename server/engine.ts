@@ -1136,7 +1136,8 @@ export class Engine {
    * RD, drag and drop on the heat board: put a pilot in heat h, slot s. An empty slot: they
    * move there. Someone sitting there: the two swap places. A pilot on a club quad keeps its
    * channel: they take the heat's empty slot already on it, else the slot switches to it (for
-   * that heat). Quad-mates never end up in one heat. All or nothing.
+   * that heat); refused when that channel is taken there. Quad-mates never end up in one heat.
+   * All or nothing.
    */
   movePilot(pilotId: string, heat: number, slot: number): { heat: number; slot: number } {
     this.checkSlot(heat, slot);
@@ -1147,8 +1148,7 @@ export class Engine {
     if (fromHeat === heat && fromSlot === slot) return { heat, slot };
     const otherId = this.heats[heat][slot];
     const other = otherId ? this.pilots.get(otherId) : undefined;
-    this.assertNotClub(p);
-    this.assertNotClub(other);
+    // Club-quad pilots move too, but keep their quad's channel (placeAt sees to that).
     const restore = this.backup();
     try {
       this.removeFromSlots(p.id);
