@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.06-0122" : "dev";
+var VERSION = true ? "2026.11.06-2024" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -1409,7 +1409,8 @@ var Engine = class {
    * RD, drag and drop on the heat board: put a pilot in heat h, slot s. An empty slot: they
    * move there. Someone sitting there: the two swap places. A pilot on a club quad keeps its
    * channel: they take the heat's empty slot already on it, else the slot switches to it (for
-   * that heat). Quad-mates never end up in one heat. All or nothing.
+   * that heat); refused when that channel is taken there. Quad-mates never end up in one heat.
+   * All or nothing.
    */
   movePilot(pilotId, heat, slot) {
     this.checkSlot(heat, slot);
@@ -1420,8 +1421,6 @@ var Engine = class {
     if (fromHeat === heat && fromSlot === slot) return { heat, slot };
     const otherId = this.heats[heat][slot];
     const other = otherId ? this.pilots.get(otherId) : void 0;
-    this.assertNotClub(p);
-    this.assertNotClub(other);
     const restore = this.backup();
     try {
       this.removeFromSlots(p.id);

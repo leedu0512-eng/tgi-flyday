@@ -933,3 +933,5 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .finish-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .finish-time { width: 200px; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color-scheme: dark; }
 .finish-quick { display: flex; gap: 8px; flex-wrap: wrap; }
+.slot .club-mark[draggable] { cursor: grab; }
+.slot .club-mark[draggable]:active { cursor: grabbing; }

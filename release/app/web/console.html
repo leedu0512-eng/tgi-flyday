@@ -747,12 +747,12 @@ function renderHeats() {
       ${h.slots.map((s, i) => {
         // A club-quad pilot flies the quad's channel: locked here, moved on the Club quads page.
         const club = s.pilotId && clubOf(s.pilotId);
-        const lock = club ? `disabled title="${esc(NAME(pm.get(s.pilotId)?.callsign ?? ''))} flies club quad ${esc(club.name)} on ${esc(club.channel)}: change it on the Club quads page"` : '';
-        return `<div class="slot ${club ? 'club' : ''}" ${club ? '' : `data-drop-heat="${h.index}" data-drop-slot="${i}"`}>
+        const lock = club ? `disabled title="${esc(NAME(pm.get(s.pilotId)?.callsign ?? ''))} flies club quad ${esc(club.name)} on ${esc(club.channel)}: drag them to another heat, or change the quad on the Club quads page"` : '';
+        return `<div class="slot ${club ? 'club' : ''}" data-drop-heat="${h.index}" data-drop-slot="${i}">
         <span class="ch-cell"><select class="chip-select ${s.own ? 'own' : ''}" data-heat-ch="${h.index}" data-slot="${i}" style="background:${SLOT_COLORS[i]}"
           ${lock || `title="${s.own ? 'Channel changed for this heat only' : 'Change the channel for this heat only'}"`} aria-label="Heat ${h.index + 1} channel">${heatChOptions(h, i)}</select>${timerMark(state, i)}</span>
         <select class="input" data-heat="${h.index}" data-slot="${i}" ${lock}>${options(s.pilotId)}</select>
-        ${club ? `<span class="club-mark" title="Club quad ${esc(club.name)}"></span>` : s.pilotId ? `<span class="grip" draggable="true" data-drag="${s.pilotId}" title="Drag to another slot or heat (onto a pilot: they swap)" aria-hidden="true"></span>` : '<span></span>'}
+        ${club ? `<span class="club-mark" draggable="true" data-drag="${s.pilotId}" title="Club quad ${esc(club.name)}. Drag to another heat: they keep ${esc(club.channel)}"></span>` : s.pilotId ? `<span class="grip" draggable="true" data-drag="${s.pilotId}" title="Drag to another slot or heat (onto a pilot: they swap)" aria-hidden="true"></span>` : '<span></span>'}
       </div>`;
       }).join('')}
     </div>`;
