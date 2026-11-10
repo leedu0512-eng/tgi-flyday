@@ -945,3 +945,6 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .outbox .hint { margin: 0; }
 .outbox .defaults-row { display: flex; gap: 8px; }
 .warn-text { color: var(--accent); }
+.ok-text { color: #22C55E; }
+.outbox .pair { font-size: 14px; line-height: 1.4; }
+.outbox .pair-code { display: block; margin-top: 4px; font-family: 'Big Shoulders Stencil', sans-serif; font-size: 40px; letter-spacing: 0.08em; color: #FFFFFF; }

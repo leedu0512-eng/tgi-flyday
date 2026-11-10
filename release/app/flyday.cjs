@@ -26,9 +26,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server/main.ts
 var import_node_http = require("node:http");
 var import_promises2 = require("node:fs/promises");
-var import_node_fs5 = require("node:fs");
+var import_node_fs6 = require("node:fs");
 var import_node_os = require("node:os");
-var import_node_path5 = require("node:path");
+var import_node_path6 = require("node:path");
 var import_node_url = require("node:url");
 var sea = __toESM(require("node:sea"), 1);
 
@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.10-1959" : "dev";
+var VERSION = true ? "2026.11.10-2042" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -474,6 +474,8 @@ var Engine = class {
   night = null;
   /** Room lights as the kiosk webcam sees them. */
   light = { state: "unknown", level: null, at: null, darkSince: null };
+  /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
+  presence = void 0;
   nightSnoozeUntil = 0;
   clock = {
     phase: "stopped",
@@ -701,6 +703,7 @@ var Engine = class {
     this.clock.pausedRemaining = null;
     this.clock.freeSince = null;
     this.calloutsDone.clear();
+    this.presenceNow("session");
     this.onChange();
   }
   enterChangeover(now, heat) {
@@ -896,12 +899,14 @@ var Engine = class {
     if (l.state !== "unknown" && l.at !== null && now - l.at > LIGHT_STALE_MS) {
       l.state = "unknown";
       l.darkSince = null;
+      this.presenceNow("lights");
       this.onChange();
     }
   }
   lightsChanged(to, now) {
     this.light.state = to;
     this.onEvent("lights", { on: to === "on", level: this.light.level });
+    this.presenceNow("lights");
     if (to === "off") {
       if (this.config.lights.enabled && this.clock.phase !== "stopped" && !this.night) {
         this.night = { deadline: now + NIGHT_GRACE_MS, why: "lights" };
@@ -911,6 +916,19 @@ var Engine = class {
       this.night = null;
     }
     this.onChange();
+  }
+  /**
+   * For the outbox: is anybody at the venue? Lights on, or practice running = yes; lights off
+   * with practice stopped = no; no light reading and practice stopped = can't tell (null).
+   * Sent only when it changes.
+   */
+  presenceNow(source) {
+    const flying = this.clock.phase !== "stopped";
+    const l = this.light.state;
+    const present = l === "on" || flying ? true : l === "off" ? false : null;
+    if (present === this.presence) return;
+    this.presence = present;
+    this.onEvent("presence", { present, source, lights: l, level: this.light.level, practice: flying });
   }
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
   endOfDay() {
@@ -1133,7 +1151,20 @@ var Engine = class {
     if (rows.some((r) => r.passes)) this.lastTimes = { heat: live.heat, rows };
     const run = this.runOf(live);
     if (run.laps.length) {
-      this.onEvent("heat", { ...run });
+      const row = this.heats[live.heat] ?? [];
+      const passes = [...live.passes].filter(([, list]) => list.length).map(([id, list]) => {
+        const p = this.pilots.get(id);
+        const slot = row.indexOf(id);
+        const t = live.timed.find((x) => x.pilotId === id);
+        const s = slot >= 0 ? slot : t ? t.slot : -1;
+        return {
+          name: p?.callsign ?? "?",
+          channel: s >= 0 ? this.channelOf(live.heat, s) : null,
+          clubQuad: !!(p?.quad && this.config.clubQuads.some((q) => q.name === p.quad)),
+          passes: [...list]
+        };
+      });
+      this.onEvent("heat", { ...run, sessionStartedAt: this.clock.startedAt, passes });
       this.runs.push(run);
       if (this.runs.length > 2e3) this.runs.splice(0, this.runs.length - 2e3);
     }
@@ -2189,14 +2220,33 @@ function cleanLights(patch, current) {
   }
   return out;
 }
+var FLYDAY_PATH = "/api/hz/tgiflyday/";
+function cleanServerUrl(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return "";
+  if (!/^https:\/\//i.test(text)) throw new EngineError("The address starts with https:// (only secure addresses).");
+  let u;
+  try {
+    u = new URL(text);
+  } catch {
+    throw new EngineError("That address doesn't look right, e.g. https://flyday.tail543cf5.ts.net:8445");
+  }
+  if (u.protocol !== "https:" || !u.hostname) throw new EngineError("The address starts with https:// (only secure addresses).");
+  if (u.username || u.password) throw new EngineError("No login in the address: the token goes in the Key field.");
+  if (u.search) throw new EngineError("No ?\u2026 in the address.");
+  let path = u.pathname.replace(/\/(hello|upload)\/?$/, "/");
+  if (path === "/") path = FLYDAY_PATH;
+  if (!path.endsWith("/")) path += "/";
+  u.pathname = path;
+  u.hash = "";
+  const out = u.toString();
+  if (out.length > 500) throw new EngineError("That address is too long.");
+  return out;
+}
 function cleanCloud(patch, current) {
   const out = { ...current };
   if (patch.enabled !== void 0) out.enabled = Boolean(patch.enabled);
-  if (patch.url !== void 0) {
-    const url = String(patch.url).trim();
-    if (url && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(url)) throw new EngineError("The address starts with https://");
-    out.url = url.slice(0, 500);
-  }
+  if (patch.url !== void 0) out.url = cleanServerUrl(patch.url);
   if (patch.key !== void 0 && patch.key !== "") out.key = String(patch.key).trim().slice(0, 2e3);
   if (patch.venue !== void 0) out.venue = String(patch.venue).replace(/\s+/g, " ").trim().slice(0, 40);
   return out;
@@ -2507,32 +2557,301 @@ var RotorHazardLink = class {
 };
 
 // server/outbox.ts
+var import_node_crypto3 = require("node:crypto");
+var import_node_fs5 = require("node:fs");
+var import_node_path5 = require("node:path");
+
+// server/flyday.ts
 var import_node_crypto2 = require("node:crypto");
 var import_node_fs4 = require("node:fs");
 var import_node_path4 = require("node:path");
+var FLYDAY_BASE = "https://hobizone.org/api/hz/tgiflyday/";
+var ALNUM = "abcdefghijklmnopqrstuvwxyz0123456789";
+function newId() {
+  const b = (0, import_node_crypto2.randomBytes)(15);
+  let out = "";
+  for (const x of b) out += ALNUM[x % 36];
+  return out;
+}
+function stableId(...parts) {
+  const h = (0, import_node_crypto2.createHash)("sha256").update(parts.map((p) => String(p ?? "")).join("\0")).digest();
+  let out = "";
+  for (let i = 0; i < 15; i++) out += ALNUM[h[i] % 36];
+  return out;
+}
+function pairingCodeOf(secret) {
+  const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const h = (0, import_node_crypto2.createHash)("sha256").update("pair\0" + secret).digest();
+  let s = "";
+  for (let i = 0; i < 6; i++) s += A[h[i] % A.length];
+  return `${s.slice(0, 3)}-${s.slice(3)}`;
+}
+function publicInstall(s) {
+  return { id: s.id, pairingCode: s.pairingCode, status: s.status, send: s.send, lastHello: s.lastHello, helloError: s.helloError };
+}
+var Install = class {
+  state;
+  file;
+  constructor(dataDir) {
+    this.file = (0, import_node_path4.join)(dataDir, "install.json");
+    let saved2 = {};
+    try {
+      if ((0, import_node_fs4.existsSync)(this.file)) saved2 = JSON.parse((0, import_node_fs4.readFileSync)(this.file, "utf8"));
+    } catch {
+    }
+    const secret = typeof saved2.secret === "string" && saved2.secret.length >= 32 ? saved2.secret : (0, import_node_crypto2.randomBytes)(32).toString("hex");
+    this.state = {
+      id: typeof saved2.id === "string" && /^[a-z0-9]{15}$/.test(saved2.id) ? saved2.id : newId(),
+      secret,
+      pairingCode: pairingCodeOf(secret),
+      status: ["new", "waiting", "approved", "revoked"].includes(saved2.status) ? saved2.status : "new",
+      token: typeof saved2.token === "string" ? saved2.token : "",
+      send: saved2.send === true,
+      lastHello: typeof saved2.lastHello === "number" ? saved2.lastHello : null,
+      helloError: ""
+    };
+    this.save();
+  }
+  save() {
+    try {
+      (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
+      const { helloError, ...keep } = this.state;
+      (0, import_node_fs4.writeFileSync)(this.file + ".tmp", JSON.stringify(keep, null, 2));
+      (0, import_node_fs4.renameSync)(this.file + ".tmp", this.file);
+    } catch {
+    }
+  }
+  /** Sending allowed: approved, token in hand, Flyday says send. */
+  canSend() {
+    return this.state.status === "approved" && !!this.state.token && this.state.send;
+  }
+  /** Flyday refused the token (401/403): ask again with a hello. */
+  tokenRefused() {
+    this.state.status = "waiting";
+    this.state.send = false;
+    this.save();
+  }
+  /** Say hello to Flyday; apply what it answers. */
+  async hello(base, venue, pc, version) {
+    const s = this.state;
+    try {
+      const res = await fetch(base + "hello", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ install: s.id, install_secret: s.secret, pairing_code: s.pairingCode, venue, pc, version }),
+        signal: AbortSignal.timeout(2e4)
+      });
+      const text = await res.text().catch(() => "");
+      if (!res.ok) throw new Error(`Flyday answered ${res.status}${text ? `: ${text.replace(/\s+/g, " ").slice(0, 160)}` : ""}`);
+      let body = {};
+      try {
+        body = JSON.parse(text);
+      } catch {
+        throw new Error("Flyday gave an answer that is not JSON");
+      }
+      s.lastHello = Date.now();
+      s.helloError = "";
+      if (typeof body.pairing_code === "string" && body.pairing_code.trim()) s.pairingCode = body.pairing_code.trim().slice(0, 20);
+      if (body.status === "approved") {
+        s.status = "approved";
+        if (typeof body.token === "string" && body.token) s.token = body.token;
+        s.send = body.send !== false && !!s.token;
+      } else if (body.status === "revoked") {
+        s.status = "revoked";
+        s.token = "";
+        s.send = false;
+      } else {
+        s.status = "waiting";
+        s.token = "";
+        s.send = false;
+        if (typeof body.message === "string") s.helloError = body.message.slice(0, 160);
+      }
+    } catch (err) {
+      const cause = err?.cause?.code || err?.cause?.message;
+      s.helloError = err?.name === "TimeoutError" ? "no answer from Flyday in 20 seconds" : `${err?.message ?? err}${cause ? ` (${cause})` : ""}`;
+    }
+    this.save();
+    return s;
+  }
+};
+var END_REASON = { stop: "stop", endTime: "end_time", night: "night", lights: "lights", reset: "reset" };
+var iso = (ms) => typeof ms === "number" && Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+function toUploads(rows, install2, kioskName, version, notes) {
+  const out = [];
+  const base = (venue) => ({
+    schema: 1,
+    install: install2,
+    tgiflyday_kiosk: { id: install2, name: venue || kioskName, app_version: version },
+    session: null,
+    pilots: [],
+    laps: [],
+    presence: []
+  });
+  const noteOf = (startedAt) => {
+    let n = notes.get(startedAt);
+    if (!n) {
+      n = { startedAt, endedAt: null, endReason: null, timed: false };
+      notes.set(startedAt, n);
+    }
+    return n;
+  };
+  const sessionOf = (n) => ({
+    id: stableId(install2, "session", n.startedAt),
+    started_at: iso(n.startedAt),
+    ended_at: iso(n.endedAt),
+    end_reason: n.endReason,
+    timed: n.timed
+  });
+  const localPilot = (name) => stableId(install2, "pilot", name.trim().toLowerCase());
+  const pilotOf = (n, name, clubQuad) => ({
+    id: stableId(install2, "session", n.startedAt, "pilot", name.trim().toLowerCase()),
+    person: null,
+    local_pilot: localPilot(name),
+    callsign: name,
+    club_quad: clubQuad
+  });
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const d = r.data ?? {};
+    if (r.type === "lights") {
+      out.push({ body: null, rows: 1 });
+      continue;
+    }
+    if (r.type === "presence") {
+      const last = out.at(-1);
+      const item = { id: stableId(install2, "presence", r.id), at: r.at, present: d.present ?? null, lights: String(d.lights ?? "unknown"), practice: !!d.practice };
+      if (last?.body && last.body.session === null && last.body.presence.length && last.body.presence.length < 200) {
+        last.body.presence.push(item);
+        last.rows++;
+      } else {
+        const b = base(r.venue);
+        b.presence.push(item);
+        out.push({ body: b, rows: 1 });
+      }
+      continue;
+    }
+    if (r.type === "session.start" && typeof d.startedAt === "number") {
+      const b = base(r.venue);
+      b.session = sessionOf(noteOf(d.startedAt));
+      out.push({ body: b, rows: 1 });
+      continue;
+    }
+    if (r.type === "session.end" && typeof d.startedAt === "number") {
+      const n = noteOf(d.startedAt);
+      n.endedAt = Date.parse(r.at);
+      n.endReason = END_REASON[d.reason] ?? String(d.reason ?? "");
+      const b = base(r.venue);
+      b.session = sessionOf(n);
+      for (const name of Array.isArray(d.pilots) ? d.pilots : []) if (typeof name === "string" && name.trim()) b.pilots.push(pilotOf(n, name, false));
+      out.push({ body: b, rows: 1 });
+      continue;
+    }
+    if (r.type === "heat") {
+      let startedAt = typeof d.sessionStartedAt === "number" ? d.sessionStartedAt : null;
+      if (startedAt === null) {
+        for (const k of notes.keys()) if (k <= d.at && (startedAt === null || k > startedAt)) startedAt = k;
+      }
+      if (startedAt === null) startedAt = typeof d.at === "number" ? d.at : Date.parse(r.at);
+      const n = noteOf(startedAt);
+      n.timed = true;
+      const b = base(r.venue);
+      b.session = sessionOf(n);
+      const key = (name) => [d.round, d.heat, d.at, name.trim().toLowerCase()];
+      if (Array.isArray(d.passes)) {
+        for (const p of d.passes) {
+          if (typeof p?.name !== "string" || !Array.isArray(p.passes)) continue;
+          const pilot = pilotOf(n, p.name, !!p.clubQuad);
+          b.pilots.push(pilot);
+          p.passes.forEach((at, k) => {
+            const ms = k === 0 ? d.free ? null : at - d.at : at - p.passes[k - 1];
+            b.laps.push({ id: stableId(install2, "lap", ...key(p.name), k), pilot: pilot.id, round: d.round, heat: d.heat + 1, free_flight: !!d.free, channel: p.channel ?? null, lap: k, ms, crossed_at: iso(at) });
+          });
+        }
+      } else if (Array.isArray(d.laps)) {
+        for (const p of d.laps) {
+          if (typeof p?.name !== "string" || !Array.isArray(p.laps)) continue;
+          const pilot = pilotOf(n, p.name, false);
+          b.pilots.push(pilot);
+          p.laps.forEach((ms, k) => b.laps.push({ id: stableId(install2, "lap", ...key(p.name), k + 1), pilot: pilot.id, round: d.round, heat: d.heat + 1, free_flight: !!d.free, channel: null, lap: k + 1, ms, crossed_at: null }));
+        }
+      }
+      out.push({ body: b, rows: 1 });
+      continue;
+    }
+    out.push({ body: null, rows: 1 });
+  }
+  return out;
+}
+var SAFE_SIZE = 9e5;
+function splitBody(b) {
+  const part = (laps, presence, pilots) => ({ ...b, laps, presence, pilots });
+  const half = (list) => [list.slice(0, Math.ceil(list.length / 2)), list.slice(Math.ceil(list.length / 2))];
+  if (b.laps.length > 1) {
+    const [l1, l2] = half(b.laps);
+    const used = (laps) => new Set(laps.map((l) => l.pilot));
+    const u1 = used(l1), u2 = used(l2);
+    return [part(l1, b.presence, b.pilots.filter((p) => u1.has(p.id) || !u2.has(p.id))), part(l2, [], b.pilots.filter((p) => u2.has(p.id)))];
+  }
+  if (b.presence.length > 1) {
+    const [p1, p2] = half(b.presence);
+    return [part(b.laps, p1, b.pilots), part([], p2, [])];
+  }
+  if (b.pilots.length > 1 && !b.laps.length) {
+    const [a, c] = half(b.pilots);
+    return [part([], b.presence, a), part([], [], c)];
+  }
+  return null;
+}
+function partsOf(b, max = SAFE_SIZE) {
+  if (JSON.stringify(b).length <= max) return [b];
+  const s = splitBody(b);
+  return s ? [...partsOf(s[0], max), ...partsOf(s[1], max)] : [b];
+}
+function verdictOf(status, text) {
+  let portalError = null;
+  try {
+    const j = JSON.parse(text);
+    if (j && typeof j.error === "string") portalError = j.error;
+  } catch {
+  }
+  if (status >= 200 && status < 300) return { verdict: "stored", portalError };
+  if (status === 401 && (portalError === "token_invalid" || portalError === "revoked")) return { verdict: "token", portalError };
+  if (status === 429) return { verdict: "backoff", portalError };
+  if (status === 413) return { verdict: "split", portalError };
+  if (status >= 400 && status < 500 && status !== 401 && status !== 403 && portalError !== null) return { verdict: "stop", portalError };
+  return { verdict: "retry", portalError };
+}
+
+// server/outbox.ts
 var BATCH = 200;
 var MAX_PENDING = 1e5;
 var Outbox = class {
   file;
   sentFile;
   pending = [];
-  st = { pending: 0, sent: 0, lastOk: null, lastTry: null, lastError: "" };
+  st = { pending: 0, sent: 0, lastOk: null, lastTry: null, lastError: "", stopped: false };
+  /** What's known of each session (by start time), so every upload carries the full session. */
+  notes = /* @__PURE__ */ new Map();
+  install;
   busy = false;
   nextTry = 0;
   soonTimer = null;
+  /** 429s in a row: wait 1, 5, then 15 minutes. */
+  busyStreak = 0;
   config;
   venueFallback;
   log;
   constructor(dataDir, config, venueFallback, log = () => {
-  }) {
+  }, install2) {
+    this.install = install2 ?? new Install(dataDir);
     this.config = config;
     this.venueFallback = venueFallback;
     this.log = log;
-    this.file = (0, import_node_path4.join)(dataDir, "outbox.jsonl");
-    this.sentFile = (0, import_node_path4.join)(dataDir, "outbox-sent.jsonl");
+    this.file = (0, import_node_path5.join)(dataDir, "outbox.jsonl");
+    this.sentFile = (0, import_node_path5.join)(dataDir, "outbox-sent.jsonl");
     try {
-      if ((0, import_node_fs4.existsSync)(this.file)) {
-        for (const line of (0, import_node_fs4.readFileSync)(this.file, "utf8").split("\n")) {
+      if ((0, import_node_fs5.existsSync)(this.file)) {
+        for (const line of (0, import_node_fs5.readFileSync)(this.file, "utf8").split("\n")) {
           if (!line.trim()) continue;
           try {
             this.pending.push(JSON.parse(line));
@@ -2540,24 +2859,39 @@ var Outbox = class {
           }
         }
       }
-      if ((0, import_node_fs4.existsSync)(this.sentFile)) this.st.sent = (0, import_node_fs4.readFileSync)(this.sentFile, "utf8").split("\n").filter((l) => l.trim()).length;
+      if ((0, import_node_fs5.existsSync)(this.sentFile)) {
+        const sent = [];
+        for (const line of (0, import_node_fs5.readFileSync)(this.sentFile, "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            sent.push(JSON.parse(line));
+          } catch {
+          }
+        }
+        this.st.sent = sent.length;
+        toUploads(sent, this.install.state.id, venueFallback, VERSION, this.notes);
+      }
     } catch (err) {
       this.log(`Outbox: could not read it (${err.message}); starting empty.`);
     }
     this.st.pending = this.pending.length;
   }
+  /** Where uploads go: the address set on this PC, else the built-in Flyday address. */
+  base() {
+    return this.config().url || FLYDAY_BASE;
+  }
   venue() {
     return this.config().venue || this.venueFallback;
   }
   add(type, data, at = Date.now()) {
-    const ev = { id: (0, import_node_crypto2.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
+    const ev = { id: (0, import_node_crypto3.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
     this.pending.push(ev);
     try {
-      (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
+      (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(this.file), { recursive: true });
       if (this.pending.length > MAX_PENDING) {
         this.pending.splice(0, this.pending.length - MAX_PENDING);
         this.rewrite();
-      } else (0, import_node_fs4.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
+      } else (0, import_node_fs5.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
     } catch (err) {
       this.log(`Outbox: could not save an event (${err.message}).`);
     }
@@ -2570,39 +2904,73 @@ var Outbox = class {
   status() {
     return { ...this.st };
   }
-  /** Send what's waiting (if sending is set up). Returns the status afterwards. */
+  /** Send what's waiting (once Flyday has approved this PC). Returns the status afterwards. */
   async flush(force = false) {
-    const cfg = this.config();
-    if (!cfg.enabled || !cfg.url || this.busy || !this.pending.length) return this.status();
-    if (!force && Date.now() < this.nextTry) return this.status();
+    if (!this.install.canSend() || this.busy || !this.pending.length) return this.status();
+    if (!force && (Date.now() < this.nextTry || this.st.stopped)) return this.status();
     this.busy = true;
+    this.st.stopped = false;
     try {
-      while (this.pending.length) {
-        const batch = this.pending.slice(0, BATCH);
-        this.st.lastTry = Date.now();
-        const headers = { "content-type": "application/json", prefer: "return=minimal" };
-        if (cfg.key) {
-          headers.authorization = `Bearer ${cfg.key}`;
-          headers.apikey = cfg.key;
+      while (this.pending.length && this.install.canSend()) {
+        const rows = this.pending.slice(0, BATCH).map((e) => e.venue ? e : { ...e, venue: this.venue() });
+        const notes = new Map([...this.notes].map(([k, v]) => [k, { ...v }]));
+        const up = toUploads(rows, this.install.state.id, this.venue(), VERSION, notes)[0];
+        if (!up) break;
+        if (up.body) {
+          const queue = partsOf(up.body);
+          while (queue.length) {
+            const body = queue.shift();
+            this.st.lastTry = Date.now();
+            const res = await fetch(this.base() + "upload", {
+              method: "POST",
+              headers: { "content-type": "application/json", authorization: `Bearer ${this.install.state.token}` },
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(2e4)
+            });
+            const text = await res.text().catch(() => "");
+            const { verdict, portalError } = verdictOf(res.status, text);
+            if (verdict === "stored") continue;
+            const msg = `Flyday answered ${res.status}${portalError ? `: ${portalError}` : text ? ` (${text.replace(/\s+/g, " ").slice(0, 120)})` : ""}`;
+            if (verdict === "split") {
+              const halves = splitBody(body);
+              if (halves) {
+                queue.unshift(...halves);
+                continue;
+              }
+              this.st.stopped = true;
+              throw new Error(`${msg}; it can't be made smaller`);
+            }
+            if (verdict === "token") {
+              this.install.tokenRefused();
+              throw new Error(`${msg} (asking Flyday again)`);
+            }
+            if (verdict === "backoff") {
+              const wait = [1, 5, 15][Math.min(this.busyStreak, 2)];
+              this.busyStreak++;
+              throw Object.assign(new Error(`${msg}: Flyday is busy, trying again in ${wait} min`), { waitMs: wait * 6e4 });
+            }
+            if (verdict === "stop") {
+              this.st.stopped = true;
+              throw new Error(msg);
+            }
+            throw new Error(msg);
+          }
+          this.busyStreak = 0;
+          this.st.lastOk = Date.now();
         }
-        const res = await fetch(cfg.url, { method: "POST", headers, body: JSON.stringify(batch.map((e) => e.venue ? e : { ...e, venue: this.venue() })), signal: AbortSignal.timeout(2e4) });
-        if (!res.ok) {
-          const text = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 200);
-          throw new Error(`the server answered ${res.status}${text ? `: ${text}` : ""}`);
-        }
-        this.pending.splice(0, batch.length);
-        (0, import_node_fs4.appendFileSync)(this.sentFile, batch.map((e) => JSON.stringify(e)).join("\n") + "\n");
+        for (const [k, v] of notes) this.notes.set(k, v);
+        const done = this.pending.splice(0, up.rows);
+        (0, import_node_fs5.appendFileSync)(this.sentFile, done.map((e) => JSON.stringify(e)).join("\n") + "\n");
         this.rewrite();
-        this.st.sent += batch.length;
+        this.st.sent += done.length;
         this.st.pending = this.pending.length;
-        this.st.lastOk = Date.now();
         this.st.lastError = "";
       }
       this.nextTry = 0;
     } catch (err) {
       const cause = err?.cause?.code || err?.cause?.message;
       this.st.lastError = err?.name === "TimeoutError" ? "no answer in 20 seconds" : `${err?.message ?? err}${cause ? ` (${cause})` : ""}`;
-      this.nextTry = Date.now() + 6e4;
+      this.nextTry = Date.now() + (typeof err?.waitMs === "number" ? err.waitMs : 6e4);
     } finally {
       this.busy = false;
     }
@@ -2610,43 +2978,43 @@ var Outbox = class {
   }
   rewrite() {
     const tmp = `${this.file}.tmp`;
-    (0, import_node_fs4.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
-    (0, import_node_fs4.renameSync)(tmp, this.file);
+    (0, import_node_fs5.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
+    (0, import_node_fs5.renameSync)(tmp, this.file);
   }
 };
 
 // server/main.ts
 var IN_EXE = sea.isSea();
-var ROOT = IN_EXE ? (0, import_node_path5.dirname)(process.execPath) : (0, import_node_path5.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
+var ROOT = IN_EXE ? (0, import_node_path6.dirname)(process.execPath) : (0, import_node_path6.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
 var APP_DIR = process.env.TGIFLYDAY_APP_DIR ?? process.env.FLYDAY_APP_DIR;
-var WEB = APP_DIR ? (0, import_node_path5.join)(APP_DIR, "web") : (0, import_node_path5.join)(ROOT, "web");
-var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs5.existsSync)((0, import_node_path5.join)(WEB, "console.html"));
+var WEB = APP_DIR ? (0, import_node_path6.join)(APP_DIR, "web") : (0, import_node_path6.join)(ROOT, "web");
+var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs6.existsSync)((0, import_node_path6.join)(WEB, "console.html"));
 async function webFile(full) {
   if (WEB_FROM_DISK) return (0, import_promises2.readFile)(full);
-  return Buffer.from(sea.getAsset("web/" + (0, import_node_path5.relative)(WEB, full).split(import_node_path5.sep).join("/")));
+  return Buffer.from(sea.getAsset("web/" + (0, import_node_path6.relative)(WEB, full).split(import_node_path6.sep).join("/")));
 }
-var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path5.join)(ROOT, "data", "flyday.json");
+var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path6.join)(ROOT, "data", "flyday.json");
 var PORT = Number(process.env.PORT ?? 8080);
-var PHOTOS = (0, import_node_path5.join)((0, import_node_path5.resolve)(DATA_FILE, ".."), "photos");
+var PHOTOS = (0, import_node_path6.join)((0, import_node_path6.resolve)(DATA_FILE, ".."), "photos");
 var photoFile = (id) => {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw new EngineError("No such pilot.");
-  return (0, import_node_path5.join)(PHOTOS, `${id}.jpg`);
+  return (0, import_node_path6.join)(PHOTOS, `${id}.jpg`);
 };
-var KNOWN = (0, import_node_path5.join)(PHOTOS, "known");
-var knownFile = (callsign) => (0, import_node_path5.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
+var KNOWN = (0, import_node_path6.join)(PHOTOS, "known");
+var knownFile = (callsign) => (0, import_node_path6.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
 function rememberPhoto(id) {
   const p = engine.pilots.get(id);
   if (!p?.photo) return;
   try {
-    (0, import_node_fs5.mkdirSync)(KNOWN, { recursive: true });
-    (0, import_node_fs5.copyFileSync)(photoFile(id), knownFile(p.callsign));
+    (0, import_node_fs6.mkdirSync)(KNOWN, { recursive: true });
+    (0, import_node_fs6.copyFileSync)(photoFile(id), knownFile(p.callsign));
   } catch {
   }
 }
-var KNOWN_FILE = (0, import_node_path5.join)((0, import_node_path5.resolve)(DATA_FILE, ".."), "known.json");
+var KNOWN_FILE = (0, import_node_path6.join)((0, import_node_path6.resolve)(DATA_FILE, ".."), "known.json");
 var known = (() => {
   try {
-    return JSON.parse((0, import_node_fs5.readFileSync)(KNOWN_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs6.readFileSync)(KNOWN_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -2664,8 +3032,8 @@ function rememberChannel(pilotId) {
     if (known[k]?.channel === channel && !!known[k]?.club === club) return;
     known[k] = { ...channel ? { channel } : {}, ...club ? { club } : {} };
     try {
-      (0, import_node_fs5.mkdirSync)((0, import_node_path5.resolve)(KNOWN_FILE, ".."), { recursive: true });
-      (0, import_node_fs5.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
+      (0, import_node_fs6.mkdirSync)((0, import_node_path6.resolve)(KNOWN_FILE, ".."), { recursive: true });
+      (0, import_node_fs6.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
     } catch {
     }
     return;
@@ -2675,17 +3043,17 @@ function restorePhotos() {
   for (const p of engine.pilots.values()) {
     if (p.photo) continue;
     const known2 = knownFile(p.callsign);
-    if (!(0, import_node_fs5.existsSync)(known2)) continue;
+    if (!(0, import_node_fs6.existsSync)(known2)) continue;
     try {
-      (0, import_node_fs5.mkdirSync)(PHOTOS, { recursive: true });
-      (0, import_node_fs5.copyFileSync)(known2, photoFile(p.id));
+      (0, import_node_fs6.mkdirSync)(PHOTOS, { recursive: true });
+      (0, import_node_fs6.copyFileSync)(known2, photoFile(p.id));
       engine.setPilotPhoto(p.id, Date.now().toString(36));
     } catch {
     }
   }
 }
-var OLD_DATA = (0, import_node_path5.join)(ROOT, "data", "eztimer.json");
-if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs5.existsSync)(DATA_FILE) && (0, import_node_fs5.existsSync)(OLD_DATA)) (0, import_node_fs5.renameSync)(OLD_DATA, DATA_FILE);
+var OLD_DATA = (0, import_node_path6.join)(ROOT, "data", "eztimer.json");
+if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs6.existsSync)(DATA_FILE) && (0, import_node_fs6.existsSync)(OLD_DATA)) (0, import_node_fs6.renameSync)(OLD_DATA, DATA_FILE);
 var clients = /* @__PURE__ */ new Set();
 function broadcast(type, payload) {
   const msg = `event: ${type}
@@ -2718,21 +3086,36 @@ var engine = new Engine(saved, {
   }
 });
 var store = saver(DATA_FILE, () => engine.toSaved());
-outbox = new Outbox((0, import_node_path5.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
-var snapshot = (now) => ({ ...engine.snapshot(now), outbox: { ...outbox.status(), venue: outbox.venue() } });
+var pairing = new Install((0, import_node_path6.resolve)(DATA_FILE, ".."));
+outbox = new Outbox((0, import_node_path6.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
+var snapshot = (now) => ({ ...engine.snapshot(now), outbox: { ...outbox.status(), venue: outbox.venue(), base: outbox.base(), flyday: publicInstall(pairing.state) } });
+async function helloFlyday() {
+  await pairing.hello(outbox.base(), outbox.venue(), (0, import_node_os.hostname)(), VERSION);
+  stateDirty = true;
+  await outbox.flush();
+  stateDirty = true;
+}
+void helloFlyday();
+var lastHelloTry = Date.now();
+setInterval(() => {
+  if (Date.now() - lastHelloTry >= 10 * 6e4) {
+    lastHelloTry = Date.now();
+    void helloFlyday();
+  }
+}, 6e4);
 setInterval(() => {
   void outbox.flush().then(() => {
     stateDirty = true;
   });
 }, 3e4);
 engine.resume(saved.clock, Date.now());
-for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs5.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
+for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs6.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
 restorePhotos();
 timerLink = new RotorHazardLink(engine, (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
 var webVersion = String(Date.now());
 var reloadTimer = null;
 try {
-  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs5.watch)(WEB, { recursive: true }, () => {
+  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs6.watch)(WEB, { recursive: true }, () => {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       webVersion = String(Date.now());
@@ -2940,7 +3323,7 @@ Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
         await (0, import_promises2.unlink)(file2).catch(() => {
         });
         try {
-          (0, import_node_fs5.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
+          (0, import_node_fs6.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
         } catch {
         }
         engine.setPilotPhoto(id, null);
@@ -2974,7 +3357,9 @@ Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
     }
   }
   if (path === "/api/outbox/send" && req.method === "POST") {
-    const st = await outbox.flush(true);
+    lastHelloTry = Date.now();
+    await pairing.hello(outbox.base(), outbox.venue(), (0, import_node_os.hostname)(), VERSION);
+    const st = { ...await outbox.flush(true), flyday: publicInstall(pairing.state) };
     stateDirty = true;
     return json(res, 200, { ok: true, result: st });
   }
@@ -2991,12 +3376,12 @@ Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
       return json(res, known2 ? 400 : 500, { error: known2 ? err.message : "Something went wrong on the server." });
     }
   }
-  const file = PAGES[path] ?? (0, import_node_path5.normalize)(path).replace(/^([/\\])+/, "");
-  const full = (0, import_node_path5.join)(WEB, file);
+  const file = PAGES[path] ?? (0, import_node_path6.normalize)(path).replace(/^([/\\])+/, "");
+  const full = (0, import_node_path6.join)(WEB, file);
   if (!full.startsWith(WEB)) return json(res, 404, { error: "Not found." });
   try {
     const body = await webFile(full);
-    res.writeHead(200, { "content-type": TYPES[(0, import_node_path5.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": TYPES[(0, import_node_path6.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
     res.end(body);
   } catch {
     json(res, 404, { error: "Not found." });
