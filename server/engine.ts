@@ -63,6 +63,8 @@ const NIGHT_GRACE_MS = 5 * 60_000;
 const LIGHTS_OFF_AFTER_MS = 60_000;
 /** How much brighter than the dark line it must be to count as on again. */
 const LIGHT_MARGIN = 10;
+/** Presence goes out at least this often, change or not. */
+export const PRESENCE_EVERY_MS = 15 * 60_000;
 /** No reading from the kiosk for this long: lights unknown. */
 const LIGHT_STALE_MS = 3 * 60_000;
 /** Callout wordings that earlier versions had as defaults; saved unchanged, they follow the new default. */
@@ -151,6 +153,8 @@ export class Engine {
   light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null } = { state: 'unknown', level: null, at: null, darkSince: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
   private presence: boolean | null | undefined = undefined;
+  /** When presence last went out (lightTick's clock); null before the first. */
+  private presenceAt: number | null = null;
   private nightSnoozeUntil = 0;
   clock: ClockState = {
     phase: 'stopped',
@@ -603,7 +607,11 @@ export class Engine {
     this.onChange();
   }
 
-  /** Every second: no reading for a while means nobody can tell. */
+  /**
+   * Every second: no reading for a while means nobody can tell. Presence also goes out once
+   * at start and then every PRESENCE_EVERY_MS even without a change, so Flyday can tell
+   * "nobody there" from "tgiFlyDay is off".
+   */
   lightTick(now: number) {
     const l = this.light;
     if (l.state !== 'unknown' && l.at !== null && now - l.at > LIGHT_STALE_MS) {
@@ -612,6 +620,8 @@ export class Engine {
       this.presenceNow('lights');
       this.onChange();
     }
+    if (this.presenceAt === null) this.presenceNow('start', now);
+    else if (now - this.presenceAt >= PRESENCE_EVERY_MS) this.presenceNow('heartbeat', now);
   }
 
   private lightsChanged(to: 'on' | 'off', now: number) {
@@ -635,12 +645,13 @@ export class Engine {
    * with practice stopped = no; no light reading and practice stopped = can't tell (null).
    * Sent only when it changes.
    */
-  private presenceNow(source: 'lights' | 'session') {
+  private presenceNow(source: 'lights' | 'session' | 'start' | 'heartbeat', now: number | null = null) {
     const flying = this.clock.phase !== 'stopped';
     const l = this.light.state;
     const present = l === 'on' || flying ? true : l === 'off' ? false : null;
-    if (present === this.presence) return;
+    if (present === this.presence && source !== 'heartbeat' && source !== 'start') return;
     this.presence = present;
+    if (now !== null) this.presenceAt = now;
     this.onEvent('presence', { present, source, lights: l, level: this.light.level, practice: flying });
   }
 

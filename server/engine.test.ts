@@ -1209,9 +1209,25 @@ test('presence: somebody is here with the lights on or practice running, nobody 
   e.lightReading(5, 10_000); e.lightReading(5, 80_000);
   assert.deepEqual(presence().at(-1), { present: false, source: 'lights', lights: 'off', level: 5, practice: false });
   // Kiosk stops reading: can't tell.
-  e.lightTick(80_000 + 3 * 60_000 + 1);
-  assert.equal(presence().at(-1).present, null);
-  assert.equal(presence().length, 3);
+  const t = 80_000 + 3 * 60_000 + 1;
+  e.lightTick(t);
+  // The first tick also sends where things stand (once at start), then every 15 minutes, change or not.
+  assert.deepEqual(presence().slice(2).map((d) => [d.present, d.source]), [[null, 'lights'], [null, 'start']]);
+  e.lightTick(t + 14 * 60_000);
+  assert.equal(presence().length, 4);
+  e.lightTick(t + 15 * 60_000);
+  assert.deepEqual(presence().slice(4).map((d) => [d.present, d.source]), [[null, 'heartbeat']]);
+  e.lightTick(t + 29 * 60_000);
+  assert.equal(presence().length, 5);
+  e.lightTick(t + 30 * 60_000);
+  assert.equal(presence().length, 6);
+});
+
+test('presence: sent at start even with no kiosk and practice stopped', () => {
+  const events: [string, any][] = [];
+  const e = new Engine({}, { onEvent: (t, d) => events.push([t, d]) });
+  e.lightTick(1000);
+  assert.deepEqual(events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.source, d.lights]), [[null, 'start', 'unknown']]);
 });
 
 test('lights: off while stopped asks nothing; switched off, or End of the day off, behave', () => {
