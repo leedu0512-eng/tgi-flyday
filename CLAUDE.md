@@ -45,6 +45,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - **Before every publish:** `npm test` and `node tools/smoke-test.cjs` (Playwright: clicks the kiosk's on-screen keys, the big screen flyout, change channel, Going home and the phone page like a pilot). Both must pass. Tests that type into inputs directly missed two kiosk breakages.
 - The restart cover shows a progress bar: GET /api/update/progress (stage check / download with files done of total / restart); the page creeps on to 100 % while waiting for tgiFlyDay to answer again. `TGIFLYDAY_FAKE_UPDATE=1` (dev) walks through a fake update to see it.
 - The restart item lives in the view picker (common.js `restart()`); test with TGIFLYDAY_UPDATE_API / TGIFLYDAY_UPDATE_RAW pointing at a fake server.
+- Unattended updates (main.ts `updateNow`, shared with the Restart button): nothing outside can reach the RD PC (Flyday is not on the venue network), so it updates itself: every night between 03:00 and 05:00 local (once a night), and when Flyday's hello answers `update: true` (`Install.state.updateRequested`, not saved). Both only while practice is stopped and nobody is signed in; a Flyday request waits until then.
 
 ## Timed channels
 

@@ -357,30 +357,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   if (path === '/api/update/progress' && req.method === 'GET') return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === '/api/update' && req.method === 'POST') {
     if (!IN_EXE && process.env.TGIFLYDAY_FAKE_UPDATE) return fakeUpdate(res);
-    if (!IN_EXE) return json(res, 200, { ok: true, result: { status: 'dev', version: VERSION } });
-    if (updating) return json(res, 200, { ok: true, result: { status: 'busy', version: VERSION } });
-    updating = true;
-    updateProgress = { stage: 'check', done: 0, total: 0 };
-    try {
-      const { release, commit } = await latest();
-      if (!(release.version > VERSION)) {
-        updating = false;
-        updateProgress = { stage: 'idle', done: 0, total: 0 };
-        return json(res, 200, { ok: true, result: { status: 'current', version: VERSION } });
-      }
-      console.log(`\nUpdating tgiFlyDay ${VERSION} -> ${release.version} ...`);
-      updateProgress = { stage: 'download', done: 0, total: release.files.length, to: release.version };
-      await install(ROOT, release, commit, (done, total) => { updateProgress = { stage: 'download', done, total, to: release.version }; });
-      updateProgress = { stage: 'restart', done: release.files.length, total: release.files.length, to: release.version };
-      json(res, 200, { ok: true, result: { status: 'updated', version: release.version } });
-      setTimeout(restartIntoUpdate, 400);
-      return;
-    } catch (err: any) {
-      updating = false;
-      updateProgress = { stage: 'idle', done: 0, total: 0 };
-      console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
-      return json(res, 200, { ok: true, result: { status: 'offline', version: VERSION, error: why(err) } });
-    }
+    return json(res, 200, { ok: true, result: await updateNow() });
   }
 
   // Pilot photo: a JPEG, already made small by the browser. data: null removes it.
@@ -502,6 +479,57 @@ const AFTER_UPDATE = process.argv.includes('--after-update');
 const OPEN_WINDOWS = process.platform === 'win32' && (IN_EXE || process.argv.includes('--open')) && !AFTER_UPDATE;
 let updating = false;
 let updateProgress: { stage: 'idle' | 'check' | 'download' | 'restart'; done: number; total: number; to?: string } = { stage: 'idle', done: 0, total: 0 };
+/**
+ * Look for a newer version on GitHub; install it and restart into it. The Restart button,
+ * the nightly check and a Flyday request all come here. Only versions/ next to the exe
+ * changes; data/ (pilots, photos, outbox) is never touched.
+ */
+async function updateNow(): Promise<{ status: string; version: string; error?: string }> {
+  if (!IN_EXE) return { status: 'dev', version: VERSION };
+  if (updating) return { status: 'busy', version: VERSION };
+  updating = true;
+  updateProgress = { stage: 'check', done: 0, total: 0 };
+  try {
+    const { release, commit } = await latest();
+    if (!(release.version > VERSION)) {
+      updating = false;
+      updateProgress = { stage: 'idle', done: 0, total: 0 };
+      return { status: 'current', version: VERSION };
+    }
+    console.log(`\nUpdating tgiFlyDay ${VERSION} -> ${release.version} ...`);
+    updateProgress = { stage: 'download', done: 0, total: release.files.length, to: release.version };
+    await install(ROOT, release, commit, (done, total) => { updateProgress = { stage: 'download', done, total, to: release.version }; });
+    updateProgress = { stage: 'restart', done: release.files.length, total: release.files.length, to: release.version };
+    setTimeout(restartIntoUpdate, 400);
+    return { status: 'updated', version: release.version };
+  } catch (err: any) {
+    updating = false;
+    updateProgress = { stage: 'idle', done: 0, total: 0 };
+    console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
+    return { status: 'offline', version: VERSION, error: why(err) };
+  }
+}
+
+/**
+ * Updates with nobody at the PC: every night between 03:00 and 05:00 (once a night), and
+ * whenever Flyday's hello asks for one. Only while practice is stopped and nobody is signed
+ * in, so nobody's flying is ever cut short; a Flyday request waits until then.
+ */
+let lastNightlyUpdate = '';
+setInterval(() => {
+  if (!IN_EXE || updating || engine.clock.phase !== 'stopped' || engine.pilots.size > 0) return;
+  const d = new Date();
+  const night = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  if (pairing.state.updateRequested) {
+    pairing.state.updateRequested = false;
+    console.log('Flyday asked for an update.');
+    void updateNow();
+  } else if (d.getHours() >= 3 && d.getHours() < 5 && lastNightlyUpdate !== night) {
+    lastNightlyUpdate = night;
+    void updateNow();
+  }
+}, 60_000);
+
 /** Dev only (TGIFLYDAY_FAKE_UPDATE=1): walks through an update slowly, to see the progress bar. */
 async function fakeUpdate(res: ServerResponse) {
   const pause = (ms: number) => new Promise((ok) => setTimeout(ok, ms));

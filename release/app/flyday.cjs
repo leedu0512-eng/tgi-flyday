@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.10-2154" : "dev";
+var VERSION = true ? "2026.11.10-2156" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2625,7 +2625,7 @@ var Install = class {
   save() {
     try {
       (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
-      const { helloError, ...keep } = this.state;
+      const { helloError, updateRequested, ...keep } = this.state;
       (0, import_node_fs4.writeFileSync)(this.file + ".tmp", JSON.stringify(keep, null, 2));
       (0, import_node_fs4.renameSync)(this.file + ".tmp", this.file);
     } catch {
@@ -2661,6 +2661,7 @@ var Install = class {
       }
       s.lastHello = Date.now();
       s.helloError = "";
+      if (body.update === true) s.updateRequested = true;
       if (typeof body.pairing_code === "string" && body.pairing_code.trim()) s.pairingCode = body.pairing_code.trim().slice(0, 20);
       if (body.status === "approved") {
         s.status = "approved";
@@ -3295,33 +3296,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   if (path === "/api/update/progress" && req.method === "GET") return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === "/api/update" && req.method === "POST") {
     if (!IN_EXE && process.env.TGIFLYDAY_FAKE_UPDATE) return fakeUpdate(res);
-    if (!IN_EXE) return json(res, 200, { ok: true, result: { status: "dev", version: VERSION } });
-    if (updating) return json(res, 200, { ok: true, result: { status: "busy", version: VERSION } });
-    updating = true;
-    updateProgress = { stage: "check", done: 0, total: 0 };
-    try {
-      const { release, commit } = await latest();
-      if (!(release.version > VERSION)) {
-        updating = false;
-        updateProgress = { stage: "idle", done: 0, total: 0 };
-        return json(res, 200, { ok: true, result: { status: "current", version: VERSION } });
-      }
-      console.log(`
-Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
-      updateProgress = { stage: "download", done: 0, total: release.files.length, to: release.version };
-      await install(ROOT, release, commit, (done, total) => {
-        updateProgress = { stage: "download", done, total, to: release.version };
-      });
-      updateProgress = { stage: "restart", done: release.files.length, total: release.files.length, to: release.version };
-      json(res, 200, { ok: true, result: { status: "updated", version: release.version } });
-      setTimeout(restartIntoUpdate, 400);
-      return;
-    } catch (err) {
-      updating = false;
-      updateProgress = { stage: "idle", done: 0, total: 0 };
-      console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
-      return json(res, 200, { ok: true, result: { status: "offline", version: VERSION, error: why(err) } });
-    }
+    return json(res, 200, { ok: true, result: await updateNow() });
   }
   if (path === "/api/pilot/photo" && req.method === "POST") {
     try {
@@ -3423,6 +3398,48 @@ var AFTER_UPDATE = process.argv.includes("--after-update");
 var OPEN_WINDOWS = process.platform === "win32" && (IN_EXE || process.argv.includes("--open")) && !AFTER_UPDATE;
 var updating = false;
 var updateProgress = { stage: "idle", done: 0, total: 0 };
+async function updateNow() {
+  if (!IN_EXE) return { status: "dev", version: VERSION };
+  if (updating) return { status: "busy", version: VERSION };
+  updating = true;
+  updateProgress = { stage: "check", done: 0, total: 0 };
+  try {
+    const { release, commit } = await latest();
+    if (!(release.version > VERSION)) {
+      updating = false;
+      updateProgress = { stage: "idle", done: 0, total: 0 };
+      return { status: "current", version: VERSION };
+    }
+    console.log(`
+Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
+    updateProgress = { stage: "download", done: 0, total: release.files.length, to: release.version };
+    await install(ROOT, release, commit, (done, total) => {
+      updateProgress = { stage: "download", done, total, to: release.version };
+    });
+    updateProgress = { stage: "restart", done: release.files.length, total: release.files.length, to: release.version };
+    setTimeout(restartIntoUpdate, 400);
+    return { status: "updated", version: release.version };
+  } catch (err) {
+    updating = false;
+    updateProgress = { stage: "idle", done: 0, total: 0 };
+    console.log(`Update check failed (carrying on with ${VERSION}): ${why(err)}`);
+    return { status: "offline", version: VERSION, error: why(err) };
+  }
+}
+var lastNightlyUpdate = "";
+setInterval(() => {
+  if (!IN_EXE || updating || engine.clock.phase !== "stopped" || engine.pilots.size > 0) return;
+  const d = /* @__PURE__ */ new Date();
+  const night = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  if (pairing.state.updateRequested) {
+    pairing.state.updateRequested = false;
+    console.log("Flyday asked for an update.");
+    void updateNow();
+  } else if (d.getHours() >= 3 && d.getHours() < 5 && lastNightlyUpdate !== night) {
+    lastNightlyUpdate = night;
+    void updateNow();
+  }
+}, 6e4);
 async function fakeUpdate(res) {
   const pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
   updateProgress = { stage: "check", done: 0, total: 0 };

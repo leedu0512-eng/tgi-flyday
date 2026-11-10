@@ -59,6 +59,8 @@ export interface InstallState {
   lastHello: number | null;
   /** What went wrong with the last hello, or Flyday's "try later". */
   helloError: string;
+  /** Flyday's hello said `update: true`: update once practice is stopped and nobody is signed in. Not saved. */
+  updateRequested?: boolean;
 }
 
 /** What the screens may see: no secret, no token. */
@@ -91,7 +93,7 @@ export class Install {
   save() {
     try {
       mkdirSync(dirname(this.file), { recursive: true });
-      const { helloError, ...keep } = this.state;
+      const { helloError, updateRequested, ...keep } = this.state;
       writeFileSync(this.file + '.tmp', JSON.stringify(keep, null, 2));
       renameSync(this.file + '.tmp', this.file);
     } catch {}
@@ -125,6 +127,7 @@ export class Install {
       try { body = JSON.parse(text); } catch { throw new Error('Flyday gave an answer that is not JSON'); }
       s.lastHello = Date.now();
       s.helloError = '';
+      if (body.update === true) s.updateRequested = true;
       if (typeof body.pairing_code === 'string' && body.pairing_code.trim()) s.pairingCode = body.pairing_code.trim().slice(0, 20);
       if (body.status === 'approved') {
         s.status = 'approved';
