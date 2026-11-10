@@ -1,7 +1,7 @@
-// Which version of FlyDay this is: stamped in when the exe or an update is built
+// Which version of tgiFlyDay this is: stamped in when the exe or an update is built
 // (e.g. "2026.11.05-1915"); "dev" when running from the source folder.
-declare const FLYDAY_BUILD_VERSION: string | undefined;
-export const VERSION: string = typeof FLYDAY_BUILD_VERSION === 'string' ? FLYDAY_BUILD_VERSION : 'dev';
+declare const TGIFLYDAY_BUILD_VERSION: string | undefined;
+export const VERSION: string = typeof TGIFLYDAY_BUILD_VERSION === 'string' ? TGIFLYDAY_BUILD_VERSION : 'dev';
 
 /** A version stamp for now, local time: sorts in time order as plain text. */
 export function stamp(d = new Date()): string {

@@ -6,9 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="FlyDay">
+<meta name="apple-mobile-web-app-title" content="tgiFlyDay">
 <meta name="theme-color" content="#000000">
-<title>TGI FlyDay · My heat</title>
+<title>tgiFlyDay · My heat</title>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
@@ -25,7 +25,7 @@
 <!-- Not on the venue network: this page only works at HOBIzone. -->
 <div id="away" class="me-away" hidden>
   <img src="/assets/mark.svg" alt="">
-  <h1>You have to be at HOBIzone to use FlyDay</h1>
+  <h1>You have to be at HOBIzone to use tgiFlyDay</h1>
   <p>This page works on the club Wi-Fi at the venue. Connect to it, then come back here.</p>
 </div>
 <div id="toast" class="toast"></div>
@@ -36,7 +36,7 @@
 import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark, faceOf, nightPrompt } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
-const KEY = 'flyday.me';
+const KEY = 'tgiflyday.me';
 let state = null;
 let search = '';
 let confirmLeave = false;
@@ -52,11 +52,11 @@ const store = {
 };
 // The name used last time, kept even after Going home, so next week is one tap. Also in a
 // cookie set by the RD PC: iPhones wipe a site's own storage after 7 days without a visit.
-const cookieName = () => decodeURIComponent((document.cookie.match(/(?:^|; )flyday_last=([^;]*)/) || [])[1] || '');
-let last = (() => { try { return localStorage.getItem('flyday.last') || ''; } catch { return ''; } })() || cookieName();
+const cookieName = () => decodeURIComponent((document.cookie.match(/(?:^|; )tgiflyday_last=([^;]*)/) || document.cookie.match(/(?:^|; )flyday_last=([^;]*)/) || [])[1] || '');
+let last = (() => { try { return localStorage.getItem('tgiflyday.last') || ''; } catch { return ''; } })() || cookieName();
 function remember(name) {
   last = name;
-  try { name ? localStorage.setItem('flyday.last', name) : localStorage.removeItem('flyday.last'); } catch {}
+  try { name ? localStorage.setItem('tgiflyday.last', name) : localStorage.removeItem('tgiflyday.last'); } catch {}
   post('/api/remember-me', { name }).catch(() => {});
 }
 let me = store.get();
@@ -79,7 +79,7 @@ const pilot = () => me && state?.pilots.find((p) => p.callsign.toLowerCase() ===
 function pickView() {
   const back = last && (state.pilots.find((p) => p.callsign.toLowerCase() === last.toLowerCase()) ?? null);
   const welcome = last ? `<div class="me-welcome"><span>Welcome back</span>
-      <button class="big primary" data-last>${esc(NAME(back?.callsign ?? last))}, that's me<small>${back ? 'Show my heat' : 'Sign me in: FlyDay picks my heat and channel'}</small></button></div>` : '';
+      <button class="big primary" data-last>${esc(NAME(back?.callsign ?? last))}, that's me<small>${back ? 'Show my heat' : 'Sign me in: tgiFlyDay picks my heat and channel'}</small></button></div>` : '';
   return `${welcome}<h1>${last ? 'Or' : 'Who are you?'}</h1>
     <input id="search" class="input" placeholder="Your pilot name" value="${esc(search)}" autocomplete="off" autocapitalize="words" enterkeyhint="go">
     <div id="pickRest">${pickRest()}</div>`;
@@ -94,7 +94,7 @@ function pickRest() {
         ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}${timerMark(state, seat.slot)}</span>` : '<span class="chip none">–</span>'}
         <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
       </button>`).join('') || `<p class="hint">${search ? 'Nobody by that name yet.' : 'Nobody has signed in yet.'}</p>`}</div>
-    ${search.trim() ? `<button class="big primary" data-signin>Sign in as ${esc(NAME(search.trim()))}<small>FlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
+    ${search.trim() ? `<button class="big primary" data-signin>Sign in as ${esc(NAME(search.trim()))}<small>tgiFlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
 }
 
 // ---------- my heat ----------
@@ -231,7 +231,7 @@ function goneView() {
 function notHereView() {
   return `<h1>${esc(NAME(me))}</h1>
     <p class="hint">You're not signed in today.</p>
-    <button class="big primary" data-signin-me>Sign me in<small>FlyDay picks your heat and channel</small></button>
+    <button class="big primary" data-signin-me>Sign me in<small>tgiFlyDay picks your heat and channel</small></button>
     <button class="link" data-switch>Not you?</button>`;
 }
 
@@ -321,7 +321,7 @@ $('view').addEventListener('click', async (e) => {
   }
 });
 
-// No contact with FlyDay for a few seconds (or none at all yet): not at HOBIzone.
+// No contact with tgiFlyDay for a few seconds (or none at all yet): not at HOBIzone.
 let awayTimer = setTimeout(() => { $('away').hidden = false; }, 6000);
 function contact(online) {
   clearTimeout(awayTimer);

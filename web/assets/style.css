@@ -1,4 +1,4 @@
-/* TGI FlyDay — one stylesheet for every screen. Dark by default: venues are dim
+/* tgiFlyDay — one stylesheet for every screen. Dark by default: venues are dim
    and screens are read from a distance. Fonts are bundled, so it works offline. */
 
 /* Archivo (SIL Open Font License, see fonts/OFL-Archivo.txt): variable weight and width. */
@@ -79,7 +79,7 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ---------- shared bits ---------- */
 
-/* Logo: the gate mark plus the "TGI FlyDay" wordmark. Size it with font-size. */
+/* Logo: the gate mark plus the "tgiFlyDay" wordmark. Size it with font-size. */
 .logo { display: inline-flex; align-items: center; gap: 0.4em; line-height: 1; white-space: nowrap; }
 .logo img { height: 1.45em; width: auto; display: block; }
 .logo .wm { font-weight: 900; font-style: italic; font-stretch: 125%; letter-spacing: -0.01em; }
@@ -875,7 +875,7 @@ details.more .more-body { display: grid; gap: 14px; padding-top: 10px; }
 .controls .pause-after.on { background: rgba(255,107,0,.15); border-color: var(--accent); color: var(--accent); }
 #compact:disabled { background: var(--panel-2); border-color: var(--line); color: var(--muted); cursor: not-allowed; opacity: 1; }
 
-/* Big screen: FlyDay <-> TrackDay fade out and back in (the header clock stays). */
+/* Big screen: tgiFlyDay <-> TrackDay fade out and back in (the header clock stays). */
 .pb #main, .pb #next, .pb .pb-head > :not(.wallclock) { transition: opacity .42s ease, transform .42s cubic-bezier(.4, 0, .2, 1), filter .42s ease; }
 .pb.view-leave #main, .pb.view-leave #next { opacity: 0; transform: translateY(1.2vh) scale(.985); filter: blur(6px); }
 .pb.view-leave .pb-head > :not(.wallclock) { opacity: 0; transform: translateY(-.6vh); }

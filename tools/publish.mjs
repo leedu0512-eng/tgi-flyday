@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Builds an update into release/: the server bundled into one script (release/app/flyday.cjs),
 // the pages (release/app/web/) and release/version.json listing every file with its SHA-256.
-// Commit and push release/ to GitHub and every FlyDay.exe picks it up from the restart button
+// Commit and push release/ to GitHub and every tgiFlyDay.exe picks it up from the restart button
 // (view picker → Restart · check for updates). Only the program is in there, never data/.
 //
 //   node tools/publish.mjs
@@ -14,11 +14,11 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const TOOLS = join(resolve(process.env.FLYDAY_BUILD ?? join(ROOT, 'build')), 'tools');
+const TOOLS = join(resolve(process.env.TGIFLYDAY_BUILD ?? join(ROOT, 'build')), 'tools');
 const OUT = join(ROOT, 'release');
 const p2 = (n) => String(n).padStart(2, '0');
 const now = new Date();
-const version = process.env.FLYDAY_VERSION ?? `${now.getFullYear()}.${p2(now.getMonth() + 1)}.${p2(now.getDate())}-${p2(now.getHours())}${p2(now.getMinutes())}`;
+const version = process.env.TGIFLYDAY_VERSION ?? `${now.getFullYear()}.${p2(now.getMonth() + 1)}.${p2(now.getDate())}-${p2(now.getHours())}${p2(now.getMinutes())}`;
 
 mkdirSync(TOOLS, { recursive: true });
 if (!existsSync(join(TOOLS, 'node_modules', 'esbuild'))) {
@@ -33,8 +33,8 @@ mkdirSync(join(OUT, 'app'), { recursive: true });
 esbuild.buildSync({
   entryPoints: [join(ROOT, 'server', 'main.ts')],
   bundle: true, platform: 'node', format: 'cjs', target: 'node22', outfile: join(OUT, 'app', 'flyday.cjs'),
-  banner: { js: 'const __flydayUrl = require("url").pathToFileURL(__filename).href;' },
-  define: { 'import.meta.url': '__flydayUrl', FLYDAY_BUILD_VERSION: JSON.stringify(version) },
+  banner: { js: 'const __tgiFlyDayUrl = require("url").pathToFileURL(__filename).href;' },
+  define: { 'import.meta.url': '__tgiFlyDayUrl', TGIFLYDAY_BUILD_VERSION: JSON.stringify(version) },
   logLevel: 'warning',
 });
 cpSync(join(ROOT, 'web'), join(OUT, 'app', 'web'), { recursive: true });

@@ -1,4 +1,4 @@
-// Entry point of the packaged FlyDay.exe. Named "... Kiosk.exe" (or started with --kiosk)
+// Entry point of the packaged tgiFlyDay.exe. Named "... Kiosk.exe" (or started with --kiosk)
 // it is the pilot kiosk for another PC; otherwise it is the RD PC: server plus screens.
 //
 // Updates: when app.json next to the exe points at a newer version than the one built in
@@ -18,14 +18,14 @@ const updated = installedApp(DIR);
 
 if (kiosk) runKiosk(DIR, PORT);
 else if (updated && updated.version > VERSION && !process.argv.includes('--built-in')) {
-  process.env.FLYDAY_APP_DIR = updated.path;
+  process.env.TGIFLYDAY_APP_DIR = updated.path;
   try {
     const main = join(updated.path, 'flyday.cjs');
     createRequire(main)(main);
   } catch (err) {
     // A broken update must never stop practice: fall back to the version built into the exe.
     console.error(`The update ${updated.version} failed to start, using the built-in version ${VERSION}:`, err);
-    delete process.env.FLYDAY_APP_DIR;
+    delete process.env.TGIFLYDAY_APP_DIR;
     import('./main.ts');
   }
 }

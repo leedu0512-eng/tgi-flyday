@@ -1,6 +1,6 @@
-// TGI FlyDay local server. Runs on the RD PC; every screen is a web page it serves.
+// tgiFlyDay local server. Runs on the RD PC; every screen is a web page it serves.
 // Start with:  node server/main.ts   (Node.js 22.18 or newer, no npm install needed)
-// or as the packaged FlyDay.exe (see tools/build-exe.mjs): then the pages come from inside
+// or as the packaged tgiFlyDay.exe (see tools/build-exe.mjs): then the pages come from inside
 // the exe, the data folder sits next to it, and it opens the screens itself.
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -19,11 +19,12 @@ import { RotorHazardLink } from './rotorhazard.ts';
 import { Outbox } from './outbox.ts';
 import type { AudioEvent } from './types.ts';
 
-/** Running as the packaged FlyDay.exe (a Node single executable application). */
+/** Running as the packaged tgiFlyDay.exe (a Node single executable application). */
 const IN_EXE = sea.isSea();
 const ROOT = IN_EXE ? dirname(process.execPath) : resolve(fileURLToPath(new URL('..', import.meta.url)));
 // An update running from the app/ folder (see exe.ts) serves its own pages from there.
-const APP_DIR = process.env.FLYDAY_APP_DIR;
+// Exes built before the rename to tgiFlyDay still set FLYDAY_APP_DIR.
+const APP_DIR = process.env.TGIFLYDAY_APP_DIR ?? process.env.FLYDAY_APP_DIR;
 const WEB = APP_DIR ? join(APP_DIR, 'web') : join(ROOT, 'web');
 // The exe serves the pages built into it, unless a web folder sits next to it (for trying out new pages).
 const WEB_FROM_DISK = !IN_EXE || !!APP_DIR || existsSync(join(WEB, 'console.html'));
@@ -31,7 +32,7 @@ async function webFile(full: string): Promise<Buffer> {
   if (WEB_FROM_DISK) return readFile(full);
   return Buffer.from(sea.getAsset('web/' + relative(WEB, full).split(sep).join('/')));
 }
-const DATA_FILE = process.env.FLYDAY_DATA ?? join(ROOT, 'data', 'flyday.json');
+const DATA_FILE = process.env.TGIFLYDAY_DATA ?? join(ROOT, 'data', 'flyday.json');
 const PORT = Number(process.env.PORT ?? 8080);
 /** Pilot photos live next to the data file: data/photos/<pilot id>.jpg */
 const PHOTOS = join(resolve(DATA_FILE, '..'), 'photos');
@@ -101,7 +102,7 @@ function restorePhotos() {
 
 // Data saved under the app's old name (EzTimer) carries over.
 const OLD_DATA = join(ROOT, 'data', 'eztimer.json');
-if (!process.env.FLYDAY_DATA && !existsSync(DATA_FILE) && existsSync(OLD_DATA)) renameSync(OLD_DATA, DATA_FILE);
+if (!process.env.TGIFLYDAY_DATA && !existsSync(DATA_FILE) && existsSync(OLD_DATA)) renameSync(OLD_DATA, DATA_FILE);
 
 // ---------- live updates (Server-Sent Events) ----------
 
@@ -316,7 +317,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   // those; a page's own storage is wiped after 7 days without a visit).
   if (path === '/api/remember-me' && req.method === 'POST') {
     const name = String((await readBody(req)).name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
-    res.setHeader('set-cookie', `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
+    res.setHeader('set-cookie', `tgiflyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
     return json(res, 200, { ok: true, result: null });
   }
   // RD console, Times tab: everyone's laps this session.
@@ -340,7 +341,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   // How far the update is, for the progress bar on the restart cover.
   if (path === '/api/update/progress' && req.method === 'GET') return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === '/api/update' && req.method === 'POST') {
-    if (!IN_EXE && process.env.FLYDAY_FAKE_UPDATE) return fakeUpdate(res);
+    if (!IN_EXE && process.env.TGIFLYDAY_FAKE_UPDATE) return fakeUpdate(res);
     if (!IN_EXE) return json(res, 200, { ok: true, result: { status: 'dev', version: VERSION } });
     if (updating) return json(res, 200, { ok: true, result: { status: 'busy', version: VERSION } });
     updating = true;
@@ -352,7 +353,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
         updateProgress = { stage: 'idle', done: 0, total: 0 };
         return json(res, 200, { ok: true, result: { status: 'current', version: VERSION } });
       }
-      console.log(`\nUpdating TGI FlyDay ${VERSION} -> ${release.version} ...`);
+      console.log(`\nUpdating tgiFlyDay ${VERSION} -> ${release.version} ...`);
       updateProgress = { stage: 'download', done: 0, total: release.files.length, to: release.version };
       await install(ROOT, release, commit, (done, total) => { updateProgress = { stage: 'download', done, total, to: release.version }; });
       updateProgress = { stage: 'restart', done: release.files.length, total: release.files.length, to: release.version };
@@ -484,7 +485,7 @@ const AFTER_UPDATE = process.argv.includes('--after-update');
 const OPEN_WINDOWS = process.platform === 'win32' && (IN_EXE || process.argv.includes('--open')) && !AFTER_UPDATE;
 let updating = false;
 let updateProgress: { stage: 'idle' | 'check' | 'download' | 'restart'; done: number; total: number; to?: string } = { stage: 'idle', done: 0, total: 0 };
-/** Dev only (FLYDAY_FAKE_UPDATE=1): walks through an update slowly, to see the progress bar. */
+/** Dev only (TGIFLYDAY_FAKE_UPDATE=1): walks through an update slowly, to see the progress bar. */
 async function fakeUpdate(res: ServerResponse) {
   const pause = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
   updateProgress = { stage: 'check', done: 0, total: 0 };
@@ -497,7 +498,7 @@ async function fakeUpdate(res: ServerResponse) {
 }
 /** Windows Firewall: do phones and the kiosk get in? Checked at start (null: can't tell). */
 let firewall: FirewallStatus | null = null;
-/** Save, start the updated FlyDay, and step aside (it waits for the port). */
+/** Save, start the updated tgiFlyDay, and step aside (it waits for the port). */
 function restartIntoUpdate() {
   store.now();
   relaunch(['--after-update']);
@@ -505,14 +506,14 @@ function restartIntoUpdate() {
   setTimeout(() => process.exit(0), 300);
 }
 let listenTries = 0;
-if (IN_EXE) process.title = 'TGI FlyDay server: keep this window open (minimised is fine)';
+if (IN_EXE) process.title = 'tgiFlyDay server: keep this window open (minimised is fine)';
 
 server.on('error', (err: any) => {
   if (err?.code !== 'EADDRINUSE') throw err;
-  // Just updated: the old FlyDay is still letting go of the port. Try again shortly.
+  // Just updated: the old tgiFlyDay is still letting go of the port. Try again shortly.
   if (AFTER_UPDATE && listenTries++ < 40) { setTimeout(() => server.listen(PORT, '0.0.0.0'), 500); return; }
-  // FlyDay is already running on this PC: just bring up fresh windows for it.
-  console.log(`\nTGI FlyDay is already running on this PC (port ${PORT} is in use).`);
+  // tgiFlyDay is already running on this PC: just bring up fresh windows for it.
+  console.log(`\ntgiFlyDay is already running on this PC (port ${PORT} is in use).`);
   if (OPEN_WINDOWS) { console.log('Opening its windows...'); closeOldWindows(); openRdWindows(PORT); }
   setTimeout(() => process.exit(0), 4000);
 });
@@ -528,7 +529,7 @@ server.listen(PORT, '0.0.0.0', () => {
   // Old update folders: keep only the one running now (and nothing older).
   if (IN_EXE) setTimeout(() => tidy(ROOT, [VERSION]), 10_000);
   const lan = lanAddresses();
-  console.log(`\nTGI FlyDay ${VERSION} is running.${AFTER_UPDATE ? ' (just updated)' : ''}\n`);
+  console.log(`\ntgiFlyDay ${VERSION} is running.${AFTER_UPDATE ? ' (just updated)' : ''}\n`);
   console.log(`  RD console      http://localhost:${PORT}/console`);
   console.log(`  Spectator view  http://localhost:${PORT}/screen`);
   console.log(`  Pilot kiosk     http://localhost:${PORT}/kiosk`);

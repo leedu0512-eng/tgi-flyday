@@ -1,4 +1,4 @@
-// Windows helpers for the packaged FlyDay.exe: open the screens in Edge (what start.bat does
+// Windows helpers for the packaged tgiFlyDay.exe: open the screens in Edge (what start.bat does
 // for the folder version), keep the server window out of the way, and the kiosk mode.
 // PowerShell snippets run with -EncodedCommand, so no quoting can go wrong.
 
@@ -39,7 +39,7 @@ function edge(args: string[]) {
   child.unref();
 }
 
-/** Close FlyDay's Edge windows that are still open, politely first so Edge doesn't bring them back. */
+/** Close tgiFlyDay's Edge windows that are still open, politely first so Edge doesn't bring them back. */
 export function closeOldWindows() {
   ps(`$w = Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*TGI-FlyDay*' }
 foreach ($x in $w) { $p = Get-Process -Id $x.ProcessId -ErrorAction SilentlyContinue; if ($p -and $p.MainWindowHandle -ne 0) { [void]$p.CloseMainWindow() } }
@@ -59,20 +59,20 @@ export function tameConsole() {
 [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr w, int c);
 '@
-$k = Add-Type -MemberDefinition $sig -Name FlyDayConsole -Namespace W -PassThru
+$k = Add-Type -MemberDefinition $sig -Name tgiFlyDayConsole -Namespace W -PassThru
 $h = $k::GetStdHandle(-10); $m = 0
 if ($k::GetConsoleMode($h, [ref]$m)) { [void]$k::SetConsoleMode($h, (($m -band (-bnot 0x40)) -bor 0x80)) }
 [void]$k::ShowWindow($k::GetConsoleWindow(), 6)`, true);
 }
 
 /**
- * Windows: keep the PC and its screens awake while FlyDay runs (no sleep, no screen off).
- * A hidden PowerShell holds the request and lets go by itself when FlyDay exits.
+ * Windows: keep the PC and its screens awake while tgiFlyDay runs (no sleep, no screen off).
+ * A hidden PowerShell holds the request and lets go by itself when tgiFlyDay exits.
  */
 export function keepAwake() {
   if (process.platform !== 'win32') return;
   const script = `$sig = '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
-$k = Add-Type -MemberDefinition $sig -Name FlyDayAwake -Namespace W -PassThru
+$k = Add-Type -MemberDefinition $sig -Name tgiFlyDayAwake -Namespace W -PassThru
 # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
 while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) {
   [void]$k::SetThreadExecutionState([uint32]2147483651)
@@ -98,8 +98,8 @@ function psAsync(script: string, timeout = 30_000): Promise<string> {
 export interface FirewallStatus { ok: boolean; network: string; reason: string }
 
 /**
- * Windows Firewall: can phones and the kiosk reach FlyDay on this network? (Dismissing
- * Windows' own "allow access" question quietly adds a rule that blocks FlyDay.)
+ * Windows Firewall: can phones and the kiosk reach tgiFlyDay on this network? (Dismissing
+ * Windows' own "allow access" question quietly adds a rule that blocks tgiFlyDay.)
  * null = can't tell (not Windows, or PowerShell didn't answer).
  */
 export async function firewallStatus(): Promise<FirewallStatus | null> {
@@ -119,22 +119,22 @@ $block = @($rules | Where-Object { $_.Action -eq 'Block' -and (& $hit $_) }).Cou
   if (!m) return null;
   const [, network, on, allow, block] = m;
   if (on === 'False') return { ok: true, network, reason: 'firewall off' };
-  if (Number(block) > 0) return { ok: false, network, reason: 'a firewall rule blocks FlyDay' };
-  if (Number(allow) === 0) return { ok: false, network, reason: 'no firewall rule lets FlyDay in' };
+  if (Number(block) > 0) return { ok: false, network, reason: 'a firewall rule blocks tgiFlyDay' };
+  if (Number(allow) === 0) return { ok: false, network, reason: 'no firewall rule lets tgiFlyDay in' };
   return { ok: true, network, reason: 'allowed' };
 }
 
 /**
  * Let phones and the kiosk in: one Windows permission prompt, then a firewall rule that
- * allows FlyDay (and removes rules that block it). True when the prompt was accepted.
+ * allows tgiFlyDay (and removes rules that block it). True when the prompt was accepted.
  */
 export async function firewallAllow(): Promise<boolean> {
   if (process.platform !== 'win32') return false;
   const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
   const inner = `$exe = ${q(process.execPath)}
 Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Action -eq 'Block' } | Remove-NetFirewallRule
-Get-NetFirewallRule -DisplayName 'TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-New-NetFirewallRule -DisplayName 'TGI FlyDay' -Description 'Phones and the pilot kiosk reach TGI FlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
+Get-NetFirewallRule -DisplayName 'tgiFlyDay','TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName 'tgiFlyDay' -Description 'Phones and the pilot kiosk reach tgiFlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
   const encoded = Buffer.from(inner, 'utf16le').toString('base64');
   const out = await psAsync(`try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; 'yes' } catch { 'no' }`, 120_000);
   return out.endsWith('yes');
@@ -184,16 +184,16 @@ function reachable(host: string, port: number): Promise<boolean> {
 
 /**
  * Kiosk PC: asks once for the RD PC's name (remembered in kiosk.json next to the exe),
- * waits until FlyDay answers there, then opens the kiosk full screen.
+ * waits until tgiFlyDay answers there, then opens the kiosk full screen.
  */
 export async function runKiosk(dir: string, port: number) {
-  process.title = 'TGI FlyDay kiosk';
+  process.title = 'tgiFlyDay kiosk';
   const file = join(dir, 'kiosk.json');
   let rd = '';
   try { rd = JSON.parse(readFileSync(file, 'utf8')).rdPc ?? ''; } catch {}
   if (!rd || process.argv.includes('--setup')) {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
-    console.log('\nTGI FlyDay kiosk\n');
+    console.log('\ntgiFlyDay kiosk\n');
     console.log("Type the RD PC's name (the RD console shows it under \"Kiosk on another PC\"), or its address, e.g. 192.168.1.10");
     rd = (await rl.question('RD PC: ')).trim();
     rl.close();
@@ -201,7 +201,7 @@ export async function runKiosk(dir: string, port: number) {
     writeFileSync(file, JSON.stringify({ rdPc: rd }, null, 2));
     console.log(`Saved. To change it later, delete kiosk.json next to this program.`);
   }
-  console.log(`\nWaiting for TGI FlyDay on ${rd} ...`);
+  console.log(`\nWaiting for tgiFlyDay on ${rd} ...`);
   while (!(await reachable(rd, port))) await new Promise((r) => setTimeout(r, 3000));
   closeOldWindows();
   // The webcam (pilot photos) works on this http page only when Edge is told it's fine.

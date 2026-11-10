@@ -1,5 +1,5 @@
 @echo off
-rem Builds dist\FlyDay.exe from this folder: one program with Node.js, the server and every
+rem Builds dist\tgiFlyDay.exe from this folder: one program with Node.js, the server and every
 rem page inside. Copy it to any Windows PC and double-click; nothing to install there.
 rem Needs Node.js (and internet, for the build tools) on THIS PC only.
 
@@ -11,8 +11,8 @@ if errorlevel 1 (
   exit /b 1
 )
 rem Build tools and work files stay off Dropbox.
-set FLYDAY_BUILD=%LOCALAPPDATA%\TGI-FlyDay\build
+set TGIFLYDAY_BUILD=%LOCALAPPDATA%\TGI-FlyDay\build
 node tools\build-exe.mjs
 echo.
-echo FlyDay.exe is in the dist folder.
+echo tgiFlyDay.exe is in the dist folder.
 pause

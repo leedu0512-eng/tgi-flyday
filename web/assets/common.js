@@ -1,8 +1,17 @@
-// Shared by every TGI FlyDay screen: live connection, clock, formatting, sound.
+// Shared by every tgiFlyDay screen: live connection, clock, formatting, sound.
 
 let offset = 0; // server clock minus this device's clock
 
 /** Server time in ms, corrected for this device's clock. */
+// Settings saved before the rename to tgiFlyDay (keys "flyday.…") carry over once.
+try {
+  for (const store of [localStorage, sessionStorage]) {
+    for (const k of Object.keys(store)) {
+      if (k.startsWith('flyday.') && store.getItem('tgi' + k) === null) store.setItem('tgi' + k, store.getItem(k));
+    }
+  }
+} catch {}
+
 export const now = () => Date.now() + offset;
 
 /**
@@ -264,7 +273,7 @@ const store = {
  * speed, volume, beep style) comes from the server's settings via apply().
  */
 export class Sound {
-  constructor(key = 'flyday.sound', defaultOn = false) {
+  constructor(key = 'tgiflyday.sound', defaultOn = false) {
     this.key = key;
     this.defaultOn = defaultOn;
     this.ctx = null;
@@ -438,7 +447,7 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
     e.stopPropagation();
     if (box.classList.toggle('open')) {
       timer = setTimeout(close, 6000);
-      fetch('/api/info').then((r) => r.json()).then((i) => { box.querySelector('.vp-version').textContent = `TGI FlyDay ${i.version ?? ''}`; }).catch(() => {});
+      fetch('/api/info').then((r) => r.json()).then((i) => { box.querySelector('.vp-version').textContent = `tgiFlyDay ${i.version ?? ''}`; }).catch(() => {});
     } else clearTimeout(timer);
   });
   box.querySelector('.vp-restart').addEventListener('click', (e) => { e.stopPropagation(); close(); restart(); });
@@ -449,7 +458,7 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
 })();
 
 /**
- * Restart: FlyDay on the RD PC looks for a newer version on GitHub. If there is one it
+ * Restart: tgiFlyDay on the RD PC looks for a newer version on GitHub. If there is one it
  * installs it and restarts (every screen reloads by itself once it's back); if not, or
  * without internet, this page just reloads. Pilots, photos and settings are never touched.
  */
@@ -492,9 +501,9 @@ async function restart() {
   following = false;
   if (r?.status === 'updated') {
     say(`Updating to ${r.version}`, 'Back in a few seconds.');
-    bar(85, 'Restarting FlyDay');
-    // Wait until FlyDay answers again (creeping on towards 98 %), then fill up and reload.
-    const creep = setInterval(() => bar(shown + (98 - shown) * 0.08, 'Restarting FlyDay'), 250);
+    bar(85, 'Restarting tgiFlyDay');
+    // Wait until tgiFlyDay answers again (creeping on towards 98 %), then fill up and reload.
+    const creep = setInterval(() => bar(shown + (98 - shown) * 0.08, 'Restarting tgiFlyDay'), 250);
     await new Promise((ok) => setTimeout(ok, 3000));
     for (let i = 0; i < 60; i++) {
       try { if ((await fetch('/api/info', { cache: 'no-store' })).ok) break; } catch {}
@@ -510,7 +519,7 @@ async function restart() {
   else bar(100, 'Restarting');
   say(r?.status === 'offline' ? 'No update' : 'Restarting', r?.status === 'current' ? `Up to date (${r.version}).`
     : r?.status === 'offline' ? `No update installed: ${r.error || 'no answer from GitHub'}`
-    : r ? '' : 'FlyDay on the RD PC did not answer.');
+    : r ? '' : 'tgiFlyDay on the RD PC did not answer.');
   setTimeout(() => location.reload(), r?.status === 'offline' ? 6000 : 1200);
 }
 

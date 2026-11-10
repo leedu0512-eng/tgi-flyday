@@ -1,4 +1,4 @@
-const __flydayUrl = require("url").pathToFileURL(__filename).href;
+const __tgiFlyDayUrl = require("url").pathToFileURL(__filename).href;
 "use strict";
 var __create = Object.create;
 var __defProp = Object.defineProperty;
@@ -78,7 +78,7 @@ function tameConsole() {
 [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr w, int c);
 '@
-$k = Add-Type -MemberDefinition $sig -Name FlyDayConsole -Namespace W -PassThru
+$k = Add-Type -MemberDefinition $sig -Name tgiFlyDayConsole -Namespace W -PassThru
 $h = $k::GetStdHandle(-10); $m = 0
 if ($k::GetConsoleMode($h, [ref]$m)) { [void]$k::SetConsoleMode($h, (($m -band (-bnot 0x40)) -bor 0x80)) }
 [void]$k::ShowWindow($k::GetConsoleWindow(), 6)`, true);
@@ -86,7 +86,7 @@ if ($k::GetConsoleMode($h, [ref]$m)) { [void]$k::SetConsoleMode($h, (($m -band (
 function keepAwake() {
   if (process.platform !== "win32") return;
   const script = `$sig = '[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);'
-$k = Add-Type -MemberDefinition $sig -Name FlyDayAwake -Namespace W -PassThru
+$k = Add-Type -MemberDefinition $sig -Name tgiFlyDayAwake -Namespace W -PassThru
 # ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
 while (Get-Process -Id ${process.pid} -ErrorAction SilentlyContinue) {
   [void]$k::SetThreadExecutionState([uint32]2147483651)
@@ -133,8 +133,8 @@ $block = @($rules | Where-Object { $_.Action -eq 'Block' -and (& $hit $_) }).Cou
   if (!m) return null;
   const [, network, on, allow, block] = m;
   if (on === "False") return { ok: true, network, reason: "firewall off" };
-  if (Number(block) > 0) return { ok: false, network, reason: "a firewall rule blocks FlyDay" };
-  if (Number(allow) === 0) return { ok: false, network, reason: "no firewall rule lets FlyDay in" };
+  if (Number(block) > 0) return { ok: false, network, reason: "a firewall rule blocks tgiFlyDay" };
+  if (Number(allow) === 0) return { ok: false, network, reason: "no firewall rule lets tgiFlyDay in" };
   return { ok: true, network, reason: "allowed" };
 }
 async function firewallAllow() {
@@ -142,8 +142,8 @@ async function firewallAllow() {
   const q = (x) => `'${x.replace(/'/g, "''")}'`;
   const inner = `$exe = ${q(process.execPath)}
 Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Action -eq 'Block' } | Remove-NetFirewallRule
-Get-NetFirewallRule -DisplayName 'TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-New-NetFirewallRule -DisplayName 'TGI FlyDay' -Description 'Phones and the pilot kiosk reach TGI FlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
+Get-NetFirewallRule -DisplayName 'tgiFlyDay','TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+New-NetFirewallRule -DisplayName 'tgiFlyDay' -Description 'Phones and the pilot kiosk reach tgiFlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
   const encoded = Buffer.from(inner, "utf16le").toString("base64");
   const out = await psAsync(`try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; 'yes' } catch { 'no' }`, 12e4);
   return out.endsWith("yes");
@@ -176,9 +176,9 @@ var import_node_crypto = require("node:crypto");
 var import_node_fs2 = require("node:fs");
 var import_node_path2 = require("node:path");
 var tls = __toESM(require("node:tls"), 1);
-var REPO = process.env.FLYDAY_REPO ?? "leedu0512-eng/tgi-flyday";
-var API = process.env.FLYDAY_UPDATE_API ?? `https://api.github.com/repos/${REPO}`;
-var RAW = process.env.FLYDAY_UPDATE_RAW ?? `https://raw.githubusercontent.com/${REPO}`;
+var REPO = process.env.TGIFLYDAY_REPO ?? "leedu0512-eng/tgi-flyday";
+var API = process.env.TGIFLYDAY_UPDATE_API ?? `https://api.github.com/repos/${REPO}`;
+var RAW = process.env.TGIFLYDAY_UPDATE_RAW ?? `https://raw.githubusercontent.com/${REPO}`;
 var systemCertsAdded = false;
 function trustSystemCerts() {
   if (systemCertsAdded) return;
@@ -199,7 +199,7 @@ function why(err) {
 async function get(url, accept) {
   trustSystemCerts();
   const res = await fetch(url, {
-    headers: { Accept: accept, "User-Agent": "TGI-FlyDay-updater" },
+    headers: { Accept: accept, "User-Agent": "tgiFlyDay-updater" },
     signal: AbortSignal.timeout(2e4)
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.10-1947" : "dev";
+var VERSION = true ? "2026.11.10-1959" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2617,15 +2617,15 @@ var Outbox = class {
 
 // server/main.ts
 var IN_EXE = sea.isSea();
-var ROOT = IN_EXE ? (0, import_node_path5.dirname)(process.execPath) : (0, import_node_path5.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __flydayUrl)));
-var APP_DIR = process.env.FLYDAY_APP_DIR;
+var ROOT = IN_EXE ? (0, import_node_path5.dirname)(process.execPath) : (0, import_node_path5.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
+var APP_DIR = process.env.TGIFLYDAY_APP_DIR ?? process.env.FLYDAY_APP_DIR;
 var WEB = APP_DIR ? (0, import_node_path5.join)(APP_DIR, "web") : (0, import_node_path5.join)(ROOT, "web");
 var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs5.existsSync)((0, import_node_path5.join)(WEB, "console.html"));
 async function webFile(full) {
   if (WEB_FROM_DISK) return (0, import_promises2.readFile)(full);
   return Buffer.from(sea.getAsset("web/" + (0, import_node_path5.relative)(WEB, full).split(import_node_path5.sep).join("/")));
 }
-var DATA_FILE = process.env.FLYDAY_DATA ?? (0, import_node_path5.join)(ROOT, "data", "flyday.json");
+var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path5.join)(ROOT, "data", "flyday.json");
 var PORT = Number(process.env.PORT ?? 8080);
 var PHOTOS = (0, import_node_path5.join)((0, import_node_path5.resolve)(DATA_FILE, ".."), "photos");
 var photoFile = (id) => {
@@ -2685,7 +2685,7 @@ function restorePhotos() {
   }
 }
 var OLD_DATA = (0, import_node_path5.join)(ROOT, "data", "eztimer.json");
-if (!process.env.FLYDAY_DATA && !(0, import_node_fs5.existsSync)(DATA_FILE) && (0, import_node_fs5.existsSync)(OLD_DATA)) (0, import_node_fs5.renameSync)(OLD_DATA, DATA_FILE);
+if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs5.existsSync)(DATA_FILE) && (0, import_node_fs5.existsSync)(OLD_DATA)) (0, import_node_fs5.renameSync)(OLD_DATA, DATA_FILE);
 var clients = /* @__PURE__ */ new Set();
 function broadcast(type, payload) {
   const msg = `event: ${type}
@@ -2884,7 +2884,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   if (path === "/api/state" && req.method === "GET") return json(res, 200, snapshot(Date.now()));
   if (path === "/api/remember-me" && req.method === "POST") {
     const name = String((await readBody(req)).name ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
-    res.setHeader("set-cookie", `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
+    res.setHeader("set-cookie", `tgiflyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
     return json(res, 200, { ok: true, result: null });
   }
   if (path === "/api/times" && req.method === "GET") return json(res, 200, engine.timesReport());
@@ -2901,7 +2901,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   }
   if (path === "/api/update/progress" && req.method === "GET") return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === "/api/update" && req.method === "POST") {
-    if (!IN_EXE && process.env.FLYDAY_FAKE_UPDATE) return fakeUpdate(res);
+    if (!IN_EXE && process.env.TGIFLYDAY_FAKE_UPDATE) return fakeUpdate(res);
     if (!IN_EXE) return json(res, 200, { ok: true, result: { status: "dev", version: VERSION } });
     if (updating) return json(res, 200, { ok: true, result: { status: "busy", version: VERSION } });
     updating = true;
@@ -2914,7 +2914,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
         return json(res, 200, { ok: true, result: { status: "current", version: VERSION } });
       }
       console.log(`
-Updating TGI FlyDay ${VERSION} -> ${release.version} ...`);
+Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
       updateProgress = { stage: "download", done: 0, total: release.files.length, to: release.version };
       await install(ROOT, release, commit, (done, total) => {
         updateProgress = { stage: "download", done, total, to: release.version };
@@ -3051,7 +3051,7 @@ function restartIntoUpdate() {
   setTimeout(() => process.exit(0), 300);
 }
 var listenTries = 0;
-if (IN_EXE) process.title = "TGI FlyDay server: keep this window open (minimised is fine)";
+if (IN_EXE) process.title = "tgiFlyDay server: keep this window open (minimised is fine)";
 server.on("error", (err) => {
   if (err?.code !== "EADDRINUSE") throw err;
   if (AFTER_UPDATE && listenTries++ < 40) {
@@ -3059,7 +3059,7 @@ server.on("error", (err) => {
     return;
   }
   console.log(`
-TGI FlyDay is already running on this PC (port ${PORT} is in use).`);
+tgiFlyDay is already running on this PC (port ${PORT} is in use).`);
   if (OPEN_WINDOWS) {
     console.log("Opening its windows...");
     closeOldWindows();
@@ -3083,7 +3083,7 @@ server.listen(PORT, "0.0.0.0", () => {
   if (IN_EXE) setTimeout(() => tidy(ROOT, [VERSION]), 1e4);
   const lan = lanAddresses();
   console.log(`
-TGI FlyDay ${VERSION} is running.${AFTER_UPDATE ? " (just updated)" : ""}
+tgiFlyDay ${VERSION} is running.${AFTER_UPDATE ? " (just updated)" : ""}
 `);
   console.log(`  RD console      http://localhost:${PORT}/console`);
   console.log(`  Spectator view  http://localhost:${PORT}/screen`);

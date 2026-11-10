@@ -1,9 +1,9 @@
 {
- "version": "2026.11.10-1947",
+ "version": "2026.11.10-1959",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "43e3d7e51694328c39d9bbc73bad5725e0e522b0513c21f5e72c9a6fc740b53e"
+   "sha256": "67743915481ef785723efd2b2e98b1af7a08c7a3ba41f16b077d74dcc529c558"
   },
   {
    "path": "web/assets/avatars.js",
@@ -11,7 +11,7 @@
   },
   {
    "path": "web/assets/common.js",
-   "sha256": "8753a24890242f1fcb00fc0e960bfaac4a78a3670984b3acbaea4158a66a8613"
+   "sha256": "d0cc72250d49c27ae3c36c60704e20732d7ff6f9fce8a4ef9e7a447963e7184b"
   },
   {
    "path": "web/assets/favicon.svg",
@@ -75,7 +75,7 @@
   },
   {
    "path": "web/assets/icons/me.webmanifest",
-   "sha256": "6b09446d1c6a1f4edfb9b148e443574ad887d9c6e81fa94892782449b49e64eb"
+   "sha256": "84c0ef7c6297af37da54e8b69629a6e8c69fe52aefe661df1e64645561e8866f"
   },
   {
    "path": "web/assets/mark-car-small.svg",
@@ -87,43 +87,43 @@
   },
   {
    "path": "web/assets/mark-small.svg",
-   "sha256": "071d4b6f186f21ffbc7316609dc00ee0810f94f948be548859035e189e4ed908"
+   "sha256": "edf0b97eccec9ff010bb4cfc1dee732d77944de4486779f0b02f255c52fda185"
   },
   {
    "path": "web/assets/mark.svg",
-   "sha256": "9f903208668dd866ad800d2ab10d5907b260a87f0cf8bcfc79c7ec2fe6373c56"
+   "sha256": "cd8945d807e75ef5f7d65005ba37ff86319327f165c8b11e89b227bb74a38c82"
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "fc626f63b075741136c8cf8acd65b3de0936ba21f1962e6f1be90275977822e2"
+   "sha256": "4b2adce48fc8964afdae6a594fe9f36f19578e5136f8850ddbdbc0a023922cde"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
-   "sha256": "193d0531c24706c13cf7a300ad63e56d7487fec185170db38c414bfda5822862"
+   "sha256": "f446eab32eee7a5c8785053deef37da013ce8478b1484e0dcc8ae45e0509750a"
   },
   {
    "path": "web/console.html",
-   "sha256": "f91947c72976c56ee8bbb4687da67d229ecb0db828b01e78976f617cef1b8bf0"
+   "sha256": "b3b2f7a1eec4549a2e2d505cc3c2c03320c74868de35479c331f3f41365249a0"
   },
   {
    "path": "web/index.html",
-   "sha256": "7e90ef6d48883fba384a33ed6797bda71d44fa60dc82da7b073655b0b340d7b6"
+   "sha256": "a052276185befbca9331ff6931f08a78a5afa602b4860cae8be04fa6aaa2702f"
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "79f6d3a7bc85a804a6f39b320d7496b1f49f4d8950cebb32c8b6928d444cc04f"
+   "sha256": "a72533a1c050454b139de84d1a1b5fd6c9024bc8871d23030015905413d64fea"
   },
   {
    "path": "web/me.html",
-   "sha256": "8b7005bcd1469301320f7565038f316d7e58505713094a7abc7c59e3dc6df50d"
+   "sha256": "89575e87af9a48664fe71d6ec21ff3e5de464fecd8a141789eaf16573b552488"
   },
   {
    "path": "web/mobile.html",
-   "sha256": "8a4e26e34c9c024d2c235473663b6645a621dc25e104d726ff850ec093736ac9"
+   "sha256": "4839de0e3eba464cab07a2de76fe05a2b514e302fa5ff7c6405b087f2c3b35ba"
   },
   {
    "path": "web/screen.html",
-   "sha256": "6160fbaf88ec7b5d972034fe09df26ae2c5eb12aa967e161866a5f482b460997"
+   "sha256": "24bfb36145b55eaca9112137803a0130e1879a9c24321e24e1b343682e370911"
   }
  ]
 }

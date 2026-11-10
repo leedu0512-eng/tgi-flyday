@@ -1211,7 +1211,7 @@ test('lights: off while stopped asks nothing; switched off, or End of the day of
   assert.equal(e.light.state, 'unknown');
   assert.throws(() => e.setConfig({ lights: { dark: 0 } as any }), /between 1 and 200/);
   assert.throws(() => e.setConfig({ cloud: { url: 'http://x.ee' } as any }), /https/);
-  e.setConfig({ cloud: { url: 'https://abc.supabase.co/rest/v1/flyday_events', key: 'secret', venue: 'HOBIzone' } as any });
+  e.setConfig({ cloud: { url: 'https://abc.supabase.co/rest/v1/tgiflyday_events', key: 'secret', venue: 'HOBIzone' } as any });
   const snap = e.snapshot(0) as any;
   assert.equal(snap.config.cloud.key, '', 'the key stays on the RD PC');
   assert.equal(snap.config.cloud.keySet, true);

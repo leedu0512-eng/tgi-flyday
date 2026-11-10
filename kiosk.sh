@@ -1,12 +1,12 @@
 #!/bin/bash
-# TGI FlyDay pilot kiosk on a Linux PC (with a webcam for pilot photos).
+# tgiFlyDay pilot kiosk on a Linux PC (with a webcam for pilot photos).
 #
 # Set the RD PC's address below: the RD console shows it under "Kiosk on another PC".
 # Use the number (e.g. 192.168.1.10); Windows PC names often don't work from Linux.
 # Then run:  bash kiosk.sh      (close the kiosk with Alt+F4; running it again restarts it)
 #
 # Browsers only let a page use the camera over https or when told it's fine, so this starts
-# Chromium/Chrome (or Firefox) with its own profile that trusts FlyDay's page and allows
+# Chromium/Chrome (or Firefox) with its own profile that trusts tgiFlyDay's page and allows
 # the camera without asking.
 RDPC=192.168.1.10
 PORT=8080
@@ -42,11 +42,11 @@ fi
 # Don't let the PC go idle or sleep while the kiosk browser is open (systemd).
 INHIBIT=""
 # Only if this PC allows it: otherwise the kiosk still starts, just without the sleep block.
-if command -v systemd-inhibit >/dev/null 2>&1 && systemd-inhibit --what=idle:sleep --who=TGI-FlyDay --why=Kiosk --mode=block true >/dev/null 2>&1; then
-  INHIBIT="systemd-inhibit --what=idle:sleep --who=TGI-FlyDay --why=Kiosk --mode=block"
+if command -v systemd-inhibit >/dev/null 2>&1 && systemd-inhibit --what=idle:sleep --who=tgiFlyDay --why=Kiosk --mode=block true >/dev/null 2>&1; then
+  INHIBIT="systemd-inhibit --what=idle:sleep --who=tgiFlyDay --why=Kiosk --mode=block"
 fi
 
-echo "Waiting for TGI FlyDay on $RDPC ..."
+echo "Waiting for tgiFlyDay on $RDPC ..."
 until (exec 3<>"/dev/tcp/$RDPC/$PORT") 2>/dev/null; do sleep 3; done
 
 if [ -n "$BROWSER" ]; then

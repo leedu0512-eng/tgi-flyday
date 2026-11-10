@@ -1,10 +1,10 @@
-# TGI FlyDay
+# tgiFlyDay
 
 Race and practice management for FPV drone racing, built for EDRL.
 
 This first version (the MVP) runs a **practice session with no timer and no video**: an unattended heat loop with a pilot kiosk, voice callouts and start/stop tones. The LapRF, OBS and live.edrl.ee come next, on top of this.
 
-The look (logo, colours, Archivo type) follows the TGI FlyDay identity; the font ships in `web/assets/fonts` so everything works offline.
+The look (logo, colours, Archivo type) follows the tgiFlyDay identity; the font ships in `web/assets/fonts` so everything works offline.
 
 ## Run it
 
@@ -14,7 +14,7 @@ The look (logo, colours, Archivo type) follows the TGI FlyDay identity; the font
    - the **spectator view**: full screen on the second monitor if there is one, otherwise as a normal window
 3. Open the kiosk on the kiosk touchscreen (see below).
 
-Running **start.bat** again is a clean restart: it first closes FlyDay's windows and the old server, so you never end up with two of each. (The session carries on.)
+Running **start.bat** again is a clean restart: it first closes tgiFlyDay's windows and the old server, so you never end up with two of each. (The session carries on.)
 
 The first time, Windows Firewall may ask about Node.js. Allow it on **private networks**, or the kiosk can't connect.
 
@@ -22,14 +22,14 @@ Close a full-screen window with **Alt+F4**. On the spectator view the mouse hide
 
 To start the server by hand instead: `npm start` (or `node server/main.ts`) in this folder.
 
-## FlyDay.exe: one file, nothing to install
+## tgiFlyDay.exe: one file, nothing to install
 
-**FlyDay.exe** is the whole app in one program: Node.js, the server, every screen, font and icon. Copy it to any Windows PC and double-click.
+**tgiFlyDay.exe** is the whole app in one program: Node.js, the server, every screen, font and icon. Copy it to any Windows PC and double-click.
 
-- **On the RD PC:** it starts the server, closes any FlyDay windows still open, and opens the RD console and the spectator view (full screen on a second monitor). Pilots, heats and settings are kept in a **data** folder next to the exe, so keep the exe in a folder of its own. A small server window stays open, minimised: closing it stops FlyDay. Double-clicking the exe again while it runs just reopens the windows.
-- **On the kiosk PC:** use a copy named **FlyDay Kiosk.exe**. The first time it asks for the RD PC's name (the console shows it under "Kiosk on another PC") and remembers it in kiosk.json. Then it waits until the RD PC answers and opens the kiosk full screen.
+- **On the RD PC:** it starts the server, closes any tgiFlyDay windows still open, and opens the RD console and the spectator view (full screen on a second monitor). Pilots, heats and settings are kept in a **data** folder next to the exe, so keep the exe in a folder of its own. A small server window stays open, minimised: closing it stops tgiFlyDay. Double-clicking the exe again while it runs just reopens the windows.
+- **On the kiosk PC:** use a copy named **tgiFlyDay Kiosk.exe**. The first time it asks for the RD PC's name (the console shows it under "Kiosk on another PC") and remembers it in kiosk.json. Then it waits until the RD PC answers and opens the kiosk full screen.
 - **Windows SmartScreen** may say it "protected your PC" the first time, because the exe isn't signed. Click **More info**, then **Run anyway**. Windows Firewall may ask about it too: allow **private networks**, or the kiosk can't connect.
-- **Updating:** run **build-exe.bat** in this folder (needs Node.js on this PC only) to make a fresh dist\FlyDay.exe, then replace the old exe. The data folder stays. To try new pages without rebuilding, put a **web** folder next to the exe: it then uses that instead of the pages inside it.
+- **Updating:** run **build-exe.bat** in this folder (needs Node.js on this PC only) to make a fresh dist\tgiFlyDay.exe, then replace the old exe. The data folder stays. To try new pages without rebuilding, put a **web** folder next to the exe: it then uses that instead of the pages inside it.
 
 The folder version (start.bat) keeps working as before, with screens updating by themselves when files change.
 
@@ -54,7 +54,7 @@ The kiosk PC needs only Microsoft Edge: no Node.js, no app folder.
 1. Connect the kiosk PC to the same wired network as the RD PC (same switch or router).
 2. On the **RD PC**, allow Node.js through Windows Firewall when asked. If the network is marked **Public**, either switch it to **Private** (Settings, Network, your connection) or allow Node.js on public networks too; otherwise the kiosk can't reach it.
 3. Copy **kiosk.bat** to the kiosk PC. Open it in Notepad and set `RDPC=` to the RD PC's name, shown in the RD console under **Kiosk on another PC**.
-4. Double-click kiosk.bat. It waits until the RD PC is running TGI FlyDay, then opens the kiosk full screen. Put it in the kiosk PC's Startup folder (Win+R, `shell:startup`) to start automatically.
+4. Double-click kiosk.bat. It waits until the RD PC is running tgiFlyDay, then opens the kiosk full screen. Put it in the kiosk PC's Startup folder (Win+R, `shell:startup`) to start automatically.
 
 If the PC name doesn't work on your network, use the RD PC's address from the same panel instead. Addresses can change when the router restarts; the name does not, or you can give the RD PC a fixed address in the router settings.
 
@@ -91,14 +91,14 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 
 **Look.** Black, bright orange and white (the HOBIzone colours), with a pit-board spectator screen: big stencil planks for the heat and the clock, white race plates for the line-up, and the next heat on the orange board. Fonts are bundled, so it works offline.
 
-**Starts by itself.** The first pilot to sign in while practice is stopped starts it, straight into free flight ("Practice is on. Free flight in heat 1…"). When a second heat forms, FlyDay says so: how many heats there are now, free flight is over, which heat is up next. After **Stop** it stays stopped until the next new sign-in. Switch it off in the console: **Start by itself**.
+**Starts by itself.** The first pilot to sign in while practice is stopped starts it, straight into free flight ("Practice is on. Free flight in heat 1…"). When a second heat forms, tgiFlyDay says so: how many heats there are now, free flight is over, which heat is up next. After **Stop** it stays stopped until the next new sign-in. Switch it off in the console: **Start by itself**.
 
-**Pilots' phones (`/me`).** A QR code on the kiosk's "you're in" screen opens the pilot's own page, already as them; a small QR code in the big screen's header opens it too ("Who are you?": tap your name, or type it to sign in). It shows your heat and channel, whether you're flying, up next, arming, or how many heats away, who's in your heat, a **Take your photo** button (the phone's own camera) and **Going home**. Lap times will show here once the timer is in. Phones must be on a network that reaches the RD PC: a Wi-Fi access point on the venue's wired network. **Add to Home Screen** gives a FlyDay app icon.
+**Pilots' phones (`/me`).** A QR code on the kiosk's "you're in" screen opens the pilot's own page, already as them; a small QR code in the big screen's header opens it too ("Who are you?": tap your name, or type it to sign in). It shows your heat and channel, whether you're flying, up next, arming, or how many heats away, who's in your heat, a **Take your photo** button (the phone's own camera) and **Going home**. Lap times will show here once the timer is in. Phones must be on a network that reaches the RD PC: a Wi-Fi access point on the venue's wired network. **Add to Home Screen** gives a tgiFlyDay app icon.
 
-**Stays awake.** While FlyDay runs, the RD PC doesn't sleep or switch its screens off. The console, big screen and kiosk pages also keep their screen on (phones don't, to save batteries). On the Linux kiosk, kiosk.sh switches off screen blanking and, where the PC allows it, blocks sleep while the kiosk is open.
+**Stays awake.** While tgiFlyDay runs, the RD PC doesn't sleep or switch its screens off. The console, big screen and kiosk pages also keep their screen on (phones don't, to save batteries). On the Linux kiosk, kiosk.sh switches off screen blanking and, where the PC allows it, blocks sleep while the kiosk is open.
 
 **Kiosk.** Three buttons: **Fly today**, **Change channel**, **Going home**.
-- *Fly today:* type your name, that's all. FlyDay puts you in the first heat to fly that has a free seat, on your usual channel (the one you flew last time) when that heat has it free, and adds a new heat when every heat is full. The screen says your heat, your channel and how many heats are before yours.
+- *Fly today:* type your name, that's all. tgiFlyDay puts you in the first heat to fly that has a free seat, on your usual channel (the one you flew last time) when that heat has it free, and adds a new heat when every heat is full. The screen says your heat, your channel and how many heats are before yours.
 - *Change channel:* tap your name, then a free slot on the heat board (your current seat is outlined).
 - *Going home:* tap your name; you're off the session and the Pilots list (your photo and usual channel are remembered, in `data/photos/known/` and `data/known.json`).
 
@@ -110,7 +110,7 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 
 **Pilots.** The **Pilots** button in the console opens a panel with every pilot: who they are and where they fly. Type a name and press Enter: the pilot goes straight into a heat (a new heat is added if all are full). Every pilot has a **Remove** button; if you hit the wrong one, press **Undo** in the message that appears. Click a pilot to change their callsign, spoken name or photo, or take them out of their heat. Pilots who join at the kiosk appear here by themselves; if every heat was full they sign in without a heat, and the Pilots button shows an orange "without a heat" count. Those get a tick box: tick who's here and press **Put ticked in heats**, or tick who has left and press **Gone home** (off the list, like Going home at the kiosk; **Undo** brings them back). They're spread evenly over as few heats as everyone needs (7 pilots in 6-pilot heats fly 4 and 3, not 6 and 1); pilots sharing a quad go on its channel in separate heats. If there's no room, new heats are added at the end of the loop, even while the session is running.
 
-**Club quads.** For pilots without their own quad. At the kiosk they tap **I don't have my own quad** under their name and get the first free club quad that isn't broken, on that quad's channel. When every working one is taken, the one with the fewest pilots is shared, each pilot in a different heat. FlyDay remembers who flew a club quad and ticks it for them next time. Set them up on the RD console's Club quads page (the quad icon in the top bar): add as many as you have, up to 8, each with a name and its fixed channel. **Broken** moves its pilots to another club quad straight away, and the voice tells them to check the big screen. Pilots see their club quad, and who shares it, on their phone page. Club-quad pilots fly the quad's channel, so their channel can't be changed by hand (greyed out on the heat board and at the kiosk's Change channel). To put one in another heat, drag the orange quad mark on the heat board: they keep the quad's channel there. They also move when you change the quad's channel, mark it Broken, or drag them to another club quad on the Club quads page (or onto "own quad").
+**Club quads.** For pilots without their own quad. At the kiosk they tap **I don't have my own quad** under their name and get the first free club quad that isn't broken, on that quad's channel. When every working one is taken, the one with the fewest pilots is shared, each pilot in a different heat. tgiFlyDay remembers who flew a club quad and ticks it for them next time. Set them up on the RD console's Club quads page (the quad icon in the top bar): add as many as you have, up to 8, each with a name and its fixed channel. **Broken** moves its pilots to another club quad straight away, and the voice tells them to check the big screen. Pilots see their club quad, and who shares it, on their phone page. Club-quad pilots fly the quad's channel, so their channel can't be changed by hand (greyed out on the heat board and at the kiosk's Change channel). To put one in another heat, drag the orange quad mark on the heat board: they keep the quad's channel there. They also move when you change the quad's channel, mark it Broken, or drag them to another club quad on the Club quads page (or onto "own quad").
 
 **Drag and drop (RD console).** On the heat board, drag a pilot by the dotted handle onto another slot: an empty slot moves them there, another pilot swaps the two. On the Club quads page, drag a pilot onto another club quad.
 
@@ -129,18 +129,18 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 
 ## Updates
 
-FlyDay updates itself from GitHub (github.com/leedu0512-eng/tgi-flyday): no USB stick.
+tgiFlyDay updates itself from GitHub (github.com/leedu0512-eng/tgi-flyday): no USB stick.
 
-- **To update:** open the faint view picker (bottom-right corner of the console, big screen or kiosk) and tap **↻ Restart · check for updates**. FlyDay on the RD PC checks GitHub; if there's a newer version it downloads it (a few hundred KB: the program and pages, not the whole exe), restarts itself, and every screen reloads by itself. Up to date, or no internet: the page just reloads. The menu shows the version that's running.
-- **What is replaced:** only the `app` folder next to FlyDay.exe. The `data` folder (pilots, photos, usual channels, settings) is never touched and never goes to GitHub.
-- **If an update ever fails to start,** FlyDay.exe falls back to the version built into it. Deleting the `app` folder does the same.
+- **To update:** open the faint view picker (bottom-right corner of the console, big screen or kiosk) and tap **↻ Restart · check for updates**. tgiFlyDay on the RD PC checks GitHub; if there's a newer version it downloads it (a few hundred KB: the program and pages, not the whole exe), restarts itself, and every screen reloads by itself. Up to date, or no internet: the page just reloads. The menu shows the version that's running.
+- **What is replaced:** only the `app` folder next to tgiFlyDay.exe. The `data` folder (pilots, photos, usual channels, settings) is never touched and never goes to GitHub.
+- **If an update ever fails to start,** tgiFlyDay.exe falls back to the version built into it. Deleting the `app` folder does the same.
 - **Publishing an update (developer):** `node tools/publish.mjs` builds `release/`; commit and push it. The RD PC needs internet when the button is pressed.
 
 ## If screens lose connection
 
 Screens reconnect by themselves within a few seconds; a red bar shows while they are trying. If they stay disconnected:
 
-- Check the **TGI FlyDay server** window (minimised in the taskbar) is still open. If it shows text selected, press **Esc**: clicking inside that window pauses it.
+- Check the **tgiFlyDay server** window (minimised in the taskbar) is still open. If it shows text selected, press **Esc**: clicking inside that window pauses it.
 - If the window is gone, run `start.bat` again.
 - Stop the PC from sleeping during practice (Windows Settings → System → Power).
 
@@ -170,7 +170,7 @@ The full spec is in the "EDRL Race System — Spec" doc.
 
 ## Room lights
 
-The kiosk's webcam also works as a light meter: every 20 seconds it tells the RD PC how bright the picture is, nothing else. No pictures are kept or sent. If the lights go off while practice is on, FlyDay asks "Still flying?" straight away; with no answer in 5 minutes practice ends and starts clean for next time. Lights back on, or laps coming in, cancel the question. In the console, Session setup → More shows the current reading and sets the **dark** line: if the room still counts as "on" with the lights off, raise it a step.
+The kiosk's webcam also works as a light meter: every 20 seconds it tells the RD PC how bright the picture is, nothing else. No pictures are kept or sent. If the lights go off while practice is on, tgiFlyDay asks "Still flying?" straight away; with no answer in 5 minutes practice ends and starts clean for next time. Lights back on, or laps coming in, cancel the question. In the console, Session setup → More shows the current reading and sets the **dark** line: if the room still counts as "on" with the lights off, raise it a step.
 
 ## Online history
 

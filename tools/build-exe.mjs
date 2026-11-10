@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Builds dist/FlyDay.exe: one Windows program with Node.js, the server and every page,
+// Builds dist/tgiFlyDay.exe: one Windows program with Node.js, the server and every page,
 // font and icon inside. Nothing to install on the PC that runs it.
 //
 //   node tools/build-exe.mjs           Windows exe (can be built on Windows, Linux or macOS)
@@ -18,16 +18,16 @@ import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-// FLYDAY_BUILD / FLYDAY_DIST move the work and output folders (e.g. off a synced drive).
-const BUILD = resolve(process.env.FLYDAY_BUILD ?? join(ROOT, 'build'));
+// TGIFLYDAY_BUILD / TGIFLYDAY_DIST move the work and output folders (e.g. off a synced drive).
+const BUILD = resolve(process.env.TGIFLYDAY_BUILD ?? join(ROOT, 'build'));
 const TOOLS = join(BUILD, 'tools');
-const DIST = resolve(process.env.FLYDAY_DIST ?? join(ROOT, 'dist'));
+const DIST = resolve(process.env.TGIFLYDAY_DIST ?? join(ROOT, 'dist'));
 const linux = process.argv.includes('--linux');
 const version = process.version.slice(1);
-// FlyDay's own version stamp (sorts in time order), also what updates compare against.
+// tgiFlyDay's own version stamp (sorts in time order), also what updates compare against.
 const p2 = (n) => String(n).padStart(2, '0');
 const now = new Date();
-const appVersion = process.env.FLYDAY_VERSION ?? `${now.getFullYear()}.${p2(now.getMonth() + 1)}.${p2(now.getDate())}-${p2(now.getHours())}${p2(now.getMinutes())}`;
+const appVersion = process.env.TGIFLYDAY_VERSION ?? `${now.getFullYear()}.${p2(now.getMonth() + 1)}.${p2(now.getDate())}-${p2(now.getHours())}${p2(now.getMinutes())}`;
 const step = (m) => console.log(`\n> ${m}`);
 
 mkdirSync(TOOLS, { recursive: true });
@@ -47,8 +47,8 @@ need('esbuild').buildSync({
   entryPoints: [join(ROOT, 'server', 'exe.ts')],
   bundle: true, platform: 'node', format: 'cjs', target: 'node22', outfile: bundle,
   // Outside the exe the bundle still finds its folder (import.meta has no meaning in CommonJS).
-  banner: { js: 'const __flydayUrl = require("url").pathToFileURL(__filename).href;' },
-  define: { 'import.meta.url': '__flydayUrl', FLYDAY_BUILD_VERSION: JSON.stringify(appVersion) },
+  banner: { js: 'const __tgiFlyDayUrl = require("url").pathToFileURL(__filename).href;' },
+  define: { 'import.meta.url': '__tgiFlyDayUrl', TGIFLYDAY_BUILD_VERSION: JSON.stringify(appVersion) },
   logLevel: 'warning',
 });
 
@@ -73,7 +73,7 @@ writeFileSync(config, JSON.stringify({
 execFileSync(process.execPath, ['--experimental-sea-config', config], { stdio: 'inherit' });
 
 step('Put it all into one program');
-const out = join(DIST, linux ? 'flyday' : 'FlyDay.exe');
+const out = join(DIST, linux ? 'tgiflyday' : 'tgiFlyDay.exe');
 const inject = () => need('postject').inject(out, 'NODE_SEA_BLOB', readFileSync(blob), {
   sentinelFuse: 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2',
   overwrite: true,
@@ -91,15 +91,15 @@ if (linux) {
   const ResEdit = need('resedit');
   const exe = ResEdit.NtExecutable.from(readFileSync(out), { ignoreCert: true });
   const res = ResEdit.NtExecutableResource.from(exe);
-  const icon = ResEdit.Data.IconFile.from(readFileSync(join(ROOT, 'tools', 'flyday.ico')));
+  const icon = ResEdit.Data.IconFile.from(readFileSync(join(ROOT, 'tools', 'tgiflyday.ico')));
   ResEdit.Resource.IconGroupEntry.replaceIconsForResource(res.entries, 1, 1033, icon.icons.map((i) => i.data));
   const [vi] = ResEdit.Resource.VersionInfo.fromEntries(res.entries);
   if (vi) {
     const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
     const v = String(pkg.version ?? '0.1.0').split('.').map(Number);
     vi.setStringValues({ lang: 1033, codepage: 1200 }, {
-      ProductName: 'TGI FlyDay', FileDescription: 'TGI FlyDay practice manager', CompanyName: 'HOBIzone',
-      OriginalFilename: 'FlyDay.exe', InternalName: 'FlyDay', LegalCopyright: 'TGI FlyDay contributors',
+      ProductName: 'tgiFlyDay', FileDescription: 'tgiFlyDay practice manager', CompanyName: 'HOBIzone',
+      OriginalFilename: 'tgiFlyDay.exe', InternalName: 'tgiFlyDay', LegalCopyright: 'tgiFlyDay contributors',
     });
     vi.removeStringValue({ lang: 1033, codepage: 1200 }, 'ProductVersion');
     vi.setFileVersion(v[0] || 0, v[1] || 0, v[2] || 0, 0, 1033);

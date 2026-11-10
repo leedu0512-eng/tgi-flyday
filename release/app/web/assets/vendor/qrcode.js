@@ -2296,5 +2296,5 @@ var qrcode = function() {
     return qrcode;
 }));
 
-// TGI FlyDay: loaded as an ES module.
+// tgiFlyDay: loaded as an ES module.
 export default qrcode;

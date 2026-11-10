@@ -1,4 +1,4 @@
-// Shared types for the TGI FlyDay server.
+// Shared types for the tgiFlyDay server.
 
 /** The session setup a clean start restores. */
 export interface SessionDefaults {

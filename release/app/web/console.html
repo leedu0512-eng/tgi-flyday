@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TGI FlyDay · RD console</title>
+<title>tgiFlyDay · RD console</title>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-<div class="offline-banner">Lost connection to the TGI FlyDay server. Reconnecting…</div>
+<div class="offline-banner">Lost connection to the tgiFlyDay server. Reconnecting…</div>
 <div class="console">
   <div class="topbar">
     <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
@@ -83,7 +83,7 @@
           <summary><h2>Online history</h2> <span id="outboxSum" class="muted"></span></summary>
           <div class="more-body outbox">
             <p class="hint">Practice start and end, every timed heat with its laps, and lights on and off are kept on this PC and sent online when an address is set, so pilots can look at their times at home. With no internet, they wait and go later.</p>
-            <div class="field"><label for="oUrl">Send to (https address)</label><input id="oUrl" class="input" placeholder="https://….supabase.co/rest/v1/flyday_events" autocomplete="off"></div>
+            <div class="field"><label for="oUrl">Send to (https address)</label><input id="oUrl" class="input" placeholder="https://….supabase.co/rest/v1/tgiflyday_events" autocomplete="off"></div>
             <div class="field"><label for="oKey">Key</label><input id="oKey" class="input" type="password" autocomplete="new-password"></div>
             <div class="field"><label for="oVenue">This place</label><input id="oVenue" class="input" placeholder="HOBIzone" autocomplete="off"></div>
             <label class="toggle"><input type="checkbox" id="oOn"><span><b>Send</b> (off: only keep them here)</span></label>
@@ -169,7 +169,7 @@
       <div class="field"><label for="tPass">Admin password</label><input id="tPass" class="input" type="password" autocomplete="new-password"></div>
     </div>
     <div><button id="tSave" class="btn primary">Save and connect</button></div>
-    <p class="hint">The timer's defaults are admin / rotorhazard. Give it a fixed address on the router so this never changes. FlyDay keeps trying to reconnect by itself, and practice carries on without laps if the timer drops out.</p>
+    <p class="hint">The timer's defaults are admin / rotorhazard. Give it a fixed address on the router so this never changes. tgiFlyDay keeps trying to reconnect by itself, and practice carries on without laps if the timer drops out.</p>
   </section>
   <section class="drawer-sec">
     <h3>On every gate pass</h3>
@@ -196,7 +196,7 @@
 <section id="clubView" class="card drawer view" hidden aria-label="Club quads">
   <div class="drawer-head"><h2>Club quads</h2></div>
   <section class="drawer-sec">
-    <p class="hint">For pilots without their own quad. At the kiosk they tap <b>I don't have my own quad</b> and get the first free club quad that isn't broken, on its channel. When every working one is taken, the one with the fewest pilots is shared: each of them flies a different heat, on that quad's channel. FlyDay remembers who flew a club quad and offers it again next time.</p>
+    <p class="hint">For pilots without their own quad. At the kiosk they tap <b>I don't have my own quad</b> and get the first free club quad that isn't broken, on its channel. When every working one is taken, the one with the fewest pilots is shared: each of them flies a different heat, on that quad's channel. tgiFlyDay remembers who flew a club quad and offers it again next time.</p>
     <div id="clubList" class="club-list"></div>
     <div><button id="clubAdd" class="btn small">+ Add a club quad</button></div>
     <p class="hint">Marking a quad <b>Broken</b> moves its pilots to another club quad straight away, and the voice tells them to check the big screen. Up to 8 club quads.</p>
@@ -216,7 +216,7 @@
   <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
   <section class="drawer-sec">
     <h3>What it will do</h3>
-    <p>Listens to the 5.8 GHz band and shows which channels are noisy, so FlyDay can steer pilots away from them when it hands out channels.</p>
+    <p>Listens to the 5.8 GHz band and shows which channels are noisy, so tgiFlyDay can steer pilots away from them when it hands out channels.</p>
     <p class="hint">Not built yet. It runs on the Waveshare ESP32-C5 with a receiver module, cabled to this PC. Its settings (which port, how often it scans) will live on this page.</p>
   </section>
 </section>
@@ -238,7 +238,7 @@ setInterval(() => {
 
 const $ = (id) => document.getElementById(id);
 // The RD console is the screen that plays callouts and tones (on by default).
-const sound = new Sound('flyday.sound', true);
+const sound = new Sound('tgiflyday.sound', true);
 setInterval(() => renderSound(), 1000);
 let state = null;
 
@@ -1168,7 +1168,7 @@ async function showInfo(info) {
   const url = (path) => `http://${host}:${info.port}${path}`;
   const fw = info.firewall;
   let open = $('screensMore')?.open;
-  if (open == null) { try { open = !!localStorage.getItem('flyday.more.screensMore'); } catch { open = false; } }
+  if (open == null) { try { open = !!localStorage.getItem('tgiflyday.more.screensMore'); } catch { open = false; } }
   const qrs = await Promise.all(SCREENS.map(([path]) => qrFor(url(path))));
   $('kioskInfo').innerHTML = `
     ${fw && !fw.ok ? `<div class="fw-warn"><b>Phones and the kiosk can't reach this PC.</b>
@@ -1204,9 +1204,9 @@ fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {});
 document.addEventListener('toggle', (e) => {
   const d = e.target;
   if (!(d instanceof HTMLDetailsElement) || !d.id || !d.classList.contains('more')) return;
-  try { localStorage.setItem(`flyday.more.${d.id}`, d.open ? '1' : ''); } catch {}
+  try { localStorage.setItem(`tgiflyday.more.${d.id}`, d.open ? '1' : ''); } catch {}
 }, true);
-try { for (const id of ['setupMore', 'outboxMore']) if (localStorage.getItem(`flyday.more.${id}`)) $(id).open = true; } catch {}
+try { for (const id of ['setupMore', 'outboxMore']) if (localStorage.getItem(`tgiflyday.more.${id}`)) $(id).open = true; } catch {}
 // The firewall check takes a few seconds after start: look again.
 setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TGI FlyDay · Pilot kiosk</title>
+<title>tgiFlyDay · Pilot kiosk</title>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/style.css">
 </head>
@@ -60,7 +60,7 @@ function go(v) {
   if (v !== 'camera') stopCamera();
   if (EMBED && v === 'home' && view !== 'home') {
     stopCamera();
-    parent.postMessage({ flyday: 'kiosk-done' }, location.origin);
+    parent.postMessage({ tgiflyday: 'kiosk-done' }, location.origin);
   }
   view = v;
   render();
@@ -315,7 +315,7 @@ async function startCamera() {
       : err?.name === 'NotReadableError' ? 'The webcam is in use by another program.'
       : 'The webcam could not be started.';
     stopCamera();
-    console.warn('TGI FlyDay kiosk: no photo,', camError);
+    console.warn('tgiFlyDay kiosk: no photo,', camError);
     if (view === 'camera') { if (me?.photo) go('isyou'); else finish(); }
   }
 }
@@ -405,7 +405,7 @@ function refreshSuggestions() {
 }
 
 let busy = false;
-/** Fly today: the name is all it takes. FlyDay picks the heat and the channel. */
+/** Fly today: the name is all it takes. tgiFlyDay picks the heat and the channel. */
 async function toSlots() {
   name = name.replace(/\s+/g, ' ').trim();
   if (!name) return toast('Type your pilot name first.');

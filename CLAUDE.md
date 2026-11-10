@@ -1,4 +1,4 @@
-# TGI FlyDay: notes for Claude Code
+# tgiFlyDay: notes for Claude Code
 
 Race and practice management for FPV drone racing (EDRL, Estonia). It replaces LiveTime and LiveFPV. The full spec lives in the "EDRL Race System — Spec" doc (https://claude.ai/artifact/5KhyU3nUmv4cqyBRqt8pGv); ask the user for anything it doesn't cover.
 
@@ -25,7 +25,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 ## Identity
 
-- Name: TGI FlyDay. Never spell out "TGI" anywhere in the app or docs; the abbreviation carries the joke. Mark: a race gate that is also a calendar page, a quad flying through (`web/assets/mark.svg`; `mark-small.svg` for small sizes; `favicon.svg`).
+- Name: **tgiFlyDay**, one word, in notes, code, files, tokens and messages. **Flyday** is the HOBIzone server (Ubuntu + Docker, PocketBase), never the app: don't call the app FlyDay. Kept from before the rename because installed PCs depend on them: `flyday.cjs` (what exes load from an update), `data/flyday.json`, the Edge profile folder `%LOCALAPPDATA%\\TGI-FlyDay` (and the `*TGI-FlyDay*` window match), `tgi-flyday-kiosk` (Linux kiosk profile), the repo `tgi-flyday`; `FLYDAY_APP_DIR` (set by older exes), the `flyday_last` cookie and `flyday.*` storage keys are still read. Never spell out "TGI" anywhere in the app or docs; the abbreviation carries the joke. Mark: a race gate that is also a calendar page, a quad flying through (`web/assets/mark.svg`; `mark-small.svg` for small sizes; `favicon.svg`).
 - Colours (HOBIzone): black #000000 ground, panels #111111 / #1A1A1A, bright orange #FF6B00 accent, white #FFFFFF, muted #9A9A9A. Phases: changeover orange, arm #FF3B30, flying / free flight #22C55E. Pilot slots follow FAI LED order.
 - Type (all bundled in `web/assets/fonts`, OFL): Big Shoulders Stencil for clocks, the wordmark and big board words; Big Shoulders Display for labels, headings and names; Archivo for body text and forms. Spectator screen is a pit board (planks, white race plates, orange next-heat board, chequered strip).
 - Logo markup: `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>`, sized with font-size.
@@ -34,17 +34,17 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 - `data/photos/<pilot id>.jpg` is the live photo; `data/photos/known/<base64url of lowercased callsign>.jpg` remembers it by name (main.ts: rememberPhoto / restorePhotos). After every API call, pilots without a photo whose name is remembered get it back, so `/api/join` and `/api/pilot/add` already answer with `photo` set. Deleting a pilot keeps the remembered copy; removing a photo deletes both.
 - Kiosk photo step (kiosk.html): after joining or signing in, "Is this you?" for a remembered photo, else the webcam (getUserMedia, whole landscape frame, zoomed fully out where the camera allows, 1280 px). No camera or no permission: skipped silently.
-- getUserMedia needs a secure context, and the kiosk is plain http on the LAN: kiosk.sh (Linux) and kiosk.bat / FlyDay Kiosk.exe (Windows) start the browser with `--unsafely-treat-insecure-origin-as-secure=<RD URL>` and `--use-fake-ui-for-media-stream` (Firefox: insecure media prefs in user.js).
+- getUserMedia needs a secure context, and the kiosk is plain http on the LAN: kiosk.sh (Linux) and kiosk.bat / tgiFlyDay Kiosk.exe (Windows) start the browser with `--unsafely-treat-insecure-origin-as-secure=<RD URL>` and `--use-fake-ui-for-media-stream` (Firefox: insecure media prefs in user.js).
 
 ## Updates (GitHub)
 
-- Repo: github.com/leedu0512-eng/tgi-flyday (public). `release/` holds the published update: `release/app/flyday.cjs` (server bundled from main.ts, version stamped via the `FLYDAY_BUILD_VERSION` define) + `release/app/web/` + `release/version.json` (version, files with sha256). Build it with `node tools/publish.mjs`, then commit and push.
+- Repo: github.com/leedu0512-eng/tgi-flyday (public). `release/` holds the published update: `release/app/flyday.cjs` (server bundled from main.ts, version stamped via the `TGIFLYDAY_BUILD_VERSION` define) + `release/app/web/` + `release/version.json` (version, files with sha256). Build it with `node tools/publish.mjs`, then commit and push.
 - Version stamps are `YYYY.MM.DD-HHMM` (local time), compared as plain strings. server/version.ts.
 - Installed updates live in `versions/<version>/` next to the exe; `app.json` points at the newest (a legacy `app/` folder is still read). exe.ts runs its `flyday.cjs` (createRequire) when newer than the built-in version; on any error it falls back to the built-in main.ts. `--built-in` forces the built-in one. Nothing in use is ever renamed: Windows refuses (that broke the first scheme). No fs.watch on an installed update's pages for the same reason. Old version folders are tidied 10 s after start.
 - POST /api/update (server/update.ts): latest commit via the GitHub API (falls back to `main` when rate-limited), then every file from raw.githubusercontent.com at that commit, sha256-checked, into versions/<v>, then app.json. Then relaunch with `--after-update` (no new windows; waits for the port) and exit. data/ is never touched. Node also trusts the OS certificate store (antivirus HTTPS inspection). Errors are reported with their cause (`why()`), shown on the restart cover.
 - **Before every publish:** `npm test` and `node tools/smoke-test.cjs` (Playwright: clicks the kiosk's on-screen keys, the big screen flyout, change channel, Going home and the phone page like a pilot). Both must pass. Tests that type into inputs directly missed two kiosk breakages.
-- The restart cover shows a progress bar: GET /api/update/progress (stage check / download with files done of total / restart); the page creeps on to 100 % while waiting for FlyDay to answer again. `FLYDAY_FAKE_UPDATE=1` (dev) walks through a fake update to see it.
-- The restart item lives in the view picker (common.js `restart()`); test with FLYDAY_UPDATE_API / FLYDAY_UPDATE_RAW pointing at a fake server.
+- The restart cover shows a progress bar: GET /api/update/progress (stage check / download with files done of total / restart); the page creeps on to 100 % while waiting for tgiFlyDay to answer again. `TGIFLYDAY_FAKE_UPDATE=1` (dev) walks through a fake update to see it.
+- The restart item lives in the view picker (common.js `restart()`); test with TGIFLYDAY_UPDATE_API / TGIFLYDAY_UPDATE_RAW pointing at a fake server.
 
 ## Timed channels
 
@@ -90,9 +90,9 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 ## TrackDay (RC cars)
 
 - The big screen has a second view (tap the logo): **TGI TrackDay** (mark: the calendar page with an RC buggy, mark-car.svg / mark-car-small.svg), for the RC car days in the arena. The clock stays (time of day when no drone practice runs), the plates make way for QR cards (`CARDS` in screen.html) on one panel that flips in 3D: pay for the track day (15 EUR, Montonio link) for 30 s, then join the club (hobizone.org/liitu, "Track days for free ;)") for 15 s. The panel element is kept across renders (`placeCard`), so a flip is never cut short. The header's drone bits (Sign in, the phone QR, Practice) never show in TrackDay.
-- Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over, pause) switches TrackDay back to the FlyDay view (`backToWork` in screen.html). Stopped or waiting: TrackDay stays.
+- Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over, pause) switches TrackDay back to the tgiFlyDay view (`backToWork` in screen.html). Stopped or waiting: TrackDay stays.
 - Views never jump: `setView` fades the board, the panel and the header extras out (blur, settle), swaps while hidden, fades back in (`.view-leave`, 0.42 s each way). The header clock stays put.
-- Switches to TrackDay by itself every Wednesday, Saturday and Sunday at 09:00 local time, once a day (tapping back to FlyDay that day sticks). The view is remembered per screen (localStorage).
+- Switches to TrackDay by itself every Wednesday, Saturday and Sunday at 09:00 local time, once a day (tapping back to tgiFlyDay that day sticks). The view is remembered per screen (localStorage).
 
 ## Clean start
 

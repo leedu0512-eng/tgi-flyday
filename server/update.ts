@@ -8,10 +8,10 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { dirname, join } from 'node:path';
 import * as tls from 'node:tls';
 
-export const REPO = process.env.FLYDAY_REPO ?? 'leedu0512-eng/tgi-flyday';
-// FLYDAY_UPDATE_API / FLYDAY_UPDATE_RAW point somewhere else, for testing.
-const API = process.env.FLYDAY_UPDATE_API ?? `https://api.github.com/repos/${REPO}`;
-const RAW = process.env.FLYDAY_UPDATE_RAW ?? `https://raw.githubusercontent.com/${REPO}`;
+export const REPO = process.env.TGIFLYDAY_REPO ?? 'leedu0512-eng/tgi-flyday';
+// TGIFLYDAY_UPDATE_API / TGIFLYDAY_UPDATE_RAW point somewhere else, for testing.
+const API = process.env.TGIFLYDAY_UPDATE_API ?? `https://api.github.com/repos/${REPO}`;
+const RAW = process.env.TGIFLYDAY_UPDATE_RAW ?? `https://raw.githubusercontent.com/${REPO}`;
 
 // Trust what the PC trusts too: antivirus or company networks often inspect secure web
 // traffic with their own certificate, which Windows knows but Node's built-in list doesn't.
@@ -39,7 +39,7 @@ export interface Release { version: string; files: { path: string; sha256: strin
 async function get(url: string, accept: string): Promise<Buffer> {
   trustSystemCerts();
   const res = await fetch(url, {
-    headers: { Accept: accept, 'User-Agent': 'TGI-FlyDay-updater' },
+    headers: { Accept: accept, 'User-Agent': 'tgiFlyDay-updater' },
     signal: AbortSignal.timeout(20_000),
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);

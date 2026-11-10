@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TGI FlyDay · Spectator view</title>
+<title>tgiFlyDay · Spectator view</title>
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/assets/style.css">
 <style>body.idle { cursor: none; }</style>
@@ -72,7 +72,7 @@ function plates(heat, pm) {
 // ---------- TrackDay view: the clock and a QR code (tap the logo to switch) ----------
 // The RC car days: the screen says TGI TrackDay and shows how to pay for the track day.
 // It switches to it by itself every Wednesday, Saturday and Sunday at 09:00 (once a day,
-// so tapping back to FlyDay that day sticks).
+// so tapping back to tgiFlyDay that day sticks).
 
 /**
  * QR cards for the second view, taking turns on one panel that flips in 3D: paying for the
@@ -82,10 +82,10 @@ const CARDS = [
   { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', secs: 30 },
   { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', secs: 15, cls: 'join' },
 ];
-let view = (() => { try { return localStorage.getItem('flyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
+let view = (() => { try { return localStorage.getItem('tgiflyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
 const cardQr = new Map();
 /**
- * Switch between FlyDay and TrackDay with a transition, never a jump: the board, the panel
+ * Switch between tgiFlyDay and TrackDay with a transition, never a jump: the board, the panel
  * and the header's logo and extras fade and settle out, the view changes while they're
  * hidden, then they come back in. The clock in the header stays put.
  */
@@ -93,7 +93,7 @@ const VIEW_FADE_MS = 420;
 let switching = false;
 function setView(v) {
   if (v === view || switching) return;
-  try { localStorage.setItem('flyday.screen.view', v); } catch {}
+  try { localStorage.setItem('tgiflyday.screen.view', v); } catch {}
   switching = true;
   $('screen').classList.add('view-leave');
   setTimeout(() => {
@@ -115,9 +115,9 @@ function trackDaySchedule() {
   if (!TRACK_DAYS.includes(d.getDay()) || d.getHours() * 60 + d.getMinutes() < TRACK_FROM) return;
   const today = d.toDateString();
   let done = '';
-  try { done = localStorage.getItem('flyday.screen.trackday') || ''; } catch {}
+  try { done = localStorage.getItem('tgiflyday.screen.trackday') || ''; } catch {}
   if (done === today) return;
-  try { localStorage.setItem('flyday.screen.trackday', today); } catch {}
+  try { localStorage.setItem('tgiflyday.screen.trackday', today); } catch {}
   if (view !== 'pay') setView('pay');
 }
 setInterval(trackDaySchedule, 30_000);
@@ -175,7 +175,7 @@ setInterval(() => {
 
 /**
  * Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over)
- * brings TrackDay back to the FlyDay view. Not on the first state after loading the page.
+ * brings TrackDay back to the tgiFlyDay view. Not on the first state after loading the page.
  */
 let lastPhase = null;
 function backToWork(c) {
@@ -199,7 +199,7 @@ function render() {
   if (!markImg.src.endsWith(mark)) markImg.src = mark;
   // TrackDay is for the RC cars: no drone bits in the header (sign in, the phone QR).
   screen.classList.toggle('car-day', view === 'pay');
-  document.title = view === 'pay' ? 'TGI TrackDay' : 'TGI FlyDay · Spectator view';
+  document.title = view === 'pay' ? 'TGI TrackDay' : 'tgiFlyDay · Spectator view';
   // The end time, if the RD set one: "until 20:00", then "last round".
   const hm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   const ends = c.lastRound ? ' · Last round' : c.finishAt ? ` · until ${hm(c.finishAt)}` : '';
@@ -337,7 +337,7 @@ $('signinClose').addEventListener('click', closeSignin);
 // A tap on the board beside the flyout closes it too.
 document.addEventListener('click', (e) => { if (!signin.contains(e.target)) closeSignin(); });
 addEventListener('message', (e) => {
-  if (e.origin === location.origin && e.data?.flyday === 'kiosk-done') closeSignin();
+  if (e.origin === location.origin && e.data?.tgiflyday === 'kiosk-done') closeSignin();
 });
 
 trackDaySchedule();

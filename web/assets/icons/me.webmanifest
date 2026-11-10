@@ -1,6 +1,6 @@
 {
-  "name": "TGI FlyDay",
-  "short_name": "FlyDay",
+  "name": "tgiFlyDay",
+  "short_name": "tgiFlyDay",
   "description": "Your heat, your channel, when you fly.",
   "start_url": "/me",
   "scope": "/",

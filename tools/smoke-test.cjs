@@ -3,7 +3,7 @@
 //
 //   node tools/smoke-test.cjs
 //
-// Needs Playwright with Chromium (dev only, not part of FlyDay). Starts its own FlyDay on a
+// Needs Playwright with Chromium (dev only, not part of tgiFlyDay). Starts its own tgiFlyDay on a
 // spare port with throwaway data, and exits non-zero on any failure.
 
 const { spawn } = require('node:child_process');
@@ -15,7 +15,7 @@ try { ({ chromium, devices } = require('playwright')); } catch { console.error('
 
 const PORT = 8190 + Math.floor(Math.random() * 9);
 const B = `http://localhost:${PORT}`;
-const DATA = mkdtempSync(join(tmpdir(), 'flyday-smoke-'));
+const DATA = mkdtempSync(join(tmpdir(), 'tgiflyday-smoke-'));
 const post = (p, b) => fetch(B + p, { method: 'POST', body: JSON.stringify(b ?? {}) }).then((r) => r.json());
 const state = () => fetch(B + '/api/state').then((r) => r.json());
 let failures = 0;
@@ -31,7 +31,7 @@ async function typeKeys(scope, text) {
 
 (async () => {
   const server = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', join(__dirname, '..', 'server', 'main.ts')],
-    { env: { ...process.env, PORT: String(PORT), FLYDAY_DATA: join(DATA, 'flyday.json') }, stdio: 'ignore' });
+    { env: { ...process.env, PORT: String(PORT), TGIFLYDAY_DATA: join(DATA, 'flyday.json') }, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) { try { await fetch(B + '/api/info'); break; } catch { await new Promise((r) => setTimeout(r, 200)); } }
   const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const errors = [];
