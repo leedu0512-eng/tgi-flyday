@@ -66,7 +66,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 ## Session end time
 
-- No end time by default. The RD console's clock icon opens the Session end page (`timeView`): a time, quick picks on the half hour, **No end time**. POST /api/finish {time: "HH:MM"} → `engine.setFinish(epoch)` (the next time the clock shows it); `clock.finishAt`, cleared whenever practice stops. `engine.finishTick(now)` (each second from main.ts): `texts.finishWarn` at 30, 20, 10 min (only those still ahead); at the time, `clock.lastRound` and `texts.finishLastRound`: the round being flown finishes (`goToNextHeat` stops instead of starting a new round, `texts.finishDone`). In free flight, waiting, or in the changeover before a round's first heat: it stops now (`texts.finishNow`). Pilots stay signed in. Callout switch `sessionEnd`. The clock icon shows "→ 20:00" / "last round"; the big screen's header says "until 20:00" / "Last round".
+- No end time by default. The RD console's clock icon opens the Session end page (`timeView`): a time, quick picks on the half hour, **No end time**. POST /api/finish {time: "HH:MM"} → `engine.setFinish(epoch)` (the next time the clock shows it); `clock.finishAt`, cleared whenever practice stops. `engine.finishTick(now)` (each second from main.ts): `texts.finishWarn` at 30, 20, 10 min (only those still ahead); at the time, `clock.lastRound` and `texts.finishLastRound`: the round being flown finishes (`goToNextHeat` stops instead of starting a new round, `texts.finishDone`). In free flight, waiting, or in the changeover before a round's first heat: it stops now (`texts.finishNow`). Then a clean start (see below). Callout switch `sessionEnd`. The clock icon shows "→ 20:00" / "last round"; the big screen's header says "until 20:00" / "Last round".
 - No "Back to heats" buttons: the session-time icon goes back to the heats (also Escape, or the open page's icon again).
 
 ## Goodbye
@@ -85,7 +85,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 
 ## End of the day
 
-- From `config.nightStopAt` (default 20:30 local; practice is usually 17:30–20:00, some fly longer) until 05:00, a running session asks "Still flying?" (`engine.nightTick`, fed local minutes by main.ts each second). The prompt is `nightPrompt(state, kind)` in common.js: big screen, console bar, phone card. "Yes, still flying" (POST /api/still-flying) snoozes it for an hour; no answer for 5 minutes → `endOfDay()`: stop, everyone off the list. A session started late gets its first hour first. `config.nightStop` switches it off.
+- From `config.nightStopAt` (default 20:30 local; practice is usually 17:30–20:00, some fly longer) until 05:00, a running session asks "Still flying?" (`engine.nightTick`, fed local minutes by main.ts each second). The prompt is `nightPrompt(state, kind)` in common.js: big screen, console bar, phone card. "Yes, still flying" (POST /api/still-flying) snoozes it for an hour; no answer for 5 minutes → `endOfDay()`: stop and a clean start (see below). A session started late gets its first hour first. `config.nightStop` switches it off.
 
 ## TrackDay (RC cars)
 
@@ -93,3 +93,8 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over, pause) switches TrackDay back to the FlyDay view (`backToWork` in screen.html). Stopped or waiting: TrackDay stays.
 - Views never jump: `setView` fades the board, the panel and the header extras out (blur, settle), swaps while hidden, fades back in (`.view-leave`, 0.42 s each way). The header clock stays put.
 - Switches to TrackDay by itself every Wednesday, Saturday and Sunday at 09:00 local time, once a day (tapping back to FlyDay that day sticks). The view is remembered per screen (localStorage).
+
+## Clean start
+
+- Every automatic end of practice (end time: `finishSession`; unanswered "Still flying?": `endOfDay`) and the RD's **Reset for next time** (action `reset`, also stops a running session, no goodbye) call `engine.cleanSlate()`: every pilot deleted (remembered photos and usual channels stay), missed counts cleared, heats emptied, per-heat channel tweaks gone, heat length / changeover / heat count / channels back to `setupDefaults()`, clock counters, end time, snooze and pause-after cleared. Club quads, callouts, sound, timer settings and the lap history stay. **Stop session** by hand does not reset: the RD can stop, fix something and restart with the same pilots.
+- `config.sessionDefaults` (null = built-in DEFAULT_CONFIG values) is set by **Save as defaults** in Session setup (action `saveDefaults`); each PC keeps its own. A saved copy that fails the checks (bad numbers, clashing channels) falls back to the built-in one. The line under the buttons (`#defaultsNote`) says what a clean start goes back to.

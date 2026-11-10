@@ -60,6 +60,11 @@
             <button class="btn small" data-preset="R1 R2 F2 F4 R7 R8">IMD6C · 6 pilots</button>
             <button class="btn small" data-preset="R1 R2 R3 R4 R5 R6 R7 R8">Raceband · 8 pilots</button>
           </div>
+          <div class="wide defaults-row">
+            <button class="btn small" id="saveDefaults" title="What you see above becomes what practice goes back to after it ends">Save as defaults</button>
+            <button class="btn small danger" id="resetAll" title="Everyone off the list, channel tweaks undone, setup back to the defaults">Reset for next time</button>
+            <span class="hint" id="defaultsNote"></span>
+          </div>
           <details class="more wide" id="setupMore">
             <summary>More</summary>
             <div class="more-body">
@@ -693,6 +698,11 @@ function renderSetup() {
   $('autoStart').checked = cfg.autoStart !== false;
   $('nightStop').checked = cfg.nightStop !== false;
   if (document.activeElement !== $('nightStopAt')) $('nightStopAt').value = String(cfg.nightStopAt ?? 1230);
+  // What a clean start goes back to, and whether the setup differs from it now.
+  const d = cfg.sessionDefaults ?? { heatSeconds: 180, changeoverSeconds: 120, heatCount: 4, channels: ['R1', 'R2', 'F2', 'F4', 'R7', 'R8'] };
+  const same = d.heatSeconds === cfg.heatSeconds && d.changeoverSeconds === cfg.changeoverSeconds && d.heatCount === cfg.heatCount && d.channels.join() === cfg.channels.join();
+  $('defaultsNote').textContent = `${same ? 'This is the default setup' : 'Defaults'}${cfg.sessionDefaults ? '' : ' (built in)'}: ${fmt(d.heatSeconds * 1000)} heats, ${fmt(d.changeoverSeconds * 1000)} changeover, ${d.heatCount} heats, ${d.channels.join(' ')}. Practice goes back to this when it ends by itself.`;
+  $('saveDefaults').disabled = same && !!cfg.sessionDefaults;
   const box = $('slotChannels');
   if (!box.contains(document.activeElement)) {
     box.innerHTML = cfg.channels.map((ch, i) =>
@@ -721,6 +731,20 @@ $('slotChannels').onchange = async (e) => {
   if (!sel) return;
   sel.blur();
   if (await act('/api/slot-channel', { slot: Number(sel.dataset.slot), channel: sel.value }) !== undefined) toast(`${sel.value} in every heat.`, true);
+};
+$('saveDefaults').onclick = async () => {
+  if (await act('/api/action', { type: 'saveDefaults' }) !== undefined) toast('Saved: practice goes back to this setup when it ends.', true);
+};
+$('resetAll').onclick = async (e) => {
+  const btn = e.currentTarget;
+  if (!btn.classList.contains('confirm')) {
+    btn.classList.add('confirm');
+    btn.textContent = 'Click again: everyone off the list';
+    setTimeout(() => { btn.classList.remove('confirm'); btn.textContent = 'Reset for next time'; }, 3000);
+    return;
+  }
+  btn.classList.remove('confirm'); btn.textContent = 'Reset for next time';
+  if (await act('/api/action', { type: 'reset' }) !== undefined) toast('Reset: nobody on the list, channels and setup back to the defaults.', true);
 };
 document.querySelectorAll('[data-preset]').forEach((b) => (b.onclick = async () => {
   const res = await act('/api/config', { channels: b.dataset.preset.split(' ') });

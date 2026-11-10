@@ -168,6 +168,8 @@ body.offline .offline-banner { display: block; }
 .setup { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .setup .wide { grid-column: span 2; }
 .setup .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.setup .defaults-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.setup .defaults-row .hint { flex-basis: 100%; margin: 0; }
 .hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
 
 .heats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }

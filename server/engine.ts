@@ -12,6 +12,7 @@ import {
   type Config,
   type Pilot,
   type SavedData,
+  type SessionDefaults,
   type TimerCommand,
   type TimerConfig,
   type TimedRun,
@@ -529,16 +530,11 @@ export class Engine {
     this.onChange();
   }
 
-  /** The end time's done: practice stops (everyone stays signed in). */
+  /** The end time's done: practice stops and the next session starts clean. */
   private finishSession(text: string) {
-    const c = this.clock;
     this.closeTiming(true);
-    c.startedAt = null;
-    c.finishAt = null;
-    c.lastRound = false;
-    c.pauseAfter = false;
-    this.finishWarned.clear();
     this.setPhase('stopped', null);
+    this.cleanSlate();
     if (this.config.callouts.sessionEnd) this.say(text);
     this.onChange();
   }
@@ -561,9 +557,56 @@ export class Engine {
     this.clock.finishAt = null;
     this.clock.lastRound = false;
     this.setPhase('stopped', null);
-    for (const id of [...this.pilots.keys()]) this.deletePilot(id);
+    this.cleanSlate();
     this.say(this.config.callouts.texts.nightEnd);
     this.onChange();
+  }
+
+  /** The setup a clean start goes back to: the RD's saved defaults when they're sound, else the built-in ones. */
+  setupDefaults(): SessionDefaults {
+    const b = DEFAULT_CONFIG;
+    const builtIn = { heatSeconds: b.heatSeconds, changeoverSeconds: b.changeoverSeconds, heatCount: b.heatCount, channels: [...b.channels] };
+    const d = this.config.sessionDefaults;
+    if (!d) return builtIn;
+    const ok = (v: unknown, min: number, max: number) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
+    try {
+      if (!ok(d.heatSeconds, 10, 1800) || !ok(d.changeoverSeconds, 10, 1800) || !ok(d.heatCount, 1, MAX_HEATS)) return builtIn;
+      return { heatSeconds: d.heatSeconds, changeoverSeconds: d.changeoverSeconds, heatCount: d.heatCount, channels: this.checkChannels(d.channels) };
+    } catch {
+      return builtIn;
+    }
+  }
+
+  /** RD: the setup as it is now becomes what a clean start goes back to. */
+  saveDefaults() {
+    const c = this.config;
+    this.config = { ...c, sessionDefaults: { heatSeconds: c.heatSeconds, changeoverSeconds: c.changeoverSeconds, heatCount: c.heatCount, channels: [...c.channels] } };
+    this.onChange();
+  }
+
+  /**
+   * A clean start for next time: everyone off the list, every heat empty, no channel tweaks,
+   * the setup back to its defaults, the session counters and end time cleared. Remembered
+   * photos and usual channels, club quads, callouts, sound and the lap times flown stay.
+   * Only while stopped (the caller stops first).
+   */
+  private cleanSlate() {
+    for (const id of [...this.pilots.keys()]) this.deletePilot(id);
+    this.missed.clear();
+    const d = this.setupDefaults();
+    this.config = { ...this.config, heatSeconds: d.heatSeconds, changeoverSeconds: d.changeoverSeconds, heatCount: d.heatCount, channels: [...d.channels] };
+    this.heats = [];
+    this.heatChannels = [];
+    this.normaliseHeats();
+    Object.assign(this.clock, {
+      phase: 'stopped', heat: 0, endsAt: null, paused: false, pausedRemaining: null, round: 0, heatsRun: 0,
+      startedAt: null, freeSince: null, pauseAfter: false, finishAt: null, lastRound: false,
+    });
+    this.night = null;
+    this.nightSnoozeUntil = 0;
+    this.finishWarned.clear();
+    this.lineupPending = false;
+    this.autoStartPending = false;
   }
 
   /** A new session: lap history and session bests start over. */
@@ -889,6 +932,16 @@ export class Engine {
         c.lastRound = false;
         this.setPhase('stopped', null);
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStop);
+        return;
+      case 'reset':
+        // RD: a clean start now. Running practice stops first (no goodbye: the RD is right there).
+        this.closeTiming(true);
+        this.setPhase('stopped', null);
+        this.cleanSlate();
+        this.onChange();
+        return;
+      case 'saveDefaults':
+        this.saveDefaults();
         return;
       case 'pause':
         if (c.phase === 'stopped' || c.phase === 'waiting' || c.phase === 'freeflight' || c.paused) return;

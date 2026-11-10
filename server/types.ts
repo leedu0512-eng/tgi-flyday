@@ -1,5 +1,13 @@
 // Shared types for the TGI FlyDay server.
 
+/** The session setup a clean start restores. */
+export interface SessionDefaults {
+  heatSeconds: number;
+  changeoverSeconds: number;
+  heatCount: number;
+  channels: string[];
+}
+
 export interface Config {
   /** Length of a practice heat, from start tone to time-up. */
   heatSeconds: number;
@@ -29,6 +37,11 @@ export interface Config {
   timer: TimerConfig;
   /** The club's own quads (up to 8) for pilots without one. Each flies one fixed channel. */
   clubQuads: ClubQuad[];
+  /**
+   * The setup a clean start goes back to (RD: Save as defaults), or null for the built-in one.
+   * Every automatic end of practice, and the RD's Reset, empties the list and restores it.
+   */
+  sessionDefaults: SessionDefaults | null;
   /** Which callouts the voice makes, and when. */
   callouts: CalloutSettings;
   /** How callouts and tones sound on the RD console. */
@@ -252,6 +265,7 @@ export const DEFAULT_CONFIG: Config = {
     { name: 'Club 4', channel: 'F4', broken: false },
   ],
   timer: { enabled: false, host: '', user: 'admin', password: 'rotorhazard' },
+  sessionDefaults: null,
   callouts: {
     sessionStartStop: true,
     lineup: true,

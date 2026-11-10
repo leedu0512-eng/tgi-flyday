@@ -1047,12 +1047,14 @@ test('session end time: warnings at 30, 20, 10 min, the round being flown finish
   assert.equal(e.clock.lastRound, true);
   assert.match(said().at(-1)!, /This round will be flown to the end/);
   const round = e.clock.round;
-  while (e.clock.phase !== 'stopped') { t += 100; e.tick(t); e.finishTick(t); }
-  assert.equal(e.clock.round, round, 'no new round started');
-  assert.equal(e.clock.heatsRun % 3, 0, 'heats 2 and 3 were flown to finish the round');
+  let lastRound = round, heatsRun = 0;
+  while (e.clock.phase !== 'stopped') { lastRound = e.clock.round; heatsRun = e.clock.heatsRun; t += 100; e.tick(t); e.finishTick(t); }
+  assert.equal(lastRound, round, 'no new round started');
+  assert.equal((heatsRun + 1) % 3, 0, 'heats 2 and 3 were flown to finish the round (the last one ends on the stopping tick)');
   assert.match(said().at(-1)!, /That was the last round\. Thank you all for flying.*cleaner than you found it/);
   assert.equal(e.clock.finishAt, null, 'cleared for the next session');
-  assert.equal(e.pilots.size, 3, 'everyone stays signed in');
+  assert.equal(e.pilots.size, 0, 'a clean start for next time');
+  assert.equal(e.heatsInUse(), 0);
 });
 
 test('session end time: in the changeover before a round starts, or in free flight, it ends now', () => {
@@ -1084,4 +1086,68 @@ test('saved callout wording that was the old default follows the new default; ed
   assert.match(e.config.callouts.texts.nightEnd, /cleaner than you found it/);
   assert.match(e.config.callouts.texts.sessionStop, /cleaner than you found it/, 'Stop session says goodbye too');
   assert.equal(e.config.callouts.texts.sessionStart, 'Off we go!');
+});
+
+test('clean start: every automatic end empties the list, undoes channel tweaks and restores the setup', () => {
+  const tweak = (e: Engine) => {
+    e.join('A', 0, 0); e.join('B', 1, 1); e.join('C', 2, 2);
+    e.setHeatChannel(1, 0, 'L1');
+    e.setConfig({ heatSeconds: 240, changeoverSeconds: 90 });
+  };
+  const clean = (e: Engine, why: string) => {
+    assert.equal(e.clock.phase, 'stopped', why);
+    assert.equal(e.pilots.size, 0, why + ': pilots');
+    assert.ok(e.heatChannels.flat().every((c) => c === null), why + ': channel tweaks');
+    assert.deepEqual(e.config.channels, ['R1', 'R2', 'F2', 'F4', 'R7', 'R8'], why + ': built-in channels');
+    assert.equal(e.config.heatCount, 4, why);
+    assert.equal(e.config.heatSeconds, 180, why);
+    assert.equal(e.config.changeoverSeconds, 120, why);
+    assert.equal(e.clock.round, 0, why);
+    assert.equal(e.clock.heatsRun, 0, why);
+    assert.equal(e.clock.finishAt, null, why);
+  };
+  // End time.
+  let { e } = setup();
+  tweak(e);
+  e.action('start', 0);
+  e.setFinish(1000, 0); e.finishTick(1000);
+  clean(e, 'end time');
+  // Night stop, nobody answers.
+  ({ e } = setup());
+  tweak(e);
+  e.action('start', 0);
+  const H = 2 * 60 * 60_000;
+  e.nightTick(H, 20 * 60 + 30); e.nightTick(H + 6 * 60_000, 20 * 60 + 36);
+  clean(e, 'night stop');
+  // RD Reset, also while running; Stop by hand keeps everyone.
+  ({ e } = setup());
+  tweak(e);
+  e.action('start', 0); e.action('stop', 1);
+  assert.equal(e.pilots.size, 3, 'Stop keeps the pilots');
+  assert.equal(e.heatChannels[1][0], 'L1', 'and the tweaks');
+  e.action('start', 2); e.action('reset', 3);
+  clean(e, 'reset');
+});
+
+test('clean start goes back to the saved defaults; broken saved defaults fall back to the built-in ones', () => {
+  const { e } = setup();
+  e.setConfig({ heatSeconds: 120, changeoverSeconds: 180, heatCount: 2 });
+  e.setChannels(['R1', 'R3', 'R6', 'R8']);
+  e.action('saveDefaults', 0);
+  assert.deepEqual(e.config.sessionDefaults, { heatSeconds: 120, changeoverSeconds: 180, heatCount: 2, channels: ['R1', 'R3', 'R6', 'R8'] });
+  e.setConfig({ heatSeconds: 300, heatCount: 5 });
+  e.setChannels(['R1', 'R2', 'F2', 'F4', 'R7', 'R8']);
+  e.join('A', 3, 0);
+  e.action('reset', 1);
+  assert.equal(e.config.heatSeconds, 120);
+  assert.equal(e.config.changeoverSeconds, 180);
+  assert.equal(e.config.heatCount, 2);
+  assert.deepEqual(e.config.channels, ['R1', 'R3', 'R6', 'R8']);
+  assert.equal(e.heats.length, 2);
+  assert.ok(e.heats.every((r) => r.length === 4 && r.every((x) => x === null)));
+  // Saved defaults survive a restart, and a broken saved copy is ignored.
+  const again = new Engine(e.toSaved());
+  assert.deepEqual(again.config.sessionDefaults, e.config.sessionDefaults);
+  const bad = new Engine({ config: { sessionDefaults: { heatSeconds: 120, changeoverSeconds: 120, heatCount: 2, channels: ['R1', 'R1'] } } as any });
+  assert.deepEqual(bad.setupDefaults().channels, ['R1', 'R2', 'F2', 'F4', 'R7', 'R8']);
 });
