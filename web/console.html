@@ -82,12 +82,11 @@
         <details class="more" id="outboxMore">
           <summary><h2>Online history</h2> <span id="outboxSum" class="muted"></span></summary>
           <div class="more-body outbox">
-            <p class="hint">Practice start and end, every timed heat with its laps, lights on and off and whether anybody is here are kept on this PC and sent to the Flyday server, so pilots can look at their times at home. With no connection, they wait and go later.</p>
-            <div class="field"><label for="oUrl">Server address (https, port allowed)</label><input id="oUrl" class="input" placeholder="https://flyday.tail543cf5.ts.net:8445" autocomplete="off" spellcheck="false"></div>
-            <div class="field"><label for="oKey">Token</label><input id="oKey" class="input" type="password" autocomplete="new-password"></div>
+            <p class="hint">Practice start and end, every timed heat with its laps and whether anybody is here are kept on this PC and sent to the Flyday server once Flyday has approved this PC, so pilots can look at their times at home. With no connection, they wait and go later.</p>
+            <div class="pair" id="oPair"></div>
             <div class="field"><label for="oVenue">This place</label><input id="oVenue" class="input" placeholder="HOBIzone" autocomplete="off"></div>
-            <label class="toggle"><input type="checkbox" id="oOn"><span><b>Send</b> (off: only keep them here)</span></label>
-            <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Send now</button></div>
+            <div class="field"><label for="oUrl">Flyday address (empty: built in)</label><input id="oUrl" class="input" placeholder="https://hobizone.org/api/hz/tgiflyday/" autocomplete="off" spellcheck="false"></div>
+            <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Ask Flyday and send now</button></div>
             <p class="hint" id="oStatus"></p>
           </div>
         </details>
@@ -771,26 +770,34 @@ function renderOutbox() {
   const cfg = state.config.cloud ?? {}, o = state.outbox ?? { pending: 0, sent: 0 };
   for (const [id, v] of [['oUrl', cfg.url], ['oVenue', cfg.venue]]) if (document.activeElement !== $(id)) $(id).value = v ?? '';
   $('oVenue').placeholder = o.venue ?? '';
-  $('oKey').placeholder = cfg.keySet ? 'Saved (type to change)' : 'From the server you send to';
-  $('oOn').checked = !!cfg.enabled;
+  const f = o.flyday ?? { status: 'new' };
+  const sending = f.status === 'approved' && f.send;
   const waiting = `${o.pending} event${o.pending === 1 ? '' : 's'} waiting`;
-  $('outboxSum').textContent = !cfg.enabled || !cfg.url ? `· keeping, ${waiting}` : o.lastError ? '· not sending' : o.pending ? `· ${waiting}` : '· sent';
-  $('outboxSum').className = cfg.enabled && cfg.url && o.lastError ? 'warn-text' : 'muted';
+  $('oPair').innerHTML =
+    f.status === 'approved' ? `<b class="ok-text">Paired with Flyday</b>${f.send ? '' : ' · Flyday has sending switched off'}`
+    : f.status === 'revoked' ? '<b class="warn-text">Flyday has revoked this PC.</b> Approve it again in the Flyday admin.'
+    : `Approve this PC in the Flyday admin. Its code:<span class="pair-code">${esc(f.pairingCode ?? '')}</span>`;
+  $('outboxSum').textContent = !sending ? `· keeping, ${waiting}` : o.lastError ? '· not sending' : o.pending ? `· ${waiting}` : '· sent';
+  $('outboxSum').className = (sending && o.lastError) || f.status === 'revoked' ? 'warn-text' : 'muted';
   $('oStatus').textContent = [
     `${waiting} on this PC, ${o.sent} sent.`,
-    !cfg.url ? 'No address yet: they wait here.' : !cfg.enabled ? 'Sending is off: they wait here.' : '',
+    `Flyday: ${o.base ?? ''}.`,
+    f.lastHello ? `Last heard from Flyday ${ago(f.lastHello)}.` : 'Not heard from Flyday yet.',
+    f.helloError ? `Flyday: ${f.helloError}.` : '',
     o.lastOk ? `Last sent ${ago(o.lastOk)}.` : '',
-    cfg.enabled && cfg.url && o.lastError ? `Last try failed: ${o.lastError}. Trying again every minute.` : '',
+    sending && o.lastError ? `Last try failed: ${o.lastError}.${o.stopped ? ' Stopped until Send now.' : ' Trying again every minute.'}` : '',
   ].filter(Boolean).join(' ');
 }
 $('oSave').onclick = async () => {
-  const r = await act('/api/config', { cloud: { url: $('oUrl').value, key: $('oKey').value, venue: $('oVenue').value, enabled: $('oOn').checked } });
-  if (r !== undefined) { $('oKey').value = ''; toast('Saved.', true); }
+  const r = await act('/api/config', { cloud: { url: $('oUrl').value, venue: $('oVenue').value } });
+  if (r !== undefined) toast('Saved.', true);
 };
-$('oOn').onchange = (e) => act('/api/config', { cloud: { enabled: e.target.checked } });
 $('oSend').onclick = async () => {
   const st = await act('/api/outbox/send');
-  if (st) toast(st.lastError ? `Not sent: ${st.lastError}` : `Sent. ${st.pending} waiting.`, !st.lastError);
+  if (!st) return;
+  const f = st.flyday ?? {};
+  if (f.status !== 'approved') toast(f.helloError ? `Flyday: ${f.helloError}` : `Waiting for approval in the Flyday admin (code ${f.pairingCode}).`, false);
+  else toast(st.lastError ? `Not sent: ${st.lastError}` : `Sent. ${st.pending} waiting.`, !st.lastError);
 };
 $('saveDefaults').onclick = async () => {
   if (await act('/api/action', { type: 'saveDefaults' }) !== undefined) toast('Saved: practice goes back to this setup when it ends.', true);

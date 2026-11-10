@@ -17,6 +17,7 @@ import { Engine, EngineError } from './engine.ts';
 import { load, saver } from './store.ts';
 import { RotorHazardLink } from './rotorhazard.ts';
 import { Outbox } from './outbox.ts';
+import { Install, publicInstall } from './flyday.ts';
 import type { AudioEvent } from './types.ts';
 
 /** Running as the packaged tgiFlyDay.exe (a Node single executable application). */
@@ -139,10 +140,24 @@ const engine = new Engine(saved, {
   },
 });
 const store = saver(DATA_FILE, () => engine.toSaved());
-outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostname(), (m) => console.log(new Date().toLocaleTimeString(), m));
-/** What the screens get: the engine's state plus how the outbox is doing. */
-const snapshot = (now: number) => ({ ...engine.snapshot(now), outbox: { ...outbox!.status(), venue: outbox!.venue() } });
-// Send what's waiting every half minute (when sending is set up); a failure waits a minute.
+const pairing = new Install(resolve(DATA_FILE, '..'));
+outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostname(), (m) => console.log(new Date().toLocaleTimeString(), m), pairing);
+/** What the screens get: the engine's state plus how the outbox and the Flyday pairing are doing (no secret, no token). */
+const snapshot = (now: number) => ({ ...engine.snapshot(now), outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
+/** Hello to Flyday: approval, token, send on or off, all decided there. Then send what's waiting. */
+async function helloFlyday() {
+  await pairing.hello(outbox!.base(), outbox!.venue(), hostname(), VERSION);
+  stateDirty = true;
+  await outbox!.flush();
+  stateDirty = true;
+}
+void helloFlyday();
+// Again every 10 minutes (Flyday may have approved, switched sending off or given a new token).
+let lastHelloTry = Date.now();
+setInterval(() => {
+  if (Date.now() - lastHelloTry >= 10 * 60_000) { lastHelloTry = Date.now(); void helloFlyday(); }
+}, 60_000);
+// Send what's waiting every half minute (once Flyday says send); a failure waits a minute.
 setInterval(() => { void outbox!.flush().then(() => { stateDirty = true; }); }, 30_000);
 engine.resume(saved.clock, Date.now());
 // Photos taken before they were remembered by name: remember them now.
@@ -410,9 +425,11 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     }
   }
 
-  // RD console: send the outbox now and say how it went.
+  // RD console: ask Flyday now (pairing), then send the outbox, and say how it went.
   if (path === '/api/outbox/send' && req.method === 'POST') {
-    const st = await outbox!.flush(true);
+    lastHelloTry = Date.now();
+    await pairing.hello(outbox!.base(), outbox!.venue(), hostname(), VERSION);
+    const st = { ...(await outbox!.flush(true)), flyday: publicInstall(pairing.state) };
     stateDirty = true;
     return json(res, 200, { ok: true, result: st });
   }

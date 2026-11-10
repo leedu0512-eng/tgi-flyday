@@ -9,6 +9,6 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/main.ts",
-    "test": "node --disable-warning=ExperimentalWarning --test server/engine.test.ts"
+    "test": "node --disable-warning=ExperimentalWarning --test server/engine.test.ts server/flyday.test.ts"
   }
 }

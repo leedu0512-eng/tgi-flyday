@@ -1240,9 +1240,11 @@ test('lights: off while stopped asks nothing; switched off, or End of the day of
   assert.throws(() => e.setConfig({ cloud: { url: 'https://flyday.ts.net:99999' } as any }), /look right/);
   assert.throws(() => e.setConfig({ cloud: { url: 'https://u:p@flyday.ts.net' } as any }), /token/);
   e.setConfig({ cloud: { url: ' https://flyday.tail543cf5.ts.net:8445 ' } as any });
-  assert.equal(e.config.cloud.url, 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/upload', 'just the server: the upload path is added, the port kept');
+  assert.equal(e.config.cloud.url, 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/', 'just the server: the path is added, the port kept');
   e.setConfig({ cloud: { url: 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/upload' } as any });
-  assert.equal(e.config.cloud.url, 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/upload');
+  assert.equal(e.config.cloud.url, 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/');
+  e.setConfig({ cloud: { url: 'https://hobizone.org/api/hz/tgiflyday' } as any });
+  assert.equal(e.config.cloud.url, 'https://hobizone.org/api/hz/tgiflyday/');
   e.setConfig({ cloud: { url: '' } as any });
   assert.equal(e.config.cloud.url, '');
   e.setConfig({ cloud: { url: 'https://abc.supabase.co/rest/v1/tgiflyday_events', key: 'secret', venue: 'HOBIzone' } as any });

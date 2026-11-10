@@ -1,16 +1,16 @@
 // The outbox: what happened at this venue (lights on/off, practice start and end, every timed
 // heat with its laps), kept in data/outbox.jsonl until it can go online.
 //
-// Nothing is lost when there's no internet or nowhere to send yet: events wait in the file
-// and go out, oldest first, once an address is set and reachable. Each event is POSTed in a
-// JSON list of rows { id, venue, at, type, data }, with the key as both a Bearer token and
-// an "apikey" header, so a Supabase REST table (columns id uuid, venue text, at timestamptz,
-// type text, data jsonb) takes it as is; any other server just reads the same list.
+// Nothing is lost when there's no internet or Flyday hasn't approved this PC yet: events wait
+// in the file and go out, oldest first, once they can. They go to the Flyday server converted to
+// the agreed upload format (schema 1, flyday.ts), one body at a time, with this install's token.
 
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { CloudConfig } from './types.ts';
+import { FLYDAY_BASE, Install, toUploads, type OutboxRow, type SessionNote } from './flyday.ts';
+import { VERSION } from './version.ts';
 
 export interface OutboxEvent {
   id: string;
@@ -29,6 +29,8 @@ export interface OutboxStatus {
   lastOk: number | null;
   lastTry: number | null;
   lastError: string;
+  /** Flyday refused a body (4xx other than the token): stopped until Send now. */
+  stopped: boolean;
 }
 
 const BATCH = 200;
@@ -39,7 +41,10 @@ export class Outbox {
   private file: string;
   private sentFile: string;
   private pending: OutboxEvent[] = [];
-  private st: OutboxStatus = { pending: 0, sent: 0, lastOk: null, lastTry: null, lastError: '' };
+  private st: OutboxStatus = { pending: 0, sent: 0, lastOk: null, lastTry: null, lastError: '', stopped: false };
+  /** What's known of each session (by start time), so every upload carries the full session. */
+  private notes = new Map<number, SessionNote>();
+  install: Install;
   private busy = false;
   private nextTry = 0;
   private soonTimer: NodeJS.Timeout | null = null;
@@ -48,7 +53,8 @@ export class Outbox {
   private venueFallback: string;
   private log: (m: string) => void;
 
-  constructor(dataDir: string, config: () => CloudConfig, venueFallback: string, log: (m: string) => void = () => {}) {
+  constructor(dataDir: string, config: () => CloudConfig, venueFallback: string, log: (m: string) => void = () => {}, install?: Install) {
+    this.install = install ?? new Install(dataDir);
     this.config = config;
     this.venueFallback = venueFallback;
     this.log = log;
@@ -61,11 +67,25 @@ export class Outbox {
           try { this.pending.push(JSON.parse(line)); } catch {}
         }
       }
-      if (existsSync(this.sentFile)) this.st.sent = readFileSync(this.sentFile, 'utf8').split('\n').filter((l) => l.trim()).length;
+      if (existsSync(this.sentFile)) {
+        const sent: OutboxRow[] = [];
+        for (const line of readFileSync(this.sentFile, 'utf8').split('\n')) {
+          if (!line.trim()) continue;
+          try { sent.push(JSON.parse(line)); } catch {}
+        }
+        this.st.sent = sent.length;
+        // Learn the sessions already sent (start, end, timed), without sending anything.
+        toUploads(sent, this.install.state.id, venueFallback, VERSION, this.notes);
+      }
     } catch (err: any) {
       this.log(`Outbox: could not read it (${err.message}); starting empty.`);
     }
     this.st.pending = this.pending.length;
+  }
+
+  /** Where uploads go: the address set on this PC, else the built-in Flyday address. */
+  base() {
+    return this.config().url || FLYDAY_BASE;
   }
 
   venue() {
@@ -94,30 +114,49 @@ export class Outbox {
     return { ...this.st };
   }
 
-  /** Send what's waiting (if sending is set up). Returns the status afterwards. */
+  /** Send what's waiting (once Flyday has approved this PC). Returns the status afterwards. */
   async flush(force = false): Promise<OutboxStatus> {
-    const cfg = this.config();
-    if (!cfg.enabled || !cfg.url || this.busy || !this.pending.length) return this.status();
-    if (!force && Date.now() < this.nextTry) return this.status();
+    if (!this.install.canSend() || this.busy || !this.pending.length) return this.status();
+    if (!force && (Date.now() < this.nextTry || this.st.stopped)) return this.status();
     this.busy = true;
+    this.st.stopped = false;
     try {
-      while (this.pending.length) {
-        const batch = this.pending.slice(0, BATCH);
-        this.st.lastTry = Date.now();
-        const headers: Record<string, string> = { 'content-type': 'application/json', prefer: 'return=minimal' };
-        if (cfg.key) { headers.authorization = `Bearer ${cfg.key}`; headers.apikey = cfg.key; }
-        const res = await fetch(cfg.url, { method: 'POST', headers, body: JSON.stringify(batch.map((e) => (e.venue ? e : { ...e, venue: this.venue() }))), signal: AbortSignal.timeout(20_000) });
-        if (!res.ok) {
-          const text = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
-          throw new Error(`the server answered ${res.status}${text ? `: ${text}` : ''}`);
+      while (this.pending.length && this.install.canSend()) {
+        const rows = this.pending.slice(0, BATCH).map((e) => (e.venue ? e : { ...e, venue: this.venue() }));
+        // Convert on a copy of the session notes: they only count once the body is stored.
+        const notes = new Map([...this.notes].map(([k, v]) => [k, { ...v }]));
+        const up = toUploads(rows, this.install.state.id, this.venue(), VERSION, notes)[0];
+        if (!up) break;
+        if (up.body) {
+          this.st.lastTry = Date.now();
+          const res = await fetch(this.base() + 'upload', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', authorization: `Bearer ${this.install.state.token}` },
+            body: JSON.stringify(up.body),
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (!res.ok) {
+            const text = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
+            const msg = `Flyday answered ${res.status}${text ? `: ${text}` : ''}`;
+            if (res.status === 401 || res.status === 403) {
+              this.install.tokenRefused(); // ask again with a hello; nothing is lost
+              throw new Error(`${msg} (asking Flyday again)`);
+            }
+            if (res.status >= 400 && res.status < 500) {
+              this.st.stopped = true; // a body Flyday won't take: stop and show it, don't hammer
+              throw new Error(msg);
+            }
+            throw new Error(msg);
+          }
+          this.st.lastOk = Date.now();
         }
-        // Sent: move them from the outbox to the sent log.
-        this.pending.splice(0, batch.length);
-        appendFileSync(this.sentFile, batch.map((e) => JSON.stringify(e)).join('\n') + '\n');
+        // Stored (or nothing to send for these rows): move them to the sent log.
+        for (const [k, v] of notes) this.notes.set(k, v);
+        const done = this.pending.splice(0, up.rows);
+        appendFileSync(this.sentFile, done.map((e) => JSON.stringify(e)).join('\n') + '\n');
         this.rewrite();
-        this.st.sent += batch.length;
+        this.st.sent += done.length;
         this.st.pending = this.pending.length;
-        this.st.lastOk = Date.now();
         this.st.lastError = '';
       }
       this.nextTry = 0;

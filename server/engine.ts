@@ -884,7 +884,19 @@ export class Engine {
     if (rows.some((r) => r.passes)) this.lastTimes = { heat: live.heat, rows };
     const run = this.runOf(live);
     if (run.laps.length) {
-      this.onEvent('heat', { ...run });
+      // For the Flyday upload: every pilot's gate passes (server clock), channel and club quad.
+      const row = this.heats[live.heat] ?? [];
+      const passes = [...live.passes].filter(([, list]) => list.length).map(([id, list]) => {
+        const p = this.pilots.get(id);
+        const slot = row.indexOf(id);
+        const t = live.timed.find((x) => x.pilotId === id);
+        const s = slot >= 0 ? slot : t ? t.slot : -1;
+        return {
+          name: p?.callsign ?? '?', channel: s >= 0 ? this.channelOf(live.heat, s) : null,
+          clubQuad: !!(p?.quad && this.config.clubQuads.some((q) => q.name === p.quad)), passes: [...list],
+        };
+      });
+      this.onEvent('heat', { ...run, sessionStartedAt: this.clock.startedAt, passes });
       this.runs.push(run);
       if (this.runs.length > 2000) this.runs.splice(0, this.runs.length - 2000);
     }
@@ -1973,12 +1985,14 @@ function cleanLights(patch: Partial<LightsConfig>, current: LightsConfig): Light
   return out;
 }
 
-/** Where uploads go on the Flyday server when the address is just the server (with or without a port). */
-export const FLYDAY_UPLOAD_PATH = '/api/hz/tgiflyday/upload';
+/** Flyday's tgiFlyDay routes (hello, upload) sit under this path. */
+export const FLYDAY_PATH = '/api/hz/tgiflyday/';
 
 /**
- * The upload address: https only, any port (the Flyday route is on a tailnet-only port, e.g.
- * https://flyday.tail543cf5.ts.net:8445). Just the server: the Flyday upload path is added.
+ * The Flyday address set on this PC (empty = the built-in public one): https only, any port
+ * (the private fallback is a tailnet-only port, https://flyday.tail543cf5.ts.net:8445). Saved as
+ * the base the routes hang off: just the server gets the path added, a trailing hello or upload
+ * is dropped, and it always ends in a slash.
  */
 export function cleanServerUrl(raw: unknown): string {
   const text = String(raw ?? '').trim();
@@ -1988,7 +2002,11 @@ export function cleanServerUrl(raw: unknown): string {
   try { u = new URL(text); } catch { throw new EngineError('That address doesn\'t look right, e.g. https://flyday.tail543cf5.ts.net:8445'); }
   if (u.protocol !== 'https:' || !u.hostname) throw new EngineError('The address starts with https:// (only secure addresses).');
   if (u.username || u.password) throw new EngineError('No login in the address: the token goes in the Key field.');
-  if (u.pathname === '/' && !u.search) u.pathname = FLYDAY_UPLOAD_PATH;
+  if (u.search) throw new EngineError('No ?… in the address.');
+  let path = u.pathname.replace(/\/(hello|upload)\/?$/, '/');
+  if (path === '/') path = FLYDAY_PATH;
+  if (!path.endsWith('/')) path += '/';
+  u.pathname = path;
   u.hash = '';
   const out = u.toString();
   if (out.length > 500) throw new EngineError('That address is too long.');

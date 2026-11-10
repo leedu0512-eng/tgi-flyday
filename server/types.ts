@@ -71,14 +71,14 @@ export interface LightsConfig {
 
 /** The outbox: where session events go online, once that's set up. */
 export interface CloudConfig {
-  /** Send what's in the outbox. Off: it only collects. */
+  /** No longer used: Flyday switches sending on and off (pairing, flyday.ts). Kept for old saves. */
   enabled: boolean;
   /**
-   * HTTPS address events are POSTed to as a JSON list, any port (Flyday's route is on a
-   * tailnet-only port). Saved as just the server, it gets /api/hz/tgiflyday/upload added.
+   * Flyday's tgiFlyDay address (base for hello and upload), https, any port. Empty: the
+   * built-in public one (FLYDAY_BASE). The tailnet fallback is set here when needed.
    */
   url: string;
-  /** The upload token. Sent as both "Authorization: Bearer <key>" and "apikey". */
+  /** No longer used: the token comes from pairing (data/install.json). Kept for old saves. */
   key: string;
   /** This place's name in the events, e.g. HOBIzone or Home. Empty: the PC's name. */
   venue: string;
