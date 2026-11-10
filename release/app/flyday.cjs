@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.10-2042" : "dev";
+var VERSION = true ? "2026.11.10-2154" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -398,6 +398,7 @@ var MIN_LAP_MS = 2e3;
 var NIGHT_GRACE_MS = 5 * 6e4;
 var LIGHTS_OFF_AFTER_MS = 6e4;
 var LIGHT_MARGIN = 10;
+var PRESENCE_EVERY_MS = 15 * 6e4;
 var LIGHT_STALE_MS = 3 * 6e4;
 var OLD_DEFAULT_TEXTS = {
   nightEnd: "Practice is over for today. Thanks for flying, good night.",
@@ -476,6 +477,8 @@ var Engine = class {
   light = { state: "unknown", level: null, at: null, darkSince: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
   presence = void 0;
+  /** When presence last went out (lightTick's clock); null before the first. */
+  presenceAt = null;
   nightSnoozeUntil = 0;
   clock = {
     phase: "stopped",
@@ -893,7 +896,11 @@ var Engine = class {
     }
     this.onChange();
   }
-  /** Every second: no reading for a while means nobody can tell. */
+  /**
+   * Every second: no reading for a while means nobody can tell. Presence also goes out once
+   * at start and then every PRESENCE_EVERY_MS even without a change, so Flyday can tell
+   * "nobody there" from "tgiFlyDay is off".
+   */
   lightTick(now) {
     const l = this.light;
     if (l.state !== "unknown" && l.at !== null && now - l.at > LIGHT_STALE_MS) {
@@ -902,6 +909,8 @@ var Engine = class {
       this.presenceNow("lights");
       this.onChange();
     }
+    if (this.presenceAt === null) this.presenceNow("start", now);
+    else if (now - this.presenceAt >= PRESENCE_EVERY_MS) this.presenceNow("heartbeat", now);
   }
   lightsChanged(to, now) {
     this.light.state = to;
@@ -922,12 +931,13 @@ var Engine = class {
    * with practice stopped = no; no light reading and practice stopped = can't tell (null).
    * Sent only when it changes.
    */
-  presenceNow(source) {
+  presenceNow(source, now = null) {
     const flying = this.clock.phase !== "stopped";
     const l = this.light.state;
     const present = l === "on" || flying ? true : l === "off" ? false : null;
-    if (present === this.presence) return;
+    if (present === this.presence && source !== "heartbeat" && source !== "start") return;
     this.presence = present;
+    if (now !== null) this.presenceAt = now;
     this.onEvent("presence", { present, source, lights: l, level: this.light.level, practice: flying });
   }
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
