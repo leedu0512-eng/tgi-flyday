@@ -69,12 +69,28 @@
             <summary>More</summary>
             <div class="more-body">
               <label class="toggle wide"><input type="checkbox" id="freeFlight"><span><b>Free flight</b> when only one heat has pilots: it keeps flying with no heat timer, until another heat gets pilots.</span></label>
-              <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes stops practice and takes everyone off the list.</span></label>
+              <label class="toggle wide"><input type="checkbox" id="nightStop"><span><b>End of the day</b> from <select id="nightStopAt" class="input inline"></select>: if practice is still on, ask out loud if anyone is still flying. "Yes" on the big screen carries on for another hour; no answer in 5 minutes ends practice and starts clean for next time.</span></label>
+              <label class="toggle wide"><input type="checkbox" id="lightsOn"><span><b>Lights off</b>, seen by the kiosk webcam: if practice is on, ask "Still flying?" straight away (no answer in 5 minutes: practice ends). Dark below <select id="lightsDark" class="input inline"></select>. <span id="lightNow" class="muted"></span></span></label>
               <label class="toggle wide"><input type="checkbox" id="autoStart"><span><b>Start by itself</b> when the first pilot signs in (straight into free flight). After Stop it waits for the next new sign-in.</span></label>
             </div>
           </details>
           <p class="hint wide" id="setupHint">All of this can change during a session. To change a channel in one heat only, click the channel on that heat's card.</p>
         </div>
+      </section>
+
+      <section class="card">
+        <details class="more" id="outboxMore">
+          <summary><h2>Online history</h2> <span id="outboxSum" class="muted"></span></summary>
+          <div class="more-body outbox">
+            <p class="hint">Practice start and end, every timed heat with its laps, and lights on and off are kept on this PC and sent online when an address is set, so pilots can look at their times at home. With no internet, they wait and go later.</p>
+            <div class="field"><label for="oUrl">Send to (https address)</label><input id="oUrl" class="input" placeholder="https://….supabase.co/rest/v1/flyday_events" autocomplete="off"></div>
+            <div class="field"><label for="oKey">Key</label><input id="oKey" class="input" type="password" autocomplete="new-password"></div>
+            <div class="field"><label for="oVenue">This place</label><input id="oVenue" class="input" placeholder="HOBIzone" autocomplete="off"></div>
+            <label class="toggle"><input type="checkbox" id="oOn"><span><b>Send</b> (off: only keep them here)</span></label>
+            <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Send now</button></div>
+            <p class="hint" id="oStatus"></p>
+          </div>
+        </details>
       </section>
 
       <section class="card">
@@ -698,6 +714,16 @@ function renderSetup() {
   $('autoStart').checked = cfg.autoStart !== false;
   $('nightStop').checked = cfg.nightStop !== false;
   if (document.activeElement !== $('nightStopAt')) $('nightStopAt').value = String(cfg.nightStopAt ?? 1230);
+  // Room lights from the kiosk webcam.
+  const lt = cfg.lights ?? { enabled: true, dark: 40 }, light = state.light ?? { state: 'unknown' };
+  $('lightsOn').checked = lt.enabled;
+  if (document.activeElement !== $('lightsDark')) {
+    if (![...$('lightsDark').options].some((o) => +o.value === lt.dark)) $('lightsDark').add(new Option(String(lt.dark), lt.dark));
+    $('lightsDark').value = String(lt.dark);
+  }
+  $('lightNow').textContent = light.state === 'unknown' ? 'Now: no reading from the kiosk webcam.'
+    : `Now: lights ${light.state}, the picture's brightness is ${light.level}.`;
+  renderOutbox();
   // What a clean start goes back to, and whether the setup differs from it now.
   const d = cfg.sessionDefaults ?? { heatSeconds: 180, changeoverSeconds: 120, heatCount: 4, channels: ['R1', 'R2', 'F2', 'F4', 'R7', 'R8'] };
   const same = d.heatSeconds === cfg.heatSeconds && d.changeoverSeconds === cfg.changeoverSeconds && d.heatCount === cfg.heatCount && d.channels.join() === cfg.channels.join();
@@ -731,6 +757,40 @@ $('slotChannels').onchange = async (e) => {
   if (!sel) return;
   sel.blur();
   if (await act('/api/slot-channel', { slot: Number(sel.dataset.slot), channel: sel.value }) !== undefined) toast(`${sel.value} in every heat.`, true);
+};
+$('lightsOn').onchange = (e) => act('/api/config', { lights: { enabled: e.target.checked } });
+$('lightsDark').innerHTML = [10, 15, 20, 25, 30, 40, 50, 60, 80, 100].map((n) => `<option value="${n}">${n}</option>`).join('');
+$('lightsDark').onchange = (e) => { e.target.blur(); act('/api/config', { lights: { dark: Number(e.target.value) } }); };
+
+// ---------- online history (the outbox) ----------
+const ago = (t) => {
+  const m = Math.round((Date.now() - t) / 60_000);
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+};
+function renderOutbox() {
+  const cfg = state.config.cloud ?? {}, o = state.outbox ?? { pending: 0, sent: 0 };
+  for (const [id, v] of [['oUrl', cfg.url], ['oVenue', cfg.venue]]) if (document.activeElement !== $(id)) $(id).value = v ?? '';
+  $('oVenue').placeholder = o.venue ?? '';
+  $('oKey').placeholder = cfg.keySet ? 'Saved (type to change)' : 'From the server you send to';
+  $('oOn').checked = !!cfg.enabled;
+  const waiting = `${o.pending} event${o.pending === 1 ? '' : 's'} waiting`;
+  $('outboxSum').textContent = !cfg.enabled || !cfg.url ? `· keeping, ${waiting}` : o.lastError ? '· not sending' : o.pending ? `· ${waiting}` : '· sent';
+  $('outboxSum').className = cfg.enabled && cfg.url && o.lastError ? 'warn-text' : 'muted';
+  $('oStatus').textContent = [
+    `${waiting} on this PC, ${o.sent} sent.`,
+    !cfg.url ? 'No address yet: they wait here.' : !cfg.enabled ? 'Sending is off: they wait here.' : '',
+    o.lastOk ? `Last sent ${ago(o.lastOk)}.` : '',
+    cfg.enabled && cfg.url && o.lastError ? `Last try failed: ${o.lastError}. Trying again every minute.` : '',
+  ].filter(Boolean).join(' ');
+}
+$('oSave').onclick = async () => {
+  const r = await act('/api/config', { cloud: { url: $('oUrl').value, key: $('oKey').value, venue: $('oVenue').value, enabled: $('oOn').checked } });
+  if (r !== undefined) { $('oKey').value = ''; toast('Saved.', true); }
+};
+$('oOn').onchange = (e) => act('/api/config', { cloud: { enabled: e.target.checked } });
+$('oSend').onclick = async () => {
+  const st = await act('/api/outbox/send');
+  if (st) toast(st.lastError ? `Not sent: ${st.lastError}` : `Sent. ${st.pending} waiting.`, !st.lastError);
 };
 $('saveDefaults').onclick = async () => {
   if (await act('/api/action', { type: 'saveDefaults' }) !== undefined) toast('Saved: practice goes back to this setup when it ends.', true);
@@ -1146,7 +1206,7 @@ document.addEventListener('toggle', (e) => {
   if (!(d instanceof HTMLDetailsElement) || !d.id || !d.classList.contains('more')) return;
   try { localStorage.setItem(`flyday.more.${d.id}`, d.open ? '1' : ''); } catch {}
 }, true);
-try { if (localStorage.getItem('flyday.more.setupMore')) $('setupMore').open = true; } catch {}
+try { for (const id of ['setupMore', 'outboxMore']) if (localStorage.getItem(`flyday.more.${id}`)) $(id).open = true; } catch {}
 // The firewall check takes a few seconds after start: look again.
 setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 

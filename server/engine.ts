@@ -13,6 +13,8 @@ import {
   type Pilot,
   type SavedData,
   type SessionDefaults,
+  type LightsConfig,
+  type CloudConfig,
   type TimerCommand,
   type TimerConfig,
   type TimedRun,
@@ -27,6 +29,8 @@ export interface EngineOptions {
   onAudio?: (event: AudioEvent) => void;
   /** Called after any change worth showing on screens or saving. */
   onChange?: () => void;
+  /** Something worth keeping in the outbox happened (session start/end, a timed heat, lights). */
+  onEvent?: (type: string, data: Record<string, unknown>) => void;
   /** Lap timer commands: set the receivers and start at the BEEP, or stop. */
   onTimer?: (command: TimerCommand) => void;
 }
@@ -55,6 +59,12 @@ interface LiveTiming {
 
 /** End of the day: how long the "still flying?" question waits, and how long "yes" holds it off. */
 const NIGHT_GRACE_MS = 5 * 60_000;
+/** Dark this long before the lights count as off (a shadow or a moment's dip doesn't). */
+const LIGHTS_OFF_AFTER_MS = 60_000;
+/** How much brighter than the dark line it must be to count as on again. */
+const LIGHT_MARGIN = 10;
+/** No reading from the kiosk for this long: lights unknown. */
+const LIGHT_STALE_MS = 3 * 60_000;
 /** Callout wordings that earlier versions had as defaults; saved unchanged, they follow the new default. */
 const OLD_DEFAULT_TEXTS: Record<string, string> = {
   nightEnd: 'Practice is over for today. Thanks for flying, good night.',
@@ -136,7 +146,9 @@ export class Engine {
   heats: (string | null)[][] = [];
   private autoStartPending = false;
   /** End of the day: the "still flying?" question is up until this time (ms), or null. */
-  night: { deadline: number } | null = null;
+  night: { deadline: number; why: 'late' | 'lights' } | null = null;
+  /** Room lights as the kiosk webcam sees them. */
+  light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null } = { state: 'unknown', level: null, at: null, darkSince: null };
   private nightSnoozeUntil = 0;
   clock: ClockState = {
     phase: 'stopped',
@@ -163,6 +175,7 @@ export class Engine {
   private newId: () => string;
   private onAudio: (event: AudioEvent) => void;
   private onChange: () => void;
+  private onEvent: (type: string, data: Record<string, unknown>) => void;
   private onTimer: (command: TimerCommand) => void;
   /** Lap timer connection, as reported by the timer link. */
   timer: TimerStatus = { state: 'off', nodes: 0, message: '' };
@@ -197,6 +210,8 @@ export class Engine {
       },
       sound: { ...DEFAULT_CONFIG.sound, ...(saved.sound ?? {}) },
       timer: { ...DEFAULT_CONFIG.timer, ...(saved.timer ?? {}) },
+      lights: { ...DEFAULT_CONFIG.lights, ...(saved.lights ?? {}) },
+      cloud: { ...DEFAULT_CONFIG.cloud, ...(saved.cloud ?? {}) },
     };
     // Saved by an older version: the start sequence no longer has ready beeps by default.
     if ((data.version ?? 1) < 2 && data.config) this.config.callouts.readyBeeps = false;
@@ -208,6 +223,7 @@ export class Engine {
     this.newId = opts.newId ?? (() => Math.random().toString(36).slice(2, 10));
     this.onAudio = opts.onAudio ?? (() => {});
     this.onChange = opts.onChange ?? (() => {});
+    this.onEvent = opts.onEvent ?? (() => {});
     this.onTimer = opts.onTimer ?? (() => {});
     this.normaliseHeats();
   }
@@ -454,6 +470,7 @@ export class Engine {
     c.round = 1;
     c.heatsRun = 0;
     c.startedAt = now;
+    this.onEvent('session.start', { startedAt: now });
     c.heat = this.nextHeat(0);
     this.setPhase('freeflight', null);
     c.freeSince = now;
@@ -470,7 +487,8 @@ export class Engine {
    */
   nightTick(now: number, localMinutes: number) {
     const c = this.clock;
-    if (c.phase === 'stopped' || !this.config.nightStop) {
+    // The lights-off question has its own switch: End of the day being off doesn't cancel it.
+    if (c.phase === 'stopped' || (!this.config.nightStop && this.night?.why !== 'lights')) {
       if (this.night) { this.night = null; this.onChange(); }
       return;
     }
@@ -479,10 +497,10 @@ export class Engine {
       return;
     }
     const late = localMinutes >= this.config.nightStopAt || localMinutes < 5 * 60;
-    if (!late || now < this.nightSnoozeUntil) return;
+    if (!this.config.nightStop || !late || now < this.nightSnoozeUntil) return;
     // A session started late gets its first hour too: somebody has only just arrived.
     if (c.startedAt != null && now - c.startedAt < NIGHT_SNOOZE_MS) return;
-    this.night = { deadline: now + NIGHT_GRACE_MS };
+    this.night = { deadline: now + NIGHT_GRACE_MS, why: 'late' };
     this.say(this.config.callouts.texts.nightAsk);
     this.onChange();
   }
@@ -532,6 +550,7 @@ export class Engine {
 
   /** The end time's done: practice stops and the next session starts clean. */
   private finishSession(text: string) {
+    this.sessionEnded('endTime');
     this.closeTiming(true);
     this.setPhase('stopped', null);
     this.cleanSlate();
@@ -548,8 +567,67 @@ export class Engine {
     this.onChange();
   }
 
+  /** For the outbox: practice ended, and why. Before the clean start, while the pilots are still known. */
+  private sessionEnded(reason: 'stop' | 'endTime' | 'night' | 'lights' | 'reset') {
+    const c = this.clock;
+    if (c.phase === 'stopped') return;
+    this.onEvent('session.end', {
+      reason, startedAt: c.startedAt, rounds: c.round, heatsRun: c.heatsRun,
+      pilots: [...this.pilots.values()].map((p) => p.callsign).sort((a, b) => a.localeCompare(b)),
+    });
+  }
+
+  /**
+   * The kiosk webcam's brightness reading (0–255, the picture's average). Dark for a minute
+   * means the lights are off; one bright reading means they're on. Readings stop coming
+   * (kiosk off, no camera): unknown after three minutes (lightTick).
+   */
+  lightReading(level: number, now: number) {
+    const n = Number(level);
+    if (!Number.isFinite(n) || n < 0 || n > 255) throw new EngineError('Brightness is 0 to 255.');
+    const l = this.light;
+    l.level = Math.round(n);
+    l.at = now;
+    const dark = this.config.lights.dark;
+    if (n < dark) {
+      l.darkSince ??= now;
+      if (l.state !== 'off' && now - l.darkSince >= LIGHTS_OFF_AFTER_MS) this.lightsChanged('off', now);
+    } else {
+      l.darkSince = null;
+      // A little above the line, so a flickering reading near it doesn't switch back and forth.
+      if (l.state !== 'on' && (l.state === 'unknown' || n >= dark + LIGHT_MARGIN)) this.lightsChanged('on', now);
+    }
+    this.onChange();
+  }
+
+  /** Every second: no reading for a while means nobody can tell. */
+  lightTick(now: number) {
+    const l = this.light;
+    if (l.state !== 'unknown' && l.at !== null && now - l.at > LIGHT_STALE_MS) {
+      l.state = 'unknown';
+      l.darkSince = null;
+      this.onChange();
+    }
+  }
+
+  private lightsChanged(to: 'on' | 'off', now: number) {
+    this.light.state = to;
+    this.onEvent('lights', { on: to === 'on', level: this.light.level });
+    if (to === 'off') {
+      // Practice is on with the lights off: has everyone gone home? The usual end-of-day question.
+      if (this.config.lights.enabled && this.clock.phase !== 'stopped' && !this.night) {
+        this.night = { deadline: now + NIGHT_GRACE_MS, why: 'lights' };
+        this.say(this.config.callouts.texts.lightsOffAsk);
+      }
+    } else if (this.night?.why === 'lights') {
+      this.night = null; // someone switched them back on
+    }
+    this.onChange();
+  }
+
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
   private endOfDay() {
+    this.sessionEnded(this.night?.why === 'lights' ? 'lights' : 'night');
     this.night = null;
     this.nightSnoozeUntil = 0;
     this.closeTiming(true);
@@ -787,6 +865,7 @@ export class Engine {
     if (rows.some((r) => r.passes)) this.lastTimes = { heat: live.heat, rows };
     const run = this.runOf(live);
     if (run.laps.length) {
+      this.onEvent('heat', { ...run });
       this.runs.push(run);
       if (this.runs.length > 2000) this.runs.splice(0, this.runs.length - 2000);
     }
@@ -889,6 +968,8 @@ export class Engine {
     }
     list.push(at);
     live.passes.set(id, list);
+    // Laps coming in: somebody is clearly flying, lights or not.
+    if (this.night?.why === 'lights') this.night = null;
     const times = pilotTimes(id, t.slot, list);
     this.noteBest(id, times);
     if (times.last !== null) this.callLap(id, times.laps.length, times.last);
@@ -919,12 +1000,14 @@ export class Engine {
         c.round = 1;
         c.heatsRun = 0;
         c.startedAt = now;
+        this.onEvent('session.start', { startedAt: now });
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStart);
         c.heat = 0;
         this.goToNextHeat(now, 0);
         c.round = 1;
         return;
       case 'stop':
+        this.sessionEnded('stop');
         this.closeTiming(true);
         c.startedAt = null;
         c.pauseAfter = false;
@@ -935,6 +1018,7 @@ export class Engine {
         return;
       case 'reset':
         // RD: a clean start now. Running practice stops first (no goodbye: the RD is right there).
+        this.sessionEnded('reset');
         this.closeTiming(true);
         this.setPhase('stopped', null);
         this.cleanSlate();
@@ -1704,6 +1788,8 @@ export class Engine {
     if (patch.nightStop !== undefined) next.nightStop = Boolean(patch.nightStop);
     if (patch.nightStopAt !== undefined && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== undefined) next.timer = cleanTimer(patch.timer, next.timer);
+    if (patch.lights !== undefined) next.lights = cleanLights(patch.lights, next.lights);
+    if (patch.cloud !== undefined) next.cloud = cleanCloud(patch.cloud, next.cloud);
     if (patch.callouts !== undefined) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== undefined) next.sound = cleanSound(patch.sound, next.sound);
     // Everything checked: now apply.
@@ -1795,7 +1881,12 @@ export class Engine {
     return {
       serverNow: now,
       // The timer password stays on the RD PC.
-      config: { ...this.config, timer: { ...this.config.timer, password: '', passwordSet: !!this.config.timer.password } },
+      config: {
+        ...this.config,
+        timer: { ...this.config.timer, password: '', passwordSet: !!this.config.timer.password },
+        cloud: { ...this.config.cloud, key: '', keySet: !!this.config.cloud.key },
+      },
+      light: this.light,
       clock: this.clock,
       pilots: [...this.pilots.values()].sort((a, b) => a.callsign.localeCompare(b.callsign)),
       heats: this.heats.map((row, h) => ({
@@ -1849,6 +1940,30 @@ function cleanTimer(patch: Partial<TimerConfig>, current: TimerConfig): TimerCon
   }
   if (patch.user !== undefined) out.user = String(patch.user).trim().slice(0, 60);
   if (patch.password !== undefined && patch.password !== '') out.password = String(patch.password).slice(0, 100);
+  return out;
+}
+
+function cleanLights(patch: Partial<LightsConfig>, current: LightsConfig): LightsConfig {
+  const out = { ...current };
+  if (patch.enabled !== undefined) out.enabled = Boolean(patch.enabled);
+  if (patch.dark !== undefined) {
+    const n = Math.round(Number(patch.dark));
+    if (!(n >= 1 && n <= 200)) throw new EngineError('The dark line is between 1 and 200.');
+    out.dark = n;
+  }
+  return out;
+}
+
+function cleanCloud(patch: Partial<CloudConfig>, current: CloudConfig): CloudConfig {
+  const out = { ...current };
+  if (patch.enabled !== undefined) out.enabled = Boolean(patch.enabled);
+  if (patch.url !== undefined) {
+    const url = String(patch.url).trim();
+    if (url && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(url)) throw new EngineError('The address starts with https://');
+    out.url = url.slice(0, 500);
+  }
+  if (patch.key !== undefined && patch.key !== '') out.key = String(patch.key).trim().slice(0, 2000);
+  if (patch.venue !== undefined) out.venue = String(patch.venue).replace(/\s+/g, ' ').trim().slice(0, 40);
   return out;
 }
 

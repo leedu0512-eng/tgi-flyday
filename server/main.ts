@@ -16,6 +16,7 @@ import { VERSION } from './version.ts';
 import { Engine, EngineError } from './engine.ts';
 import { load, saver } from './store.ts';
 import { RotorHazardLink } from './rotorhazard.ts';
+import { Outbox } from './outbox.ts';
 import type { AudioEvent } from './types.ts';
 
 /** Running as the packaged FlyDay.exe (a Node single executable application). */
@@ -125,7 +126,10 @@ function broadcast(type: string, payload: unknown) {
 let stateDirty = false;
 const saved = load(DATA_FILE);
 let timerLink: RotorHazardLink | null = null;
+// The outbox: events wait in data/outbox.jsonl until they can go online (see outbox.ts).
+let outbox: Outbox | null = null;
 const engine = new Engine(saved, {
+  onEvent: (type, data) => outbox?.add(type, data),
   onTimer: (cmd) => timerLink?.command(cmd),
   onAudio: (e: AudioEvent) => broadcast('audio', { ...e, at: Date.now() }),
   onChange: () => {
@@ -134,6 +138,11 @@ const engine = new Engine(saved, {
   },
 });
 const store = saver(DATA_FILE, () => engine.toSaved());
+outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostname(), (m) => console.log(new Date().toLocaleTimeString(), m));
+/** What the screens get: the engine's state plus how the outbox is doing. */
+const snapshot = (now: number) => ({ ...engine.snapshot(now), outbox: { ...outbox!.status(), venue: outbox!.venue() } });
+// Send what's waiting every half minute (when sending is set up); a failure waits a minute.
+setInterval(() => { void outbox!.flush().then(() => { stateDirty = true; }); }, 30_000);
 engine.resume(saved.clock, Date.now());
 // Photos taken before they were remembered by name: remember them now.
 for (const p of engine.pilots.values()) if (p.photo && !existsSync(knownFile(p.callsign))) rememberPhoto(p.id);
@@ -168,9 +177,10 @@ setInterval(() => {
   const d = new Date();
   engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
   engine.finishTick(Date.now());
+  engine.lightTick(Date.now());
   if (stateDirty) {
     stateDirty = false;
-    broadcast('state', engine.snapshot(Date.now()));
+    broadcast('state', snapshot(Date.now()));
   }
 }, 50);
 
@@ -253,6 +263,8 @@ const API: Record<string, Handler> = {
   },
   '/api/config': (b) => engine.setConfig(b),
   '/api/compact': () => engine.compact(),
+  // Kiosk webcam: the room's brightness (0–255). Answers whether the kiosk should keep reading it.
+  '/api/light': (b) => { engine.lightReading(Number(b.level), Date.now()); return { enabled: true }; },
   '/api/club-quads': (b) => engine.setClubQuads(b.quads),
   // RD: the session's end time as "HH:MM" local time (the next time the clock shows it), or null.
   '/api/finish': (b) => {
@@ -290,7 +302,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     req.socket.setNoDelay(true);
     // Tell the browser to retry after 1 s if the connection drops.
     res.write(`retry: 1000\nevent: ping\ndata: ${JSON.stringify({ t: Date.now(), v: webVersion })}\n\n`);
-    res.write(`event: state\ndata: ${JSON.stringify(engine.snapshot(Date.now()))}\n\n`);
+    res.write(`event: state\ndata: ${JSON.stringify(snapshot(Date.now()))}\n\n`);
     clients.add(res);
     const drop = () => clients.delete(res);
     req.on('close', drop);
@@ -299,7 +311,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     return;
   }
 
-  if (path === '/api/state' && req.method === 'GET') return json(res, 200, engine.snapshot(Date.now()));
+  if (path === '/api/state' && req.method === 'GET') return json(res, 200, snapshot(Date.now()));
   // Pilot's phone page: remember the name used, in a cookie the RD PC sets (iPhones keep
   // those; a page's own storage is wiped after 7 days without a visit).
   if (path === '/api/remember-me' && req.method === 'POST') {
@@ -395,6 +407,13 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     } catch {
       return json(res, 404, { error: 'Not found.' });
     }
+  }
+
+  // RD console: send the outbox now and say how it went.
+  if (path === '/api/outbox/send' && req.method === 'POST') {
+    const st = await outbox!.flush(true);
+    stateDirty = true;
+    return json(res, 200, { ok: true, result: st });
   }
 
   if (path in API) {

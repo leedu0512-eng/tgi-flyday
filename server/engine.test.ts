@@ -1151,3 +1151,68 @@ test('clean start goes back to the saved defaults; broken saved defaults fall ba
   const bad = new Engine({ config: { sessionDefaults: { heatSeconds: 120, changeoverSeconds: 120, heatCount: 2, channels: ['R1', 'R1'] } } as any });
   assert.deepEqual(bad.setupDefaults().channels, ['R1', 'R2', 'F2', 'F4', 'R7', 'R8']);
 });
+
+test('lights: dark for a minute means off; off during practice asks "Still flying?", no answer ends it clean', () => {
+  const events: [string, any][] = [];
+  let id = 0;
+  const audio: AudioEvent[] = [];
+  const e = new Engine({ config: { freeFlight: true } as any }, { newId: () => `p${++id}`, onAudio: (a) => audio.push(a), onEvent: (t, d) => events.push([t, d]) });
+  const said = () => audio.filter((a) => a.kind === 'say').map((a: any) => a.text);
+  e.lightReading(120, 0);
+  assert.equal(e.light.state, 'on');
+  e.walkIn('Chirp'); e.tick(1000);
+  assert.equal(e.clock.phase, 'freeflight');
+  e.lightReading(10, 10_000);
+  assert.equal(e.light.state, 'on', 'one dark reading is not enough');
+  e.lightReading(12, 50_000);
+  assert.equal(e.light.state, 'on');
+  e.lightReading(15, 70_000);
+  assert.equal(e.light.state, 'off');
+  assert.equal(e.night?.why, 'lights');
+  assert.match(said().at(-1)!, /The lights are off\. Is anyone still flying/);
+  // Back on before the time is up: carry on.
+  e.lightReading(45, 80_000);
+  assert.equal(e.light.state, 'off', 'just over the line is not enough');
+  e.lightReading(60, 90_000);
+  assert.equal(e.light.state, 'on');
+  assert.equal(e.night, null);
+  // Off again, nobody answers: clean start.
+  e.lightReading(5, 100_000); e.lightReading(5, 160_000);
+  assert.equal(e.night?.why, 'lights');
+  e.nightTick(160_000 + 5 * 60_000, 18 * 60);
+  assert.equal(e.clock.phase, 'stopped');
+  assert.equal(e.pilots.size, 0);
+  const end = events.find(([t]) => t === 'session.end');
+  assert.equal(end?.[1].reason, 'lights');
+  assert.deepEqual(end?.[1].pilots, ['Chirp']);
+  assert.deepEqual(events.filter(([t]) => t === 'lights').map(([, d]) => d.on), [true, false, true, false]);
+  assert.equal(events[1][0], 'session.start');
+});
+
+test('lights: off while stopped asks nothing; switched off, or End of the day off, behave', () => {
+  const { e } = setup();
+  e.lightReading(100, 0); e.lightReading(5, 1000); e.lightReading(5, 70_000);
+  assert.equal(e.light.state, 'off');
+  assert.equal(e.night, null, 'nothing running');
+  // The lights switch off: no question.
+  e.lightReading(100, 80_000);
+  e.setConfig({ lights: { enabled: false } as any });
+  e.join('A', 0, 0); e.action('start', 80_000);
+  e.lightReading(5, 90_000); e.lightReading(5, 160_000);
+  assert.equal(e.night, null);
+  // End of the day off doesn't cancel a lights question.
+  e.lightReading(100, 170_000);
+  e.setConfig({ lights: { enabled: true } as any, nightStop: false });
+  e.lightReading(5, 180_000); e.lightReading(5, 250_000);
+  e.nightTick(251_000, 18 * 60);
+  assert.equal(e.night?.why, 'lights');
+  // No readings for three minutes: unknown.
+  e.lightTick(250_000 + 3 * 60_000 + 1);
+  assert.equal(e.light.state, 'unknown');
+  assert.throws(() => e.setConfig({ lights: { dark: 0 } as any }), /between 1 and 200/);
+  assert.throws(() => e.setConfig({ cloud: { url: 'http://x.ee' } as any }), /https/);
+  e.setConfig({ cloud: { url: 'https://abc.supabase.co/rest/v1/flyday_events', key: 'secret', venue: 'HOBIzone' } as any });
+  const snap = e.snapshot(0) as any;
+  assert.equal(snap.config.cloud.key, '', 'the key stays on the RD PC');
+  assert.equal(snap.config.cloud.keySet, true);
+});

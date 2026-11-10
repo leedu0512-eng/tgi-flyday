@@ -295,6 +295,7 @@ function cameraView() {
 }
 
 async function startCamera() {
+  lightStop(); // the photo needs the webcam to itself
   try {
     if (!stream) {
       stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 }, facingMode: 'user' }, audio: false });
@@ -519,6 +520,50 @@ $('view').addEventListener('click', async (e) => {
     } catch (err) { toast(err.message); }
   }
 });
+
+// ---------- room lights ----------
+// The webcam doubles as a light meter: every 20 s the server gets the picture's average
+// brightness (0-255), nothing else. No picture is kept or sent. The server decides from that
+// whether the lights are on. The kiosk inside the big screen leaves this to the real kiosk.
+let lightStream = null, lightVideo = null, lightRetryAt = 0;
+const lightCanvas = document.createElement('canvas');
+lightCanvas.width = 64; lightCanvas.height = 48;
+async function lightStart() {
+  if (lightStream || stream || Date.now() < lightRetryAt) return;
+  try {
+    lightStream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 320 }, height: { ideal: 240 } }, audio: false });
+    lightVideo = document.createElement('video');
+    lightVideo.muted = true; lightVideo.playsInline = true;
+    lightVideo.srcObject = lightStream;
+    await lightVideo.play();
+  } catch {
+    lightStop();
+    lightRetryAt = Date.now() + 5 * 60_000; // no camera, or busy: try again in a while
+  }
+}
+function lightStop() {
+  lightStream?.getTracks().forEach((t) => t.stop());
+  lightStream = null; lightVideo = null;
+}
+function lightLevel() {
+  const v = lightVideo;
+  if (!v?.videoWidth) return null;
+  const ctx = lightCanvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(v, 0, 0, 64, 48);
+  const d = ctx.getImageData(0, 0, 64, 48).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+  return sum / (d.length / 4);
+}
+async function lightCheck() {
+  if (EMBED || !navigator.mediaDevices?.getUserMedia) return;
+  if (view === 'camera' || stream) { lightStop(); return; }
+  await lightStart();
+  const level = lightLevel();
+  if (level !== null) post('/api/light', { level: Math.round(level) }).catch(() => {});
+}
+setTimeout(lightCheck, 3000);
+setInterval(lightCheck, 20_000);
 
 connect({
   canReload: () => view === 'home',

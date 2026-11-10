@@ -26,9 +26,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server/main.ts
 var import_node_http = require("node:http");
 var import_promises2 = require("node:fs/promises");
-var import_node_fs4 = require("node:fs");
+var import_node_fs5 = require("node:fs");
 var import_node_os = require("node:os");
-var import_node_path4 = require("node:path");
+var import_node_path5 = require("node:path");
 var import_node_url = require("node:url");
 var sea = __toESM(require("node:sea"), 1);
 
@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.10-1940" : "dev";
+var VERSION = true ? "2026.11.10-1947" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -283,6 +283,8 @@ var DEFAULT_CONFIG = {
   ],
   timer: { enabled: false, host: "", user: "admin", password: "rotorhazard" },
   sessionDefaults: null,
+  lights: { enabled: true, dark: 40 },
+  cloud: { enabled: false, url: "", key: "", venue: "" },
   callouts: {
     sessionStartStop: true,
     lineup: true,
@@ -319,6 +321,7 @@ var DEFAULT_CONFIG = {
       freeFlightOpen: "Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.",
       heatsForm: "More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.",
       nightAsk: "Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.",
+      lightsOffAsk: "The lights are off. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.",
       nightSnooze: "OK, carry on. I will ask again in an hour.",
       nightEnd: "Practice is over for today. Thank you all for flying! Please leave the club cleaner than you found it. Good night!",
       gatePass: "{name}, {laptime}",
@@ -393,6 +396,9 @@ function pilotTimes(pilotId, slot, passes) {
 var FINISH_WINDOW_MS = 3e4;
 var MIN_LAP_MS = 2e3;
 var NIGHT_GRACE_MS = 5 * 6e4;
+var LIGHTS_OFF_AFTER_MS = 6e4;
+var LIGHT_MARGIN = 10;
+var LIGHT_STALE_MS = 3 * 6e4;
 var OLD_DEFAULT_TEXTS = {
   nightEnd: "Practice is over for today. Thanks for flying, good night.",
   sessionStop: "Practice session stopped."
@@ -466,6 +472,8 @@ var Engine = class {
   autoStartPending = false;
   /** End of the day: the "still flying?" question is up until this time (ms), or null. */
   night = null;
+  /** Room lights as the kiosk webcam sees them. */
+  light = { state: "unknown", level: null, at: null, darkSince: null };
   nightSnoozeUntil = 0;
   clock = {
     phase: "stopped",
@@ -491,6 +499,7 @@ var Engine = class {
   newId;
   onAudio;
   onChange;
+  onEvent;
   onTimer;
   /** Lap timer connection, as reported by the timer link. */
   timer = { state: "off", nodes: 0, message: "" };
@@ -523,7 +532,9 @@ var Engine = class {
         }
       },
       sound: { ...DEFAULT_CONFIG.sound, ...saved2.sound ?? {} },
-      timer: { ...DEFAULT_CONFIG.timer, ...saved2.timer ?? {} }
+      timer: { ...DEFAULT_CONFIG.timer, ...saved2.timer ?? {} },
+      lights: { ...DEFAULT_CONFIG.lights, ...saved2.lights ?? {} },
+      cloud: { ...DEFAULT_CONFIG.cloud, ...saved2.cloud ?? {} }
     };
     if ((data.version ?? 1) < 2 && data.config) this.config.callouts.readyBeeps = false;
     for (const p of data.pilots ?? []) this.pilots.set(p.id, { ...p });
@@ -535,6 +546,8 @@ var Engine = class {
     this.onAudio = opts.onAudio ?? (() => {
     });
     this.onChange = opts.onChange ?? (() => {
+    });
+    this.onEvent = opts.onEvent ?? (() => {
     });
     this.onTimer = opts.onTimer ?? (() => {
     });
@@ -750,6 +763,7 @@ var Engine = class {
     c.round = 1;
     c.heatsRun = 0;
     c.startedAt = now;
+    this.onEvent("session.start", { startedAt: now });
     c.heat = this.nextHeat(0);
     this.setPhase("freeflight", null);
     c.freeSince = now;
@@ -765,7 +779,7 @@ var Engine = class {
    */
   nightTick(now, localMinutes) {
     const c = this.clock;
-    if (c.phase === "stopped" || !this.config.nightStop) {
+    if (c.phase === "stopped" || !this.config.nightStop && this.night?.why !== "lights") {
       if (this.night) {
         this.night = null;
         this.onChange();
@@ -777,9 +791,9 @@ var Engine = class {
       return;
     }
     const late = localMinutes >= this.config.nightStopAt || localMinutes < 5 * 60;
-    if (!late || now < this.nightSnoozeUntil) return;
+    if (!this.config.nightStop || !late || now < this.nightSnoozeUntil) return;
     if (c.startedAt != null && now - c.startedAt < NIGHT_SNOOZE_MS) return;
-    this.night = { deadline: now + NIGHT_GRACE_MS };
+    this.night = { deadline: now + NIGHT_GRACE_MS, why: "late" };
     this.say(this.config.callouts.texts.nightAsk);
     this.onChange();
   }
@@ -828,6 +842,7 @@ var Engine = class {
   }
   /** The end time's done: practice stops and the next session starts clean. */
   finishSession(text) {
+    this.sessionEnded("endTime");
     this.closeTiming(true);
     this.setPhase("stopped", null);
     this.cleanSlate();
@@ -842,8 +857,64 @@ var Engine = class {
     this.say(this.config.callouts.texts.nightSnooze);
     this.onChange();
   }
+  /** For the outbox: practice ended, and why. Before the clean start, while the pilots are still known. */
+  sessionEnded(reason) {
+    const c = this.clock;
+    if (c.phase === "stopped") return;
+    this.onEvent("session.end", {
+      reason,
+      startedAt: c.startedAt,
+      rounds: c.round,
+      heatsRun: c.heatsRun,
+      pilots: [...this.pilots.values()].map((p) => p.callsign).sort((a, b) => a.localeCompare(b))
+    });
+  }
+  /**
+   * The kiosk webcam's brightness reading (0–255, the picture's average). Dark for a minute
+   * means the lights are off; one bright reading means they're on. Readings stop coming
+   * (kiosk off, no camera): unknown after three minutes (lightTick).
+   */
+  lightReading(level, now) {
+    const n = Number(level);
+    if (!Number.isFinite(n) || n < 0 || n > 255) throw new EngineError("Brightness is 0 to 255.");
+    const l = this.light;
+    l.level = Math.round(n);
+    l.at = now;
+    const dark = this.config.lights.dark;
+    if (n < dark) {
+      l.darkSince ??= now;
+      if (l.state !== "off" && now - l.darkSince >= LIGHTS_OFF_AFTER_MS) this.lightsChanged("off", now);
+    } else {
+      l.darkSince = null;
+      if (l.state !== "on" && (l.state === "unknown" || n >= dark + LIGHT_MARGIN)) this.lightsChanged("on", now);
+    }
+    this.onChange();
+  }
+  /** Every second: no reading for a while means nobody can tell. */
+  lightTick(now) {
+    const l = this.light;
+    if (l.state !== "unknown" && l.at !== null && now - l.at > LIGHT_STALE_MS) {
+      l.state = "unknown";
+      l.darkSince = null;
+      this.onChange();
+    }
+  }
+  lightsChanged(to, now) {
+    this.light.state = to;
+    this.onEvent("lights", { on: to === "on", level: this.light.level });
+    if (to === "off") {
+      if (this.config.lights.enabled && this.clock.phase !== "stopped" && !this.night) {
+        this.night = { deadline: now + NIGHT_GRACE_MS, why: "lights" };
+        this.say(this.config.callouts.texts.lightsOffAsk);
+      }
+    } else if (this.night?.why === "lights") {
+      this.night = null;
+    }
+    this.onChange();
+  }
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
   endOfDay() {
+    this.sessionEnded(this.night?.why === "lights" ? "lights" : "night");
     this.night = null;
     this.nightSnoozeUntil = 0;
     this.closeTiming(true);
@@ -1062,6 +1133,7 @@ var Engine = class {
     if (rows.some((r) => r.passes)) this.lastTimes = { heat: live.heat, rows };
     const run = this.runOf(live);
     if (run.laps.length) {
+      this.onEvent("heat", { ...run });
       this.runs.push(run);
       if (this.runs.length > 2e3) this.runs.splice(0, this.runs.length - 2e3);
     }
@@ -1181,6 +1253,7 @@ var Engine = class {
     }
     list.push(at);
     live.passes.set(id, list);
+    if (this.night?.why === "lights") this.night = null;
     const times = pilotTimes(id, t.slot, list);
     this.noteBest(id, times);
     if (times.last !== null) this.callLap(id, times.laps.length, times.last);
@@ -1207,12 +1280,14 @@ var Engine = class {
         c.round = 1;
         c.heatsRun = 0;
         c.startedAt = now;
+        this.onEvent("session.start", { startedAt: now });
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStart);
         c.heat = 0;
         this.goToNextHeat(now, 0);
         c.round = 1;
         return;
       case "stop":
+        this.sessionEnded("stop");
         this.closeTiming(true);
         c.startedAt = null;
         c.pauseAfter = false;
@@ -1222,6 +1297,7 @@ var Engine = class {
         if (this.config.callouts.sessionStartStop) this.say(this.config.callouts.texts.sessionStop);
         return;
       case "reset":
+        this.sessionEnded("reset");
         this.closeTiming(true);
         this.setPhase("stopped", null);
         this.cleanSlate();
@@ -1960,6 +2036,8 @@ var Engine = class {
     if (patch.nightStop !== void 0) next.nightStop = Boolean(patch.nightStop);
     if (patch.nightStopAt !== void 0 && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== void 0) next.timer = cleanTimer(patch.timer, next.timer);
+    if (patch.lights !== void 0) next.lights = cleanLights(patch.lights, next.lights);
+    if (patch.cloud !== void 0) next.cloud = cleanCloud(patch.cloud, next.cloud);
     if (patch.callouts !== void 0) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== void 0) next.sound = cleanSound(patch.sound, next.sound);
     if (this.clock.heat >= next.heatCount) this.clock.heat = 0;
@@ -2042,7 +2120,12 @@ var Engine = class {
     return {
       serverNow: now,
       // The timer password stays on the RD PC.
-      config: { ...this.config, timer: { ...this.config.timer, password: "", passwordSet: !!this.config.timer.password } },
+      config: {
+        ...this.config,
+        timer: { ...this.config.timer, password: "", passwordSet: !!this.config.timer.password },
+        cloud: { ...this.config.cloud, key: "", keySet: !!this.config.cloud.key }
+      },
+      light: this.light,
       clock: this.clock,
       pilots: [...this.pilots.values()].sort((a, b) => a.callsign.localeCompare(b.callsign)),
       heats: this.heats.map((row, h) => ({
@@ -2094,6 +2177,28 @@ function cleanTimer(patch, current) {
   }
   if (patch.user !== void 0) out.user = String(patch.user).trim().slice(0, 60);
   if (patch.password !== void 0 && patch.password !== "") out.password = String(patch.password).slice(0, 100);
+  return out;
+}
+function cleanLights(patch, current) {
+  const out = { ...current };
+  if (patch.enabled !== void 0) out.enabled = Boolean(patch.enabled);
+  if (patch.dark !== void 0) {
+    const n = Math.round(Number(patch.dark));
+    if (!(n >= 1 && n <= 200)) throw new EngineError("The dark line is between 1 and 200.");
+    out.dark = n;
+  }
+  return out;
+}
+function cleanCloud(patch, current) {
+  const out = { ...current };
+  if (patch.enabled !== void 0) out.enabled = Boolean(patch.enabled);
+  if (patch.url !== void 0) {
+    const url = String(patch.url).trim();
+    if (url && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(url)) throw new EngineError("The address starts with https://");
+    out.url = url.slice(0, 500);
+  }
+  if (patch.key !== void 0 && patch.key !== "") out.key = String(patch.key).trim().slice(0, 2e3);
+  if (patch.venue !== void 0) out.venue = String(patch.venue).replace(/\s+/g, " ").trim().slice(0, 40);
   return out;
 }
 function cleanCallouts(patch, current) {
@@ -2401,38 +2506,147 @@ var RotorHazardLink = class {
   }
 };
 
+// server/outbox.ts
+var import_node_crypto2 = require("node:crypto");
+var import_node_fs4 = require("node:fs");
+var import_node_path4 = require("node:path");
+var BATCH = 200;
+var MAX_PENDING = 1e5;
+var Outbox = class {
+  file;
+  sentFile;
+  pending = [];
+  st = { pending: 0, sent: 0, lastOk: null, lastTry: null, lastError: "" };
+  busy = false;
+  nextTry = 0;
+  soonTimer = null;
+  config;
+  venueFallback;
+  log;
+  constructor(dataDir, config, venueFallback, log = () => {
+  }) {
+    this.config = config;
+    this.venueFallback = venueFallback;
+    this.log = log;
+    this.file = (0, import_node_path4.join)(dataDir, "outbox.jsonl");
+    this.sentFile = (0, import_node_path4.join)(dataDir, "outbox-sent.jsonl");
+    try {
+      if ((0, import_node_fs4.existsSync)(this.file)) {
+        for (const line of (0, import_node_fs4.readFileSync)(this.file, "utf8").split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            this.pending.push(JSON.parse(line));
+          } catch {
+          }
+        }
+      }
+      if ((0, import_node_fs4.existsSync)(this.sentFile)) this.st.sent = (0, import_node_fs4.readFileSync)(this.sentFile, "utf8").split("\n").filter((l) => l.trim()).length;
+    } catch (err) {
+      this.log(`Outbox: could not read it (${err.message}); starting empty.`);
+    }
+    this.st.pending = this.pending.length;
+  }
+  venue() {
+    return this.config().venue || this.venueFallback;
+  }
+  add(type, data, at = Date.now()) {
+    const ev = { id: (0, import_node_crypto2.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
+    this.pending.push(ev);
+    try {
+      (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
+      if (this.pending.length > MAX_PENDING) {
+        this.pending.splice(0, this.pending.length - MAX_PENDING);
+        this.rewrite();
+      } else (0, import_node_fs4.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
+    } catch (err) {
+      this.log(`Outbox: could not save an event (${err.message}).`);
+    }
+    this.st.pending = this.pending.length;
+    if (!this.soonTimer) this.soonTimer = setTimeout(() => {
+      this.soonTimer = null;
+      void this.flush();
+    }, 3e3);
+  }
+  status() {
+    return { ...this.st };
+  }
+  /** Send what's waiting (if sending is set up). Returns the status afterwards. */
+  async flush(force = false) {
+    const cfg = this.config();
+    if (!cfg.enabled || !cfg.url || this.busy || !this.pending.length) return this.status();
+    if (!force && Date.now() < this.nextTry) return this.status();
+    this.busy = true;
+    try {
+      while (this.pending.length) {
+        const batch = this.pending.slice(0, BATCH);
+        this.st.lastTry = Date.now();
+        const headers = { "content-type": "application/json", prefer: "return=minimal" };
+        if (cfg.key) {
+          headers.authorization = `Bearer ${cfg.key}`;
+          headers.apikey = cfg.key;
+        }
+        const res = await fetch(cfg.url, { method: "POST", headers, body: JSON.stringify(batch.map((e) => e.venue ? e : { ...e, venue: this.venue() })), signal: AbortSignal.timeout(2e4) });
+        if (!res.ok) {
+          const text = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 200);
+          throw new Error(`the server answered ${res.status}${text ? `: ${text}` : ""}`);
+        }
+        this.pending.splice(0, batch.length);
+        (0, import_node_fs4.appendFileSync)(this.sentFile, batch.map((e) => JSON.stringify(e)).join("\n") + "\n");
+        this.rewrite();
+        this.st.sent += batch.length;
+        this.st.pending = this.pending.length;
+        this.st.lastOk = Date.now();
+        this.st.lastError = "";
+      }
+      this.nextTry = 0;
+    } catch (err) {
+      const cause = err?.cause?.code || err?.cause?.message;
+      this.st.lastError = err?.name === "TimeoutError" ? "no answer in 20 seconds" : `${err?.message ?? err}${cause ? ` (${cause})` : ""}`;
+      this.nextTry = Date.now() + 6e4;
+    } finally {
+      this.busy = false;
+    }
+    return this.status();
+  }
+  rewrite() {
+    const tmp = `${this.file}.tmp`;
+    (0, import_node_fs4.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
+    (0, import_node_fs4.renameSync)(tmp, this.file);
+  }
+};
+
 // server/main.ts
 var IN_EXE = sea.isSea();
-var ROOT = IN_EXE ? (0, import_node_path4.dirname)(process.execPath) : (0, import_node_path4.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __flydayUrl)));
+var ROOT = IN_EXE ? (0, import_node_path5.dirname)(process.execPath) : (0, import_node_path5.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __flydayUrl)));
 var APP_DIR = process.env.FLYDAY_APP_DIR;
-var WEB = APP_DIR ? (0, import_node_path4.join)(APP_DIR, "web") : (0, import_node_path4.join)(ROOT, "web");
-var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs4.existsSync)((0, import_node_path4.join)(WEB, "console.html"));
+var WEB = APP_DIR ? (0, import_node_path5.join)(APP_DIR, "web") : (0, import_node_path5.join)(ROOT, "web");
+var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs5.existsSync)((0, import_node_path5.join)(WEB, "console.html"));
 async function webFile(full) {
   if (WEB_FROM_DISK) return (0, import_promises2.readFile)(full);
-  return Buffer.from(sea.getAsset("web/" + (0, import_node_path4.relative)(WEB, full).split(import_node_path4.sep).join("/")));
+  return Buffer.from(sea.getAsset("web/" + (0, import_node_path5.relative)(WEB, full).split(import_node_path5.sep).join("/")));
 }
-var DATA_FILE = process.env.FLYDAY_DATA ?? (0, import_node_path4.join)(ROOT, "data", "flyday.json");
+var DATA_FILE = process.env.FLYDAY_DATA ?? (0, import_node_path5.join)(ROOT, "data", "flyday.json");
 var PORT = Number(process.env.PORT ?? 8080);
-var PHOTOS = (0, import_node_path4.join)((0, import_node_path4.resolve)(DATA_FILE, ".."), "photos");
+var PHOTOS = (0, import_node_path5.join)((0, import_node_path5.resolve)(DATA_FILE, ".."), "photos");
 var photoFile = (id) => {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw new EngineError("No such pilot.");
-  return (0, import_node_path4.join)(PHOTOS, `${id}.jpg`);
+  return (0, import_node_path5.join)(PHOTOS, `${id}.jpg`);
 };
-var KNOWN = (0, import_node_path4.join)(PHOTOS, "known");
-var knownFile = (callsign) => (0, import_node_path4.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
+var KNOWN = (0, import_node_path5.join)(PHOTOS, "known");
+var knownFile = (callsign) => (0, import_node_path5.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
 function rememberPhoto(id) {
   const p = engine.pilots.get(id);
   if (!p?.photo) return;
   try {
-    (0, import_node_fs4.mkdirSync)(KNOWN, { recursive: true });
-    (0, import_node_fs4.copyFileSync)(photoFile(id), knownFile(p.callsign));
+    (0, import_node_fs5.mkdirSync)(KNOWN, { recursive: true });
+    (0, import_node_fs5.copyFileSync)(photoFile(id), knownFile(p.callsign));
   } catch {
   }
 }
-var KNOWN_FILE = (0, import_node_path4.join)((0, import_node_path4.resolve)(DATA_FILE, ".."), "known.json");
+var KNOWN_FILE = (0, import_node_path5.join)((0, import_node_path5.resolve)(DATA_FILE, ".."), "known.json");
 var known = (() => {
   try {
-    return JSON.parse((0, import_node_fs4.readFileSync)(KNOWN_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs5.readFileSync)(KNOWN_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -2450,8 +2664,8 @@ function rememberChannel(pilotId) {
     if (known[k]?.channel === channel && !!known[k]?.club === club) return;
     known[k] = { ...channel ? { channel } : {}, ...club ? { club } : {} };
     try {
-      (0, import_node_fs4.mkdirSync)((0, import_node_path4.resolve)(KNOWN_FILE, ".."), { recursive: true });
-      (0, import_node_fs4.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
+      (0, import_node_fs5.mkdirSync)((0, import_node_path5.resolve)(KNOWN_FILE, ".."), { recursive: true });
+      (0, import_node_fs5.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
     } catch {
     }
     return;
@@ -2461,17 +2675,17 @@ function restorePhotos() {
   for (const p of engine.pilots.values()) {
     if (p.photo) continue;
     const known2 = knownFile(p.callsign);
-    if (!(0, import_node_fs4.existsSync)(known2)) continue;
+    if (!(0, import_node_fs5.existsSync)(known2)) continue;
     try {
-      (0, import_node_fs4.mkdirSync)(PHOTOS, { recursive: true });
-      (0, import_node_fs4.copyFileSync)(known2, photoFile(p.id));
+      (0, import_node_fs5.mkdirSync)(PHOTOS, { recursive: true });
+      (0, import_node_fs5.copyFileSync)(known2, photoFile(p.id));
       engine.setPilotPhoto(p.id, Date.now().toString(36));
     } catch {
     }
   }
 }
-var OLD_DATA = (0, import_node_path4.join)(ROOT, "data", "eztimer.json");
-if (!process.env.FLYDAY_DATA && !(0, import_node_fs4.existsSync)(DATA_FILE) && (0, import_node_fs4.existsSync)(OLD_DATA)) (0, import_node_fs4.renameSync)(OLD_DATA, DATA_FILE);
+var OLD_DATA = (0, import_node_path5.join)(ROOT, "data", "eztimer.json");
+if (!process.env.FLYDAY_DATA && !(0, import_node_fs5.existsSync)(DATA_FILE) && (0, import_node_fs5.existsSync)(OLD_DATA)) (0, import_node_fs5.renameSync)(OLD_DATA, DATA_FILE);
 var clients = /* @__PURE__ */ new Set();
 function broadcast(type, payload) {
   const msg = `event: ${type}
@@ -2493,7 +2707,9 @@ data: ${JSON.stringify(payload)}
 var stateDirty = false;
 var saved = load(DATA_FILE);
 var timerLink = null;
+var outbox = null;
 var engine = new Engine(saved, {
+  onEvent: (type, data) => outbox?.add(type, data),
   onTimer: (cmd) => timerLink?.command(cmd),
   onAudio: (e) => broadcast("audio", { ...e, at: Date.now() }),
   onChange: () => {
@@ -2502,14 +2718,21 @@ var engine = new Engine(saved, {
   }
 });
 var store = saver(DATA_FILE, () => engine.toSaved());
+outbox = new Outbox((0, import_node_path5.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
+var snapshot = (now) => ({ ...engine.snapshot(now), outbox: { ...outbox.status(), venue: outbox.venue() } });
+setInterval(() => {
+  void outbox.flush().then(() => {
+    stateDirty = true;
+  });
+}, 3e4);
 engine.resume(saved.clock, Date.now());
-for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs4.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
+for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs5.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
 restorePhotos();
 timerLink = new RotorHazardLink(engine, (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
 var webVersion = String(Date.now());
 var reloadTimer = null;
 try {
-  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs4.watch)(WEB, { recursive: true }, () => {
+  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs5.watch)(WEB, { recursive: true }, () => {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       webVersion = String(Date.now());
@@ -2524,9 +2747,10 @@ setInterval(() => {
   const d = /* @__PURE__ */ new Date();
   engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
   engine.finishTick(Date.now());
+  engine.lightTick(Date.now());
   if (stateDirty) {
     stateDirty = false;
-    broadcast("state", engine.snapshot(Date.now()));
+    broadcast("state", snapshot(Date.now()));
   }
 }, 50);
 setInterval(() => broadcast("ping", { t: Date.now(), v: webVersion }), 5e3);
@@ -2603,6 +2827,11 @@ var API2 = {
   },
   "/api/config": (b) => engine.setConfig(b),
   "/api/compact": () => engine.compact(),
+  // Kiosk webcam: the room's brightness (0–255). Answers whether the kiosk should keep reading it.
+  "/api/light": (b) => {
+    engine.lightReading(Number(b.level), Date.now());
+    return { enabled: true };
+  },
   "/api/club-quads": (b) => engine.setClubQuads(b.quads),
   // RD: the session's end time as "HH:MM" local time (the next time the clock shows it), or null.
   "/api/finish": (b) => {
@@ -2642,7 +2871,7 @@ data: ${JSON.stringify({ t: Date.now(), v: webVersion })}
 
 `);
     res.write(`event: state
-data: ${JSON.stringify(engine.snapshot(Date.now()))}
+data: ${JSON.stringify(snapshot(Date.now()))}
 
 `);
     clients.add(res);
@@ -2652,7 +2881,7 @@ data: ${JSON.stringify(engine.snapshot(Date.now()))}
     res.on("error", drop);
     return;
   }
-  if (path === "/api/state" && req.method === "GET") return json(res, 200, engine.snapshot(Date.now()));
+  if (path === "/api/state" && req.method === "GET") return json(res, 200, snapshot(Date.now()));
   if (path === "/api/remember-me" && req.method === "POST") {
     const name = String((await readBody(req)).name ?? "").replace(/\s+/g, " ").trim().slice(0, 40);
     res.setHeader("set-cookie", `flyday_last=${encodeURIComponent(name)}; Path=/; Max-Age=${name ? 400 * 86400 : 0}; SameSite=Lax`);
@@ -2711,7 +2940,7 @@ Updating TGI FlyDay ${VERSION} -> ${release.version} ...`);
         await (0, import_promises2.unlink)(file2).catch(() => {
         });
         try {
-          (0, import_node_fs4.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
+          (0, import_node_fs5.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
         } catch {
         }
         engine.setPilotPhoto(id, null);
@@ -2744,6 +2973,11 @@ Updating TGI FlyDay ${VERSION} -> ${release.version} ...`);
       return json(res, 404, { error: "Not found." });
     }
   }
+  if (path === "/api/outbox/send" && req.method === "POST") {
+    const st = await outbox.flush(true);
+    stateDirty = true;
+    return json(res, 200, { ok: true, result: st });
+  }
   if (path in API2) {
     if (req.method !== "POST") return json(res, 405, { error: "Use POST." });
     try {
@@ -2757,12 +2991,12 @@ Updating TGI FlyDay ${VERSION} -> ${release.version} ...`);
       return json(res, known2 ? 400 : 500, { error: known2 ? err.message : "Something went wrong on the server." });
     }
   }
-  const file = PAGES[path] ?? (0, import_node_path4.normalize)(path).replace(/^([/\\])+/, "");
-  const full = (0, import_node_path4.join)(WEB, file);
+  const file = PAGES[path] ?? (0, import_node_path5.normalize)(path).replace(/^([/\\])+/, "");
+  const full = (0, import_node_path5.join)(WEB, file);
   if (!full.startsWith(WEB)) return json(res, 404, { error: "Not found." });
   try {
     const body = await webFile(full);
-    res.writeHead(200, { "content-type": TYPES[(0, import_node_path4.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": TYPES[(0, import_node_path5.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
     res.end(body);
   } catch {
     json(res, 404, { error: "Not found." });

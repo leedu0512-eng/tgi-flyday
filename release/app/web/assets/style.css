@@ -937,3 +937,11 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .finish-quick { display: flex; gap: 8px; flex-wrap: wrap; }
 .slot .club-mark[draggable] { cursor: grab; }
 .slot .club-mark[draggable]:active { cursor: grabbing; }
+
+/* Online history (the outbox) */
+#outboxMore summary h2 { display: inline; margin: 0; }
+#outboxMore summary { cursor: pointer; }
+.outbox { display: grid; gap: 12px; margin-top: 12px; }
+.outbox .hint { margin: 0; }
+.outbox .defaults-row { display: flex; gap: 8px; }
+.warn-text { color: var(--accent); }

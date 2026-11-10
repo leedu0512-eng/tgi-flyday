@@ -167,3 +167,11 @@ The full spec is in the "EDRL Race System — Spec" doc.
 - `server/engine.ts`: the session logic (heat loop, slots, callouts). Pure, so it can be tested.
 - `server/main.ts`: HTTP server, live updates to screens (Server-Sent Events), the API.
 - `web/`: the screens, as plain HTML and JavaScript.
+
+## Room lights
+
+The kiosk's webcam also works as a light meter: every 20 seconds it tells the RD PC how bright the picture is, nothing else. No pictures are kept or sent. If the lights go off while practice is on, FlyDay asks "Still flying?" straight away; with no answer in 5 minutes practice ends and starts clean for next time. Lights back on, or laps coming in, cancel the question. In the console, Session setup → More shows the current reading and sets the **dark** line: if the room still counts as "on" with the lights off, raise it a step.
+
+## Online history
+
+Practice start and end, every timed heat with its laps, and lights on and off are kept on the RD PC in `data/outbox.jsonl`. In the console's **Online history** card, set the https address, key and this place's name, tick **Send** and **Save**: everything waiting goes out, and new events follow within seconds. With no internet they wait and go later. A Supabase table works as is: POST to `https://<project>.supabase.co/rest/v1/<table>` with columns `id uuid`, `venue text`, `at timestamptz`, `type text`, `data jsonb`.

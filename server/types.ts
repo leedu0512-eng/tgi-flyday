@@ -42,6 +42,10 @@ export interface Config {
    * Every automatic end of practice, and the RD's Reset, empties the list and restores it.
    */
   sessionDefaults: SessionDefaults | null;
+  /** Room lights from the kiosk webcam. */
+  lights: LightsConfig;
+  /** Sending the outbox online. */
+  cloud: CloudConfig;
   /** Which callouts the voice makes, and when. */
   callouts: CalloutSettings;
   /** How callouts and tones sound on the RD console. */
@@ -55,6 +59,26 @@ export interface ClubQuad {
   channel: string;
   /** Out of action: nobody is put on it. */
   broken: boolean;
+}
+
+/** Room lights, read by the kiosk's webcam. */
+export interface LightsConfig {
+  /** Lights off while practice runs: ask "Still flying?" straight away. */
+  enabled: boolean;
+  /** Picture brightness (0–255) below which the room counts as dark. */
+  dark: number;
+}
+
+/** The outbox: where session events go online, once that's set up. */
+export interface CloudConfig {
+  /** Send what's in the outbox. Off: it only collects. */
+  enabled: boolean;
+  /** HTTPS address events are POSTed to as a JSON list (a Supabase REST table works as is). */
+  url: string;
+  /** Sent as both "Authorization: Bearer <key>" and "apikey". */
+  key: string;
+  /** This place's name in the events, e.g. HOBIzone or Home. Empty: the PC's name. */
+  venue: string;
 }
 
 export interface TimerConfig {
@@ -150,6 +174,7 @@ export interface CalloutTexts {
   heatsForm: string;
   /** End of the day: anyone still flying? */
   nightAsk: string;
+  lightsOffAsk: string;
   /** Someone is: carry on, ask again later. */
   nightSnooze: string;
   /** Nobody answered: practice is over, everyone off the list. */
@@ -266,6 +291,8 @@ export const DEFAULT_CONFIG: Config = {
   ],
   timer: { enabled: false, host: '', user: 'admin', password: 'rotorhazard' },
   sessionDefaults: null,
+  lights: { enabled: true, dark: 40 },
+  cloud: { enabled: false, url: '', key: '', venue: '' },
   callouts: {
     sessionStartStop: true,
     lineup: true,
@@ -302,6 +329,7 @@ export const DEFAULT_CONFIG: Config = {
       freeFlightOpen: 'Practice is on. Free flight in heat {heat}, fly as you like. When more pilots sign in, the heats will take turns.',
       heatsForm: 'More pilots are here, so there are {heats} heats now. Free flight is over, please land. Heat {next} is up next, then the heats take turns.',
       nightAsk: 'Practice is about to end for today. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.',
+      lightsOffAsk: 'The lights are off. Is anyone still flying? If you are, tap Still flying on the big screen within five minutes.',
       nightSnooze: 'OK, carry on. I will ask again in an hour.',
       nightEnd: 'Practice is over for today. Thank you all for flying! Please leave the club cleaner than you found it. Good night!',
       gatePass: '{name}, {laptime}',
