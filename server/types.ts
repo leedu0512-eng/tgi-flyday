@@ -73,9 +73,12 @@ export interface LightsConfig {
 export interface CloudConfig {
   /** Send what's in the outbox. Off: it only collects. */
   enabled: boolean;
-  /** HTTPS address events are POSTed to as a JSON list (a Supabase REST table works as is). */
+  /**
+   * HTTPS address events are POSTed to as a JSON list, any port (Flyday's route is on a
+   * tailnet-only port). Saved as just the server, it gets /api/hz/tgiflyday/upload added.
+   */
   url: string;
-  /** Sent as both "Authorization: Bearer <key>" and "apikey". */
+  /** The upload token. Sent as both "Authorization: Bearer <key>" and "apikey". */
   key: string;
   /** This place's name in the events, e.g. HOBIzone or Home. Empty: the PC's name. */
   venue: string;

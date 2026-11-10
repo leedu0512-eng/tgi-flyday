@@ -149,6 +149,8 @@ export class Engine {
   night: { deadline: number; why: 'late' | 'lights' } | null = null;
   /** Room lights as the kiosk webcam sees them. */
   light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null } = { state: 'unknown', level: null, at: null, darkSince: null };
+  /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
+  private presence: boolean | null | undefined = undefined;
   private nightSnoozeUntil = 0;
   clock: ClockState = {
     phase: 'stopped',
@@ -401,6 +403,7 @@ export class Engine {
     this.clock.pausedRemaining = null;
     this.clock.freeSince = null;
     this.calloutsDone.clear();
+    this.presenceNow('session');
     this.onChange();
   }
 
@@ -606,6 +609,7 @@ export class Engine {
     if (l.state !== 'unknown' && l.at !== null && now - l.at > LIGHT_STALE_MS) {
       l.state = 'unknown';
       l.darkSince = null;
+      this.presenceNow('lights');
       this.onChange();
     }
   }
@@ -613,6 +617,7 @@ export class Engine {
   private lightsChanged(to: 'on' | 'off', now: number) {
     this.light.state = to;
     this.onEvent('lights', { on: to === 'on', level: this.light.level });
+    this.presenceNow('lights');
     if (to === 'off') {
       // Practice is on with the lights off: has everyone gone home? The usual end-of-day question.
       if (this.config.lights.enabled && this.clock.phase !== 'stopped' && !this.night) {
@@ -623,6 +628,20 @@ export class Engine {
       this.night = null; // someone switched them back on
     }
     this.onChange();
+  }
+
+  /**
+   * For the outbox: is anybody at the venue? Lights on, or practice running = yes; lights off
+   * with practice stopped = no; no light reading and practice stopped = can't tell (null).
+   * Sent only when it changes.
+   */
+  private presenceNow(source: 'lights' | 'session') {
+    const flying = this.clock.phase !== 'stopped';
+    const l = this.light.state;
+    const present = l === 'on' || flying ? true : l === 'off' ? false : null;
+    if (present === this.presence) return;
+    this.presence = present;
+    this.onEvent('presence', { present, source, lights: l, level: this.light.level, practice: flying });
   }
 
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
@@ -1954,14 +1973,32 @@ function cleanLights(patch: Partial<LightsConfig>, current: LightsConfig): Light
   return out;
 }
 
+/** Where uploads go on the Flyday server when the address is just the server (with or without a port). */
+export const FLYDAY_UPLOAD_PATH = '/api/hz/tgiflyday/upload';
+
+/**
+ * The upload address: https only, any port (the Flyday route is on a tailnet-only port, e.g.
+ * https://flyday.tail543cf5.ts.net:8445). Just the server: the Flyday upload path is added.
+ */
+export function cleanServerUrl(raw: unknown): string {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  if (!/^https:\/\//i.test(text)) throw new EngineError('The address starts with https:// (only secure addresses).');
+  let u: URL;
+  try { u = new URL(text); } catch { throw new EngineError('That address doesn\'t look right, e.g. https://flyday.tail543cf5.ts.net:8445'); }
+  if (u.protocol !== 'https:' || !u.hostname) throw new EngineError('The address starts with https:// (only secure addresses).');
+  if (u.username || u.password) throw new EngineError('No login in the address: the token goes in the Key field.');
+  if (u.pathname === '/' && !u.search) u.pathname = FLYDAY_UPLOAD_PATH;
+  u.hash = '';
+  const out = u.toString();
+  if (out.length > 500) throw new EngineError('That address is too long.');
+  return out;
+}
+
 function cleanCloud(patch: Partial<CloudConfig>, current: CloudConfig): CloudConfig {
   const out = { ...current };
   if (patch.enabled !== undefined) out.enabled = Boolean(patch.enabled);
-  if (patch.url !== undefined) {
-    const url = String(patch.url).trim();
-    if (url && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(url)) throw new EngineError('The address starts with https://');
-    out.url = url.slice(0, 500);
-  }
+  if (patch.url !== undefined) out.url = cleanServerUrl(patch.url);
   if (patch.key !== undefined && patch.key !== '') out.key = String(patch.key).trim().slice(0, 2000);
   if (patch.venue !== undefined) out.venue = String(patch.venue).replace(/\s+/g, ' ').trim().slice(0, 40);
   return out;

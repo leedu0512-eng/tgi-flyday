@@ -82,9 +82,9 @@
         <details class="more" id="outboxMore">
           <summary><h2>Online history</h2> <span id="outboxSum" class="muted"></span></summary>
           <div class="more-body outbox">
-            <p class="hint">Practice start and end, every timed heat with its laps, and lights on and off are kept on this PC and sent online when an address is set, so pilots can look at their times at home. With no internet, they wait and go later.</p>
-            <div class="field"><label for="oUrl">Send to (https address)</label><input id="oUrl" class="input" placeholder="https://….supabase.co/rest/v1/tgiflyday_events" autocomplete="off"></div>
-            <div class="field"><label for="oKey">Key</label><input id="oKey" class="input" type="password" autocomplete="new-password"></div>
+            <p class="hint">Practice start and end, every timed heat with its laps, lights on and off and whether anybody is here are kept on this PC and sent to the Flyday server, so pilots can look at their times at home. With no connection, they wait and go later.</p>
+            <div class="field"><label for="oUrl">Server address (https, port allowed)</label><input id="oUrl" class="input" placeholder="https://flyday.tail543cf5.ts.net:8445" autocomplete="off" spellcheck="false"></div>
+            <div class="field"><label for="oKey">Token</label><input id="oKey" class="input" type="password" autocomplete="new-password"></div>
             <div class="field"><label for="oVenue">This place</label><input id="oVenue" class="input" placeholder="HOBIzone" autocomplete="off"></div>
             <label class="toggle"><input type="checkbox" id="oOn"><span><b>Send</b> (off: only keep them here)</span></label>
             <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Send now</button></div>

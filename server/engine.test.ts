@@ -1186,7 +1186,32 @@ test('lights: dark for a minute means off; off during practice asks "Still flyin
   assert.equal(end?.[1].reason, 'lights');
   assert.deepEqual(end?.[1].pilots, ['Chirp']);
   assert.deepEqual(events.filter(([t]) => t === 'lights').map(([, d]) => d.on), [true, false, true, false]);
-  assert.equal(events[1][0], 'session.start');
+  assert.equal(events.filter(([t]) => t !== 'presence')[1][0], 'session.start');
+  // Presence: lights on = here; practice keeps it so through the dark minutes; off and stopped = gone.
+  assert.deepEqual(events.filter(([t]) => t === 'presence').map(([, d]) => d.present), [true, false]);
+});
+
+test('presence: somebody is here with the lights on or practice running, nobody with lights off and stopped, null when nobody can tell', () => {
+  const events: [string, any][] = [];
+  let id = 0;
+  const e = new Engine({ config: { freeFlight: true } as any }, { newId: () => `p${++id}`, onEvent: (t, d) => events.push([t, d]) });
+  const presence = () => events.filter(([t]) => t === 'presence').map(([, d]) => d);
+  // No kiosk readings, practice starts: somebody is flying.
+  e.walkIn('Chirp'); e.tick(1000);
+  assert.deepEqual(presence().map((d) => [d.present, d.source, d.practice]), [[true, 'session', true]]);
+  // Lights on while flying: no change, nothing sent.
+  e.lightReading(120, 2000);
+  assert.equal(presence().length, 1);
+  // Stopped by hand with the lights on: still here.
+  e.action('stop', 3000);
+  assert.equal(presence().length, 1);
+  // Lights off: gone.
+  e.lightReading(5, 10_000); e.lightReading(5, 80_000);
+  assert.deepEqual(presence().at(-1), { present: false, source: 'lights', lights: 'off', level: 5, practice: false });
+  // Kiosk stops reading: can't tell.
+  e.lightTick(80_000 + 3 * 60_000 + 1);
+  assert.equal(presence().at(-1).present, null);
+  assert.equal(presence().length, 3);
 });
 
 test('lights: off while stopped asks nothing; switched off, or End of the day off, behave', () => {
@@ -1211,6 +1236,15 @@ test('lights: off while stopped asks nothing; switched off, or End of the day of
   assert.equal(e.light.state, 'unknown');
   assert.throws(() => e.setConfig({ lights: { dark: 0 } as any }), /between 1 and 200/);
   assert.throws(() => e.setConfig({ cloud: { url: 'http://x.ee' } as any }), /https/);
+  assert.throws(() => e.setConfig({ cloud: { url: 'flyday.tail543cf5.ts.net:8445' } as any }), /https/);
+  assert.throws(() => e.setConfig({ cloud: { url: 'https://flyday.ts.net:99999' } as any }), /look right/);
+  assert.throws(() => e.setConfig({ cloud: { url: 'https://u:p@flyday.ts.net' } as any }), /token/);
+  e.setConfig({ cloud: { url: ' https://flyday.tail543cf5.ts.net:8445 ' } as any });
+  assert.equal(e.config.cloud.url, 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/upload', 'just the server: the upload path is added, the port kept');
+  e.setConfig({ cloud: { url: 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/upload' } as any });
+  assert.equal(e.config.cloud.url, 'https://flyday.tail543cf5.ts.net:8445/api/hz/tgiflyday/upload');
+  e.setConfig({ cloud: { url: '' } as any });
+  assert.equal(e.config.cloud.url, '');
   e.setConfig({ cloud: { url: 'https://abc.supabase.co/rest/v1/tgiflyday_events', key: 'secret', venue: 'HOBIzone' } as any });
   const snap = e.snapshot(0) as any;
   assert.equal(snap.config.cloud.key, '', 'the key stays on the RD PC');
