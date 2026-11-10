@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { CloudConfig } from './types.ts';
-import { FLYDAY_BASE, Install, toUploads, type OutboxRow, type SessionNote } from './flyday.ts';
+import { FLYDAY_BASE, Install, partsOf, splitBody, toUploads, verdictOf, type OutboxRow, type SessionNote, type UploadBody } from './flyday.ts';
 import { VERSION } from './version.ts';
 
 export interface OutboxEvent {
@@ -48,6 +48,8 @@ export class Outbox {
   private busy = false;
   private nextTry = 0;
   private soonTimer: NodeJS.Timeout | null = null;
+  /** 429s in a row: wait 1, 5, then 15 minutes. */
+  private busyStreak = 0;
 
   private config: () => CloudConfig;
   private venueFallback: string;
@@ -128,26 +130,44 @@ export class Outbox {
         const up = toUploads(rows, this.install.state.id, this.venue(), VERSION, notes)[0];
         if (!up) break;
         if (up.body) {
-          this.st.lastTry = Date.now();
-          const res = await fetch(this.base() + 'upload', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json', authorization: `Bearer ${this.install.state.token}` },
-            body: JSON.stringify(up.body),
-            signal: AbortSignal.timeout(20_000),
-          });
-          if (!res.ok) {
-            const text = (await res.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 200);
-            const msg = `Flyday answered ${res.status}${text ? `: ${text}` : ''}`;
-            if (res.status === 401 || res.status === 403) {
+          // Each part fits under Flyday's limit; a 413 halves a part again. Parts already stored
+          // are safe to send again (stable ids), so a failure part-way only repeats some.
+          const queue: UploadBody[] = partsOf(up.body);
+          while (queue.length) {
+            const body = queue.shift()!;
+            this.st.lastTry = Date.now();
+            const res = await fetch(this.base() + 'upload', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json', authorization: `Bearer ${this.install.state.token}` },
+              body: JSON.stringify(body),
+              signal: AbortSignal.timeout(20_000),
+            });
+            const text = await res.text().catch(() => '');
+            const { verdict, portalError } = verdictOf(res.status, text);
+            if (verdict === 'stored') continue;
+            const msg = `Flyday answered ${res.status}${portalError ? `: ${portalError}` : text ? ` (${text.replace(/\s+/g, ' ').slice(0, 120)})` : ''}`;
+            if (verdict === 'split') {
+              const halves = splitBody(body);
+              if (halves) { queue.unshift(...halves); continue; }
+              this.st.stopped = true; // one lap and still too big: nothing more to try
+              throw new Error(`${msg}; it can't be made smaller`);
+            }
+            if (verdict === 'token') {
               this.install.tokenRefused(); // ask again with a hello; nothing is lost
               throw new Error(`${msg} (asking Flyday again)`);
             }
-            if (res.status >= 400 && res.status < 500) {
-              this.st.stopped = true; // a body Flyday won't take: stop and show it, don't hammer
+            if (verdict === 'backoff') {
+              const wait = [1, 5, 15][Math.min(this.busyStreak, 2)];
+              this.busyStreak++;
+              throw Object.assign(new Error(`${msg}: Flyday is busy, trying again in ${wait} min`), { waitMs: wait * 60_000 });
+            }
+            if (verdict === 'stop') {
+              this.st.stopped = true; // the portal won't take this body: stop and show it, don't hammer
               throw new Error(msg);
             }
-            throw new Error(msg);
+            throw new Error(msg); // anything else (Cloudflare, 5xx, 401/403 without the portal's word): later
           }
+          this.busyStreak = 0;
           this.st.lastOk = Date.now();
         }
         // Stored (or nothing to send for these rows): move them to the sent log.
@@ -163,7 +183,7 @@ export class Outbox {
     } catch (err: any) {
       const cause = err?.cause?.code || err?.cause?.message;
       this.st.lastError = err?.name === 'TimeoutError' ? 'no answer in 20 seconds' : `${err?.message ?? err}${cause ? ` (${cause})` : ''}`;
-      this.nextTry = Date.now() + 60_000; // try again in a minute
+      this.nextTry = Date.now() + (typeof err?.waitMs === 'number' ? err.waitMs : 60_000); // a minute, or the busy backoff
     } finally {
       this.busy = false;
     }

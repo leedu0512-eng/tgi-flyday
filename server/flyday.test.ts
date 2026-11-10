@@ -66,3 +66,41 @@ test('schema 1: older heat rows (lap times only) join the session they were flow
   assert.equal(out[1].body!.session!.id, out[0].body!.session!.id);
   assert.deepEqual(out[1].body!.laps.map((l) => [l.lap, l.ms, l.crossed_at]), [[1, 23000, null], [2, 22000, null]]);
 });
+
+import { partsOf, splitBody, verdictOf, type UploadBody } from './flyday.ts';
+
+test('upload answers: only the portal\'s own JSON drops the token or stops; Cloudflare answers mean later', () => {
+  const v = (s: number, t = '') => verdictOf(s, t).verdict;
+  assert.equal(v(201), 'stored');
+  assert.equal(v(401, '{"error":"token_invalid"}'), 'token');
+  assert.equal(v(401, '{"error":"revoked"}'), 'token');
+  assert.equal(v(401, '<html>Cloudflare</html>'), 'retry');
+  assert.equal(v(401, '{"error":"something_else"}'), 'retry');
+  assert.equal(v(403, '{"error":"revoked"}'), 'retry');
+  assert.equal(v(403, '<html>Access denied</html>'), 'retry');
+  assert.equal(v(429), 'backoff');
+  assert.equal(v(429, '{"error":"slow_down"}'), 'backoff');
+  assert.equal(v(413, '<html>too big</html>'), 'split');
+  assert.equal(v(400, '{"error":"bad_lap"}'), 'stop');
+  assert.equal(v(400, '<html>Bad request</html>'), 'retry');
+  assert.equal(v(502, '<html>Bad gateway</html>'), 'retry');
+  assert.equal(v(500, '{"error":"db"}'), 'retry');
+});
+
+test('a big upload goes in parts under the limit, each with the pilots its laps need', () => {
+  const pilots = Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`.padEnd(15, 'x'), person: null, local_pilot: `l${i}`.padEnd(15, 'x'), callsign: `Pilot ${i}`, club_quad: false }));
+  const laps = Array.from({ length: 3000 }, (_, k) => ({ id: `l${k}`.padEnd(15, 'y'), pilot: pilots[k % 5].id, round: 1, heat: 1, free_flight: false, channel: 'R1', lap: k, ms: 20000 + k, crossed_at: new Date(k).toISOString() }));
+  const body: UploadBody = { schema: 1, install: 'i'.repeat(15), tgiflyday_kiosk: { id: 'i'.repeat(15), name: 'HOBIzone', app_version: 'dev' },
+    session: { id: 's'.repeat(15), started_at: new Date(0).toISOString(), ended_at: null, end_reason: null, timed: true }, pilots, laps, presence: [] };
+  const parts = partsOf(body, 100_000);
+  assert.ok(parts.length > 1);
+  for (const p of parts) {
+    assert.ok(JSON.stringify(p).length <= 100_000);
+    assert.equal(p.session!.id, body.session!.id);
+    for (const l of p.laps) assert.ok(p.pilots.some((x) => x.id === l.pilot), 'every lap travels with its pilot');
+  }
+  assert.equal(parts.reduce((n, p) => n + p.laps.length, 0), 3000, 'no lap lost or doubled');
+  assert.ok(parts.some((p) => p.pilots.some((x) => x.callsign === 'Pilot 5')), 'a pilot with no laps still goes');
+  // One lap can't be split further.
+  assert.equal(splitBody({ ...body, laps: laps.slice(0, 1), pilots: pilots.slice(0, 1) }), null);
+});

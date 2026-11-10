@@ -251,3 +251,50 @@ export function toUploads(rows: OutboxRow[], install: string, kioskName: string,
   // Rows nobody sends (lights, unknown kinds) fold into the body after them, or stand alone.
   return out;
 }
+
+/** Flyday's upload limit (bytes of JSON); bodies are kept under it, with room to spare. */
+export const UPLOAD_LIMIT = 1_000_000;
+const SAFE_SIZE = 900_000;
+
+/**
+ * One upload in two halves (same session, each with the pilots its laps need), for when it is
+ * too big. null when it can't be split any further.
+ */
+export function splitBody(b: UploadBody): [UploadBody, UploadBody] | null {
+  const part = (laps: UploadBody['laps'], presence: UploadBody['presence'], pilots: UploadBody['pilots']): UploadBody => ({ ...b, laps, presence, pilots });
+  const half = <T>(list: T[]) => [list.slice(0, Math.ceil(list.length / 2)), list.slice(Math.ceil(list.length / 2))] as const;
+  if (b.laps.length > 1) {
+    const [l1, l2] = half(b.laps);
+    const used = (laps: UploadBody['laps']) => new Set(laps.map((l) => l.pilot));
+    const u1 = used(l1), u2 = used(l2);
+    // Pilots with no laps here (session end) ride with the first half.
+    return [part(l1, b.presence, b.pilots.filter((p) => u1.has(p.id) || !u2.has(p.id))), part(l2, [], b.pilots.filter((p) => u2.has(p.id)))];
+  }
+  if (b.presence.length > 1) { const [p1, p2] = half(b.presence); return [part(b.laps, p1, b.pilots), part([], p2, [])]; }
+  if (b.pilots.length > 1 && !b.laps.length) { const [a, c] = half(b.pilots); return [part([], b.presence, a), part([], [], c)]; }
+  return null;
+}
+
+/** An upload as parts that each fit comfortably under the limit. */
+export function partsOf(b: UploadBody, max = SAFE_SIZE): UploadBody[] {
+  if (JSON.stringify(b).length <= max) return [b];
+  const s = splitBody(b);
+  return s ? [...partsOf(s[0], max), ...partsOf(s[1], max)] : [b];
+}
+
+export type UploadVerdict = 'stored' | 'token' | 'split' | 'backoff' | 'stop' | 'retry';
+
+/**
+ * What an upload answer means. Cloudflare sits in front of the public address and can answer by
+ * itself, so only the portal's own JSON ({"error": …}) is trusted to drop the token or stop.
+ */
+export function verdictOf(status: number, text: string): { verdict: UploadVerdict; portalError: string | null } {
+  let portalError: string | null = null;
+  try { const j = JSON.parse(text); if (j && typeof j.error === 'string') portalError = j.error; } catch {}
+  if (status >= 200 && status < 300) return { verdict: 'stored', portalError };
+  if (status === 401 && (portalError === 'token_invalid' || portalError === 'revoked')) return { verdict: 'token', portalError };
+  if (status === 429) return { verdict: 'backoff', portalError };
+  if (status === 413) return { verdict: 'split', portalError };
+  if (status >= 400 && status < 500 && status !== 401 && status !== 403 && portalError !== null) return { verdict: 'stop', portalError };
+  return { verdict: 'retry', portalError };
+}

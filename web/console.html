@@ -785,7 +785,7 @@ function renderOutbox() {
     f.lastHello ? `Last heard from Flyday ${ago(f.lastHello)}.` : 'Not heard from Flyday yet.',
     f.helloError ? `Flyday: ${f.helloError}.` : '',
     o.lastOk ? `Last sent ${ago(o.lastOk)}.` : '',
-    sending && o.lastError ? `Last try failed: ${o.lastError}.${o.stopped ? ' Stopped until Send now.' : ' Trying again every minute.'}` : '',
+    sending && o.lastError ? `Last try failed: ${o.lastError}.${o.stopped ? ' Stopped until Send now.' : ' Trying again by itself.'}` : '',
   ].filter(Boolean).join(' ');
 }
 $('oSave').onclick = async () => {
