@@ -110,6 +110,8 @@ async function typeKeys(scope, text) {
     console.log('Big screen flyout');
     const sc = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     sc.on('pageerror', (e) => errors.push(`screen: ${e.message}`));
+    // TrackDay switches itself on Wed/Sat/Sun from 09:00 and hides Sign in: mark today's switch as done.
+    await sc.addInitScript(() => localStorage.setItem('tgiflyday.screen.trackday', new Date().toDateString()));
     await sc.goto(B + '/screen');
     check(!!(await sc.waitForSelector('#meQr svg', { timeout: 5000 }).catch(() => null)), 'header shows the phone QR code');
     await sc.click('#signinBtn');

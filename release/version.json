@@ -1,9 +1,9 @@
 {
- "version": "2026.11.10-2156",
+ "version": "2026.11.11-2127",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "952d2b3879a4bfba4691b0988066685059718699d106011aa41cd4af03fb9f6c"
+   "sha256": "8158b98d0a3e85a7074bddfefa8032912047aa8e60adda7f22b7186782daedda"
   },
   {
    "path": "web/assets/avatars.js",
@@ -15,7 +15,7 @@
   },
   {
    "path": "web/assets/favicon.svg",
-   "sha256": "dac1eb13a73ae67a46dc5d1a0ec031c73dbce5a36691074cd20cacd8904760cd"
+   "sha256": "3b885f2ca857fc044f0e9cd126fa5b94ab5fa42b4f0c9eb71c426d7369151f91"
   },
   {
    "path": "web/assets/fonts/OFL-Archivo.txt",
@@ -58,24 +58,60 @@
    "sha256": "2a832664d136037daeb00e01fda9e84354a32aa6bd6568c90202137a92ec61e8"
   },
   {
+   "path": "web/assets/icons/app-icon-1024.png",
+   "sha256": "22504989d8a191b8c24a565162c4d6aae2b36343cdd7a7c58e383579426477c2"
+  },
+  {
+   "path": "web/assets/icons/app-icon-192.png",
+   "sha256": "b4b3be71ec27c7a5469b19fe697462fdcbe5ddcf0219ff2339effe5814c28d30"
+  },
+  {
+   "path": "web/assets/icons/app-icon-512.png",
+   "sha256": "3eefb5b506656dcae0b60693b5d022689a2e2f0efd8e8f5cad188ade7168a827"
+  },
+  {
+   "path": "web/assets/icons/app-icon-maskable-192.png",
+   "sha256": "a6b609fc725aa40848693e980002e89c2aafd87d41ebef739f0fc14c259fe6e0"
+  },
+  {
+   "path": "web/assets/icons/app-icon-maskable-512.png",
+   "sha256": "b302e52d5e673e53a43e6f73ddb6985fc19da642ee969efefd01eee7c12da725"
+  },
+  {
+   "path": "web/assets/icons/app-icon.svg",
+   "sha256": "40cfb144dfea08ddbfec21c9f37cef1903aa186d8ca7d4ae044a125787c64798"
+  },
+  {
    "path": "web/assets/icons/apple-touch-icon.png",
-   "sha256": "6c8443bf2f9745fa43ec6cb5ad8cc2e46f260a5cd628890e68f5fc9124dc853c"
+   "sha256": "3af59b8f1e4c5ce8f3a9ab09f99785d2e188772ff1d0d6d52674991e889fdec8"
+  },
+  {
+   "path": "web/assets/icons/favicon-16.png",
+   "sha256": "4f0c9a18b4fbdbc78f99596fdd718998f4839306fd999ba4f52d2c18b0ff1ba0"
   },
   {
    "path": "web/assets/icons/favicon-32.png",
-   "sha256": "3c0548ab46c0fd3c15a5b39f7efc29d3ddef68716c24c4edebad01f4d0fcbeaa"
+   "sha256": "0ecea1dcbc653eeeab544c172f1cf02990afb43b2eec98aaba25469570810a8e"
   },
   {
-   "path": "web/assets/icons/icon-192.png",
-   "sha256": "a12f6c4067a9fe0a3cc174448a6fee2f59cbf94f07543fa2207f8add4805f03f"
-  },
-  {
-   "path": "web/assets/icons/icon-512.png",
-   "sha256": "9d30addd97ca5ce0649d315f84f916e1116b2a2edf713aad313f79fb36431402"
+   "path": "web/assets/icons/favicon-48.png",
+   "sha256": "80b879a5acab5adecf659c0335f458d03c96a9fdeb67525b231de4372e746f16"
   },
   {
    "path": "web/assets/icons/me.webmanifest",
-   "sha256": "84c0ef7c6297af37da54e8b69629a6e8c69fe52aefe661df1e64645561e8866f"
+   "sha256": "27ed9723968f402982330374b807553966ec89ba3b2555300d7210fcde5bddfa"
+  },
+  {
+   "path": "web/assets/icons/monochrome-192.png",
+   "sha256": "bb1588bbd6049b850d7277d0c85b4182d9a27faec3de0d7b66b51ecaa26b47fe"
+  },
+  {
+   "path": "web/assets/icons/monochrome-512.png",
+   "sha256": "d769f51fc07d78bc0cc7dc38a70cb7e15d75e7a2e90c2c1ddd4c527a3d2aaa1d"
+  },
+  {
+   "path": "web/assets/icons/monochrome-96.png",
+   "sha256": "c063f693fb7a05a5338b5ed7ce9456e55eccdd2d1acb806e49152d8213470faa"
   },
   {
    "path": "web/assets/mark-car-small.svg",
@@ -103,27 +139,31 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "724432f6d65b062220c7c3e343245bc6d049201b45beb41cb51ce28a04f13a8f"
+   "sha256": "63b26a5186915405373518cf5e5f1f7b2cb3cb660e2704974e4108cfdbba9523"
+  },
+  {
+   "path": "web/favicon.ico",
+   "sha256": "1f6ae8c5dea699adcf1a940c88d61e4f5b2609fb1b85dffe8471bb2d9507ce04"
   },
   {
    "path": "web/index.html",
-   "sha256": "a052276185befbca9331ff6931f08a78a5afa602b4860cae8be04fa6aaa2702f"
+   "sha256": "882413e727b67ddd14347b8a3ced3dd1a507bae6c203c17bab6fcf302b4da1b9"
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "a72533a1c050454b139de84d1a1b5fd6c9024bc8871d23030015905413d64fea"
+   "sha256": "d5c83a6f149e0e8bbf4bfe2221355da1338888ddaf677049fe78a9c3eded521b"
   },
   {
    "path": "web/me.html",
-   "sha256": "89575e87af9a48664fe71d6ec21ff3e5de464fecd8a141789eaf16573b552488"
+   "sha256": "e81b1e9a6cf6f39e94c6034524371a847518548350d227867e72318356ab2783"
   },
   {
    "path": "web/mobile.html",
-   "sha256": "4839de0e3eba464cab07a2de76fe05a2b514e302fa5ff7c6405b087f2c3b35ba"
+   "sha256": "74c98930e26b3388501fc31216339b398355d47797f7d75f3781a4ad9f65493c"
   },
   {
    "path": "web/screen.html",
-   "sha256": "24bfb36145b55eaca9112137803a0130e1879a9c24321e24e1b343682e370911"
+   "sha256": "0c8f2da25b7d1731b6dce00bb211763a7c12edc4adf9742943056c22df89be44"
   }
  ]
 }
