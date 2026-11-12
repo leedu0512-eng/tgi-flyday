@@ -126,11 +126,15 @@ if (-not $cats.Count) { $cats = @('Public') }
 $on = @($cats | Where-Object { [string](Get-NetFirewallProfile -Name $_).Enabled -eq 'True' })
 $closed = @($on | Where-Object { [string](Get-NetFirewallProfile -Name $_).AllowInboundRules -eq 'False' })
 $hit = { param($r) $p = [string]$r.Profile; $p -eq 'Any' -or @($on | Where-Object { $p -match $_ }).Count -gt 0 }
+$denied = 0
+try { $null = Get-NetFirewallRule -Direction Inbound -ErrorAction Stop | Select-Object -First 1; $null = Get-NetFirewallPortFilter -Protocol TCP -ErrorAction Stop | Select-Object -First 1 } catch { $denied = 1 }
+if ($denied) { 'FW|denied'; return }
 $rules = @(Get-NetFirewallApplicationFilter -Program ${q(process.execPath)} | Get-NetFirewallRule | Where-Object { [string]$_.Enabled -eq 'True' -and [string]$_.Direction -eq 'Inbound' })
 $ports = @(Get-NetFirewallPortFilter -Protocol TCP | Where-Object { [string]$_.LocalPort -eq '${port}' } | Get-NetFirewallRule | Where-Object { [string]$_.Enabled -eq 'True' -and [string]$_.Direction -eq 'Inbound' -and [string]$_.Action -eq 'Allow' })
 $allow = @($rules | Where-Object { [string]$_.Action -eq 'Allow' -and (& $hit $_) }).Count + @($ports | Where-Object { & $hit $_ }).Count
 $block = @($rules | Where-Object { [string]$_.Action -eq 'Block' -and (& $hit $_) }).Count
 "FW|$($cats -join ',')|$($on.Count)|$allow|$block|$($closed -join ',')"`, 6e4);
+  if (/^FW\|denied$/m.test(out)) return null;
   const m = out.match(/^FW\|([\w,]*)\|(\d+)\|(\d+)\|(\d+)\|([\w,]*)$/m);
   if (!m) return null;
   const [, cats, on, allow, block, closed] = m;
@@ -285,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.12-1823" : "dev";
+var VERSION = true ? "2026.11.12-1842" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -3336,11 +3340,11 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     const name = url.searchParams.get("name") ?? "";
     return json(res, 200, known[knownKey(name)] ?? {});
   }
-  if (path === "/api/info" && req.method === "GET") return json(res, 200, { hostname: (0, import_node_os2.hostname)(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall });
+  if (path === "/api/info" && req.method === "GET") return json(res, 200, { hostname: (0, import_node_os2.hostname)(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall: firewallNow() });
   if (path === "/api/firewall/allow" && req.method === "POST") {
     const { accepted, error } = await firewallAllow(PORT);
     firewall = await firewallStatus(PORT);
-    return json(res, 200, { ok: true, result: { accepted, error, firewall } });
+    return json(res, 200, { ok: true, result: { accepted, error, firewall: firewallNow() } });
   }
   if (path === "/api/update/progress" && req.method === "GET") return json(res, 200, { ...updateProgress, version: VERSION });
   if (path === "/api/update" && req.method === "POST") {
@@ -3422,6 +3426,8 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   }
 }
 var server = (0, import_node_http.createServer)((req, res) => {
+  const from = (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "");
+  if (from && from !== "127.0.0.1" && from !== "::1" && !ownAddresses().has(from)) reachedFromOutside = Date.now();
   handle(req, res).catch((err) => {
     console.error(err);
     if (!res.headersSent) json(res, 500, { error: "Something went wrong on the server." });
@@ -3505,6 +3511,17 @@ async function fakeUpdate(res) {
   }, 1e3);
 }
 var firewall = null;
+var reachedFromOutside = 0;
+var firewallNow = () => reachedFromOutside && firewall && !firewall.ok ? { ok: true, network: firewall.network, reason: "other devices reach this PC" } : firewall;
+var ownCache = { at: 0, set: /* @__PURE__ */ new Set() };
+function ownAddresses() {
+  if (Date.now() - ownCache.at > 6e4) {
+    const set = /* @__PURE__ */ new Set();
+    for (const list of Object.values((0, import_node_os2.networkInterfaces)())) for (const a of list ?? []) set.add(a.address);
+    ownCache = { at: Date.now(), set };
+  }
+  return ownCache.set;
+}
 function restartIntoUpdate() {
   store.now();
   relaunch(["--after-update"]);

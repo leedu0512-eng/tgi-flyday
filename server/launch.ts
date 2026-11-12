@@ -114,11 +114,15 @@ if (-not $cats.Count) { $cats = @('Public') }
 $on = @($cats | Where-Object { [string](Get-NetFirewallProfile -Name $_).Enabled -eq 'True' })
 $closed = @($on | Where-Object { [string](Get-NetFirewallProfile -Name $_).AllowInboundRules -eq 'False' })
 $hit = { param($r) $p = [string]$r.Profile; $p -eq 'Any' -or @($on | Where-Object { $p -match $_ }).Count -gt 0 }
+$denied = 0
+try { $null = Get-NetFirewallRule -Direction Inbound -ErrorAction Stop | Select-Object -First 1; $null = Get-NetFirewallPortFilter -Protocol TCP -ErrorAction Stop | Select-Object -First 1 } catch { $denied = 1 }
+if ($denied) { 'FW|denied'; return }
 $rules = @(Get-NetFirewallApplicationFilter -Program ${q(process.execPath)} | Get-NetFirewallRule | Where-Object { [string]$_.Enabled -eq 'True' -and [string]$_.Direction -eq 'Inbound' })
 $ports = @(Get-NetFirewallPortFilter -Protocol TCP | Where-Object { [string]$_.LocalPort -eq '${port}' } | Get-NetFirewallRule | Where-Object { [string]$_.Enabled -eq 'True' -and [string]$_.Direction -eq 'Inbound' -and [string]$_.Action -eq 'Allow' })
 $allow = @($rules | Where-Object { [string]$_.Action -eq 'Allow' -and (& $hit $_) }).Count + @($ports | Where-Object { & $hit $_ }).Count
 $block = @($rules | Where-Object { [string]$_.Action -eq 'Block' -and (& $hit $_) }).Count
 "FW|$($cats -join ',')|$($on.Count)|$allow|$block|$($closed -join ',')"`, 60_000);
+  if (/^FW\|denied$/m.test(out)) return null; // can't read the rules here: can't tell, so no warning
   const m = out.match(/^FW\|([\w,]*)\|(\d+)\|(\d+)\|(\d+)\|([\w,]*)$/m);
   if (!m) return null;
   const [, cats, on, allow, block, closed] = m;

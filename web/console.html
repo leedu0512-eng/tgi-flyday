@@ -1228,6 +1228,8 @@ async function showInfo(info) {
   });
 }
 fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {});
+// While the firewall warning shows, look again now and then: it goes once a phone or the kiosk gets through.
+setInterval(() => { if (document.querySelector('.fw-warn')) fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}); }, 30_000);
 // "More" folds are remembered on this PC.
 document.addEventListener('toggle', (e) => {
   const d = e.target;

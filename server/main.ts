@@ -348,12 +348,12 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     const name = url.searchParams.get('name') ?? '';
     return json(res, 200, known[knownKey(name)] ?? {});
   }
-  if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall });
+  if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall: firewallNow() });
   // Console: "Let them in" (Windows Firewall), one permission prompt on this PC.
   if (path === '/api/firewall/allow' && req.method === 'POST') {
     const { accepted, error } = await firewallAllow(PORT);
     firewall = await firewallStatus(PORT);
-    return json(res, 200, { ok: true, result: { accepted, error, firewall } });
+    return json(res, 200, { ok: true, result: { accepted, error, firewall: firewallNow() } });
   }
   // Restart button (view picker): look for a newer version on GitHub, install it, restart.
   // Only the app/ folder next to the exe is replaced; data/ (pilots, photos) is never touched.
@@ -445,6 +445,10 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
 }
 
 const server = createServer((req, res) => {
+  // Something from another device got through: the firewall lets phones and the kiosk in,
+  // whatever the rule check says (it can't read the rules without admin rights on some PCs).
+  const from = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '');
+  if (from && from !== '127.0.0.1' && from !== '::1' && !ownAddresses().has(from)) reachedFromOutside = Date.now();
   handle(req, res).catch((err) => {
     console.error(err);
     if (!res.headersSent) json(res, 500, { error: 'Something went wrong on the server.' });
@@ -547,6 +551,20 @@ async function fakeUpdate(res: ServerResponse) {
 }
 /** Windows Firewall: do phones and the kiosk get in? Checked at start (null: can't tell). */
 let firewall: FirewallStatus | null = null;
+/** When a request last came from another device (proof the firewall lets them in). */
+let reachedFromOutside = 0;
+/** The firewall as the screens see it: another device got through, so it's fine. */
+const firewallNow = (): FirewallStatus | null =>
+  reachedFromOutside && firewall && !firewall.ok ? { ok: true, network: firewall.network, reason: 'other devices reach this PC' } : firewall;
+let ownCache: { at: number; set: Set<string> } = { at: 0, set: new Set() };
+function ownAddresses(): Set<string> {
+  if (Date.now() - ownCache.at > 60_000) {
+    const set = new Set<string>();
+    for (const list of Object.values(networkInterfaces())) for (const a of list ?? []) set.add(a.address);
+    ownCache = { at: Date.now(), set };
+  }
+  return ownCache.set;
+}
 /** Save, start the updated tgiFlyDay, and step aside (it waits for the port). */
 function restartIntoUpdate() {
   store.now();
