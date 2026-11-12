@@ -280,7 +280,11 @@ const API: Record<string, Handler> = {
   '/api/config': (b) => engine.setConfig(b),
   '/api/compact': () => engine.compact(),
   // Kiosk webcam: the room's brightness (0–255). Answers whether the kiosk should keep reading it.
-  '/api/light': (b) => { engine.lightReading(Number(b.level), Date.now()); return { enabled: true }; },
+  '/api/light': (b) => {
+    if (typeof b.problem === 'string') engine.lightProblem(b.problem, Date.now());
+    else engine.lightReading(Number(b.level), Date.now());
+    return { enabled: true };
+  },
   '/api/club-quads': (b) => engine.setClubQuads(b.quads),
   // RD: the session's end time as "HH:MM" local time (the next time the clock shows it), or null.
   '/api/finish': (b) => {

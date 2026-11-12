@@ -152,7 +152,8 @@ export class Engine {
   /** End of the day: the "still flying?" question is up until this time (ms), or null. */
   night: { deadline: number; why: 'late' | 'lights' } | null = null;
   /** Room lights as the kiosk webcam sees them. */
-  light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null } = { state: 'unknown', level: null, at: null, darkSince: null };
+  light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null; problem: string; kioskAt: number | null } =
+    { state: 'unknown', level: null, at: null, darkSince: null, problem: '', kioskAt: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
   private presence: boolean | null | undefined = undefined;
   /** When presence last went out (lightTick's clock); null before the first. */
@@ -599,6 +600,8 @@ export class Engine {
     const n = Number(level);
     if (!Number.isFinite(n) || n < 0 || n > 255) throw new EngineError('Brightness is 0 to 255.');
     const l = this.light;
+    l.kioskAt = now;
+    l.problem = '';
     l.level = Math.round(n);
     l.at = now;
     const dark = this.config.lights.dark;
@@ -610,6 +613,13 @@ export class Engine {
       // A little above the line, so a flickering reading near it doesn't switch back and forth.
       if (l.state !== 'on' && (l.state === 'unknown' || n >= dark + LIGHT_MARGIN)) this.lightsChanged('on', now);
     }
+    this.onChange();
+  }
+
+  /** The kiosk couldn't read the light, and says why (shown on the console). The light state isn't touched. */
+  lightProblem(problem: string, now: number) {
+    this.light.problem = String(problem).replace(/\s+/g, ' ').trim().slice(0, 300);
+    this.light.kioskAt = now;
     this.onChange();
   }
 

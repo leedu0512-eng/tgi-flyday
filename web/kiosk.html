@@ -529,7 +529,7 @@ $('view').addEventListener('click', async (e) => {
 // The webcam doubles as a light meter: every 20 s the server gets the picture's average
 // brightness (0-255), nothing else. No picture is kept or sent. The server decides from that
 // whether the lights are on. The kiosk inside the big screen leaves this to the real kiosk.
-let lightStream = null, lightVideo = null, lightRetryAt = 0;
+let lightStream = null, lightVideo = null, lightRetryAt = 0, lightProblem = '';
 const lightCanvas = document.createElement('canvas');
 lightCanvas.width = 64; lightCanvas.height = 48;
 async function lightStart() {
@@ -540,9 +540,19 @@ async function lightStart() {
     lightVideo.muted = true; lightVideo.playsInline = true;
     lightVideo.srcObject = lightStream;
     await lightVideo.play();
-  } catch {
+    lightProblem = '';
+  } catch (err) {
     lightStop();
-    lightRetryAt = Date.now() + 5 * 60_000; // no camera, or busy: try again in a while
+    lightRetryAt = Date.now() + 60_000; // no camera, or busy: try again in a minute
+    const why = {
+      NotAllowedError: 'the browser blocks the webcam on this page',
+      SecurityError: 'the browser blocks the webcam on this page',
+      NotFoundError: 'no webcam found on the kiosk PC',
+      OverconstrainedError: 'no webcam found on the kiosk PC',
+      NotReadableError: 'the webcam is in use by another program, or not working',
+      AbortError: 'the webcam is in use by another program, or not working',
+    }[err?.name];
+    lightProblem = why ?? `the webcam would not open (${err?.name ?? ''} ${err?.message ?? err})`.trim();
   }
 }
 function lightStop() {
@@ -560,11 +570,17 @@ function lightLevel() {
   return sum / (d.length / 4);
 }
 async function lightCheck() {
-  if (EMBED || !navigator.mediaDevices?.getUserMedia) return;
+  if (EMBED) return;
+  // No camera API at all: plain http without kiosk.sh's / kiosk.bat's browser flags.
+  if (!navigator.mediaDevices?.getUserMedia) {
+    post('/api/light', { problem: `this browser won't let ${location.origin} use a camera: start the kiosk with kiosk.sh (Linux) or kiosk.bat, with this RD PC's address in it` }).catch(() => {});
+    return;
+  }
   if (view === 'camera' || stream) { lightStop(); return; }
   await lightStart();
   const level = lightLevel();
   if (level !== null) post('/api/light', { level: Math.round(level) }).catch(() => {});
+  else post('/api/light', { problem: lightProblem || 'the webcam opened but gives no picture yet' }).catch(() => {});
 }
 setTimeout(lightCheck, 3000);
 setInterval(lightCheck, 20_000);

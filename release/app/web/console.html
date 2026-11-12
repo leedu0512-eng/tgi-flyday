@@ -725,7 +725,7 @@ function renderSetup() {
     if (![...$('lightsDark').options].some((o) => +o.value === lt.dark)) $('lightsDark').add(new Option(String(lt.dark), lt.dark));
     $('lightsDark').value = String(lt.dark);
   }
-  $('lightNow').textContent = light.state === 'unknown' ? 'Now: no reading from the kiosk webcam.'
+  $('lightNow').textContent = light.state === 'unknown' ? `Now: no reading from the kiosk webcam${light.problem ? ` (${light.problem})` : ''}.`
     : `Now: lights ${light.state}, the picture's brightness is ${light.level}.`;
   renderOutbox();
   // What a clean start goes back to, and whether the setup differs from it now.
@@ -796,9 +796,10 @@ function renderOutbox() {
   const light = state.light ?? { state: 'unknown' }, p = state.presenceSent;
   const said = (v) => (v === true ? 'somebody is here' : v === false ? 'nobody is here' : "can't tell");
   $('oPresence').innerHTML = [
-    light.state === 'unknown'
-      ? `<b class="warn-text">Kiosk webcam: no light reading.</b> Presence stays "can't tell" while practice is stopped. Open the kiosk with kiosk.sh so it can use the webcam.`
-      : `Kiosk webcam: lights ${light.state} (brightness ${light.level}${light.at ? `, ${ago(light.at)}` : ''}).`,
+    light.state !== 'unknown' ? `Kiosk webcam: lights ${light.state} (brightness ${light.level}${light.at ? `, ${ago(light.at)}` : ''}).`
+      : light.problem && light.kioskAt && Date.now() - light.kioskAt < 3 * 60_000
+        ? `<b class="warn-text">Kiosk webcam: no light reading.</b> The kiosk says: ${esc(light.problem)}.`
+        : `<b class="warn-text">Kiosk webcam: no light reading.</b> The kiosk isn't reporting at all${light.kioskAt ? ` (last heard ${ago(light.kioskAt)})` : ''}: is the kiosk screen open? An older kiosk page updates itself only on its start screen: tap Back there, or restart it with kiosk.sh.`,
     p ? `Presence last sent: <b>${said(p.present)}</b> (lights ${esc(p.lights)}${p.practice ? ', practice on' : ''}${p.at ? `, ${ago(p.at)}` : ''}). Again on every change and every 15 minutes.`
       : 'Presence: waiting for the kiosk\'s first light reading (at most 2 minutes after start).',
   ].join(' ');

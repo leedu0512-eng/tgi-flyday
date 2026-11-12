@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.12-1816" : "dev";
+var VERSION = true ? "2026.11.12-1820" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -475,7 +475,7 @@ var Engine = class {
   /** End of the day: the "still flying?" question is up until this time (ms), or null. */
   night = null;
   /** Room lights as the kiosk webcam sees them. */
-  light = { state: "unknown", level: null, at: null, darkSince: null };
+  light = { state: "unknown", level: null, at: null, darkSince: null, problem: "", kioskAt: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
   presence = void 0;
   /** When presence last went out (lightTick's clock); null before the first. */
@@ -889,6 +889,8 @@ var Engine = class {
     const n = Number(level);
     if (!Number.isFinite(n) || n < 0 || n > 255) throw new EngineError("Brightness is 0 to 255.");
     const l = this.light;
+    l.kioskAt = now;
+    l.problem = "";
     l.level = Math.round(n);
     l.at = now;
     const dark = this.config.lights.dark;
@@ -899,6 +901,12 @@ var Engine = class {
       l.darkSince = null;
       if (l.state !== "on" && (l.state === "unknown" || n >= dark + LIGHT_MARGIN)) this.lightsChanged("on", now);
     }
+    this.onChange();
+  }
+  /** The kiosk couldn't read the light, and says why (shown on the console). The light state isn't touched. */
+  lightProblem(problem, now) {
+    this.light.problem = String(problem).replace(/\s+/g, " ").trim().slice(0, 300);
+    this.light.kioskAt = now;
     this.onChange();
   }
   /**
@@ -3238,7 +3246,8 @@ var API2 = {
   "/api/compact": () => engine.compact(),
   // Kiosk webcam: the room's brightness (0–255). Answers whether the kiosk should keep reading it.
   "/api/light": (b) => {
-    engine.lightReading(Number(b.level), Date.now());
+    if (typeof b.problem === "string") engine.lightProblem(b.problem, Date.now());
+    else engine.lightReading(Number(b.level), Date.now());
     return { enabled: true };
   },
   "/api/club-quads": (b) => engine.setClubQuads(b.quads),
