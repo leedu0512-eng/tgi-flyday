@@ -260,7 +260,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.11-2127" : "dev";
+var VERSION = true ? "2026.11.12-1816" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -399,6 +399,7 @@ var NIGHT_GRACE_MS = 5 * 6e4;
 var LIGHTS_OFF_AFTER_MS = 6e4;
 var LIGHT_MARGIN = 10;
 var PRESENCE_EVERY_MS = 15 * 6e4;
+var PRESENCE_START_WAIT_MS = 2 * 6e4;
 var LIGHT_STALE_MS = 3 * 6e4;
 var OLD_DEFAULT_TEXTS = {
   nightEnd: "Practice is over for today. Thanks for flying, good night.",
@@ -479,6 +480,10 @@ var Engine = class {
   presence = void 0;
   /** When presence last went out (lightTick's clock); null before the first. */
   presenceAt = null;
+  /** The first lightTick: the start row waits a little for the kiosk's first light reading. */
+  firstTickAt = null;
+  /** The last presence row that went to the outbox, for the RD console. */
+  presenceSent = null;
   nightSnoozeUntil = 0;
   clock = {
     phase: "stopped",
@@ -906,16 +911,24 @@ var Engine = class {
     if (l.state !== "unknown" && l.at !== null && now - l.at > LIGHT_STALE_MS) {
       l.state = "unknown";
       l.darkSince = null;
-      this.presenceNow("lights");
+      this.presenceNow("lights", now);
       this.onChange();
     }
-    if (this.presenceAt === null) this.presenceNow("start", now);
-    else if (now - this.presenceAt >= PRESENCE_EVERY_MS) this.presenceNow("heartbeat", now);
+    this.firstTickAt ??= now;
+    if (this.presenceAt === null) {
+      if (this.light.state !== "unknown" || this.clock.phase !== "stopped" || now - this.firstTickAt >= PRESENCE_START_WAIT_MS) {
+        this.presenceNow("start", now);
+        this.onChange();
+      }
+    } else if (now - this.presenceAt >= PRESENCE_EVERY_MS) {
+      this.presenceNow("heartbeat", now);
+      this.onChange();
+    }
   }
   lightsChanged(to, now) {
     this.light.state = to;
     this.onEvent("lights", { on: to === "on", level: this.light.level });
-    this.presenceNow("lights");
+    this.presenceNow("lights", now);
     if (to === "off") {
       if (this.config.lights.enabled && this.clock.phase !== "stopped" && !this.night) {
         this.night = { deadline: now + NIGHT_GRACE_MS, why: "lights" };
@@ -938,6 +951,7 @@ var Engine = class {
     if (present === this.presence && source !== "heartbeat" && source !== "start") return;
     this.presence = present;
     if (now !== null) this.presenceAt = now;
+    this.presenceSent = { present, lights: l, practice: flying, source, at: now ?? this.presenceSent?.at ?? null };
     this.onEvent("presence", { present, source, lights: l, level: this.light.level, practice: flying });
   }
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
@@ -2167,6 +2181,7 @@ var Engine = class {
         cloud: { ...this.config.cloud, key: "", keySet: !!this.config.cloud.key }
       },
       light: this.light,
+      presenceSent: this.presenceSent,
       clock: this.clock,
       pilots: [...this.pilots.values()].sort((a, b) => a.callsign.localeCompare(b.callsign)),
       heats: this.heats.map((row, h) => ({

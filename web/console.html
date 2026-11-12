@@ -92,6 +92,7 @@
             <div class="field"><label for="oUrl">Flyday address (empty: built in)</label><input id="oUrl" class="input" placeholder="https://hobizone.org/api/hz/tgiflyday/" autocomplete="off" spellcheck="false"></div>
             <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Ask Flyday and send now</button></div>
             <p class="hint" id="oStatus"></p>
+            <p class="hint" id="oPresence"></p>
           </div>
         </details>
       </section>
@@ -791,6 +792,16 @@ function renderOutbox() {
     o.lastOk ? `Last sent ${ago(o.lastOk)}.` : '',
     sending && o.lastError ? `Last try failed: ${o.lastError}.${o.stopped ? ' Stopped until Send now.' : ' Trying again by itself.'}` : '',
   ].filter(Boolean).join(' ');
+  // Presence: what the kiosk webcam reports, and the last row that went to Flyday.
+  const light = state.light ?? { state: 'unknown' }, p = state.presenceSent;
+  const said = (v) => (v === true ? 'somebody is here' : v === false ? 'nobody is here' : "can't tell");
+  $('oPresence').innerHTML = [
+    light.state === 'unknown'
+      ? `<b class="warn-text">Kiosk webcam: no light reading.</b> Presence stays "can't tell" while practice is stopped. Open the kiosk with kiosk.sh so it can use the webcam.`
+      : `Kiosk webcam: lights ${light.state} (brightness ${light.level}${light.at ? `, ${ago(light.at)}` : ''}).`,
+    p ? `Presence last sent: <b>${said(p.present)}</b> (lights ${esc(p.lights)}${p.practice ? ', practice on' : ''}${p.at ? `, ${ago(p.at)}` : ''}). Again on every change and every 15 minutes.`
+      : 'Presence: waiting for the kiosk\'s first light reading (at most 2 minutes after start).',
+  ].join(' ');
 }
 $('oSave').onclick = async () => {
   const r = await act('/api/config', { cloud: { url: $('oUrl').value, venue: $('oVenue').value } });

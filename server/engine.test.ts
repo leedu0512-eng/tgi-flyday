@@ -1211,23 +1211,36 @@ test('presence: somebody is here with the lights on or practice running, nobody 
   // Kiosk stops reading: can't tell.
   const t = 80_000 + 3 * 60_000 + 1;
   e.lightTick(t);
-  // The first tick also sends where things stand (once at start), then every 15 minutes, change or not.
-  assert.deepEqual(presence().slice(2).map((d) => [d.present, d.source]), [[null, 'lights'], [null, 'start']]);
+  // That row counts as the first one (no separate start row), then every 15 minutes, change or not.
+  assert.deepEqual(presence().slice(2).map((d) => [d.present, d.source]), [[null, 'lights']]);
   e.lightTick(t + 14 * 60_000);
-  assert.equal(presence().length, 4);
+  assert.equal(presence().length, 3);
   e.lightTick(t + 15 * 60_000);
-  assert.deepEqual(presence().slice(4).map((d) => [d.present, d.source]), [[null, 'heartbeat']]);
+  assert.deepEqual(presence().slice(3).map((d) => [d.present, d.source]), [[null, 'heartbeat']]);
   e.lightTick(t + 29 * 60_000);
-  assert.equal(presence().length, 5);
+  assert.equal(presence().length, 4);
   e.lightTick(t + 30 * 60_000);
-  assert.equal(presence().length, 6);
+  assert.equal(presence().length, 5);
+  assert.equal(e.presenceSent?.source, 'heartbeat');
 });
 
-test('presence: sent at start even with no kiosk and practice stopped', () => {
+test('presence at start: waits up to 2 minutes for the kiosk, then says what it knows', () => {
   const events: [string, any][] = [];
   const e = new Engine({}, { onEvent: (t, d) => events.push([t, d]) });
+  const rows = () => events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.source, d.lights]);
   e.lightTick(1000);
-  assert.deepEqual(events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.source, d.lights]), [[null, 'start', 'unknown']]);
+  e.lightTick(1000 + 119_000);
+  assert.deepEqual(rows(), [], 'still waiting for the kiosk');
+  e.lightTick(1000 + 120_000);
+  assert.deepEqual(rows(), [[null, 'start', 'unknown']], 'no kiosk: can\'t tell');
+  assert.equal(e.presenceSent?.present, null);
+  // The kiosk reports within the wait: that reading is the first row, nothing extra.
+  const ev2: [string, any][] = [];
+  const e2 = new Engine({}, { onEvent: (t, d) => ev2.push([t, d]) });
+  e2.lightTick(1000);
+  e2.lightReading(120, 5000);
+  for (let t = 2000; t < 150_000; t += 1000) e2.lightTick(t);
+  assert.deepEqual(ev2.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.source, d.lights]), [[true, 'lights', 'on']]);
 });
 
 test('lights: off while stopped asks nothing; switched off, or End of the day off, behave', () => {

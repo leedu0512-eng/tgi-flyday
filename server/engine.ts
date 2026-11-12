@@ -65,6 +65,8 @@ const LIGHTS_OFF_AFTER_MS = 60_000;
 const LIGHT_MARGIN = 10;
 /** Presence goes out at least this often, change or not. */
 export const PRESENCE_EVERY_MS = 15 * 60_000;
+/** After a start, the first presence row waits this long at most for the kiosk's light reading. */
+export const PRESENCE_START_WAIT_MS = 2 * 60_000;
 /** No reading from the kiosk for this long: lights unknown. */
 const LIGHT_STALE_MS = 3 * 60_000;
 /** Callout wordings that earlier versions had as defaults; saved unchanged, they follow the new default. */
@@ -155,6 +157,10 @@ export class Engine {
   private presence: boolean | null | undefined = undefined;
   /** When presence last went out (lightTick's clock); null before the first. */
   private presenceAt: number | null = null;
+  /** The first lightTick: the start row waits a little for the kiosk's first light reading. */
+  private firstTickAt: number | null = null;
+  /** The last presence row that went to the outbox, for the RD console. */
+  presenceSent: { present: boolean | null; lights: string; practice: boolean; source: string; at: number | null } | null = null;
   private nightSnoozeUntil = 0;
   clock: ClockState = {
     phase: 'stopped',
@@ -617,17 +623,27 @@ export class Engine {
     if (l.state !== 'unknown' && l.at !== null && now - l.at > LIGHT_STALE_MS) {
       l.state = 'unknown';
       l.darkSince = null;
-      this.presenceNow('lights');
+      this.presenceNow('lights', now);
       this.onChange();
     }
-    if (this.presenceAt === null) this.presenceNow('start', now);
-    else if (now - this.presenceAt >= PRESENCE_EVERY_MS) this.presenceNow('heartbeat', now);
+    this.firstTickAt ??= now;
+    if (this.presenceAt === null) {
+      // Wait for the kiosk's first reading (it comes within seconds when the kiosk is on), so a
+      // restart doesn't open with "can't tell"; after PRESENCE_START_WAIT_MS send what we know.
+      if (this.light.state !== 'unknown' || this.clock.phase !== 'stopped' || now - this.firstTickAt >= PRESENCE_START_WAIT_MS) {
+        this.presenceNow('start', now);
+        this.onChange();
+      }
+    } else if (now - this.presenceAt >= PRESENCE_EVERY_MS) {
+      this.presenceNow('heartbeat', now);
+      this.onChange();
+    }
   }
 
   private lightsChanged(to: 'on' | 'off', now: number) {
     this.light.state = to;
     this.onEvent('lights', { on: to === 'on', level: this.light.level });
-    this.presenceNow('lights');
+    this.presenceNow('lights', now);
     if (to === 'off') {
       // Practice is on with the lights off: has everyone gone home? The usual end-of-day question.
       if (this.config.lights.enabled && this.clock.phase !== 'stopped' && !this.night) {
@@ -652,6 +668,7 @@ export class Engine {
     if (present === this.presence && source !== 'heartbeat' && source !== 'start') return;
     this.presence = present;
     if (now !== null) this.presenceAt = now;
+    this.presenceSent = { present, lights: l, practice: flying, source, at: now ?? this.presenceSent?.at ?? null };
     this.onEvent('presence', { present, source, lights: l, level: this.light.level, practice: flying });
   }
 
@@ -1929,6 +1946,7 @@ export class Engine {
         cloud: { ...this.config.cloud, key: '', keySet: !!this.config.cloud.key },
       },
       light: this.light,
+      presenceSent: this.presenceSent,
       clock: this.clock,
       pilots: [...this.pilots.values()].sort((a, b) => a.callsign.localeCompare(b.callsign)),
       heats: this.heats.map((row, h) => ({
