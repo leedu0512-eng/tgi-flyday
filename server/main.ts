@@ -351,9 +351,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall });
   // Console: "Let them in" (Windows Firewall), one permission prompt on this PC.
   if (path === '/api/firewall/allow' && req.method === 'POST') {
-    const accepted = await firewallAllow();
-    firewall = await firewallStatus();
-    return json(res, 200, { ok: true, result: { accepted, firewall } });
+    const { accepted, error } = await firewallAllow(PORT);
+    firewall = await firewallStatus(PORT);
+    return json(res, 200, { ok: true, result: { accepted, error, firewall } });
   }
   // Restart button (view picker): look for a newer version on GitHub, install it, restart.
   // Only the app/ folder next to the exe is replaced; data/ (pilots, photos) is never touched.
@@ -571,7 +571,7 @@ server.listen(PORT, '0.0.0.0', () => {
   if (OPEN_WINDOWS) { closeOldWindows(); openRdWindows(PORT); }
   if (process.platform === 'win32' && (OPEN_WINDOWS || AFTER_UPDATE)) tameConsole();
   keepAwake(); // the RD PC must not fall asleep mid-session
-  firewallStatus().then((f) => {
+  firewallStatus(PORT).then((f) => {
     firewall = f;
     if (f && !f.ok) console.log(`\n  Phones and the kiosk can't reach this PC: ${f.reason} (${f.network} network).\n  Fix it in the RD console: "Let them in".`);
   });

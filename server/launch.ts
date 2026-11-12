@@ -3,7 +3,8 @@
 // PowerShell snippets run with -EncodedCommand, so no quoting can go wrong.
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createConnection } from 'node:net';
 import { createInterface } from 'node:readline/promises';
 import { join } from 'node:path';
@@ -95,49 +96,70 @@ function psAsync(script: string, timeout = 30_000): Promise<string> {
   });
 }
 
-export interface FirewallStatus { ok: boolean; network: string; reason: string }
+export interface FirewallStatus { ok: boolean; network: string; reason: string; closed?: boolean }
 
 /**
  * Windows Firewall: can phones and the kiosk reach tgiFlyDay on this network? (Dismissing
  * Windows' own "allow access" question quietly adds a rule that blocks tgiFlyDay.)
  * null = can't tell (not Windows, or PowerShell didn't answer).
  */
-export async function firewallStatus(): Promise<FirewallStatus | null> {
+export async function firewallStatus(port = 8080): Promise<FirewallStatus | null> {
   if (process.platform !== 'win32') return null;
   const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
+  // Every connected network counts (the LAN and, say, Tailscale can be different kinds), and a
+  // rule for tgiFlyDay's program or for its port both let phones and the kiosk in.
   const out = await psAsync(`$ErrorActionPreference = 'SilentlyContinue'
-$cat = [string](Get-NetConnectionProfile | Where-Object { $_.IPv4Connectivity -ne 'Disconnected' } | Select-Object -First 1).NetworkCategory
-if (-not $cat) { $cat = 'Public' }
-$prof = if ($cat -eq 'DomainAuthenticated') { 'Domain' } else { $cat }
-$on = [string](Get-NetFirewallProfile -Name $prof).Enabled
-$rules = @(Get-NetFirewallApplicationFilter -Program ${q(process.execPath)} | Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' })
-$hit = { param($r) $p = [string]$r.Profile; $p -eq 'Any' -or $p -match $prof }
-$allow = @($rules | Where-Object { $_.Action -eq 'Allow' -and (& $hit $_) }).Count
-$block = @($rules | Where-Object { $_.Action -eq 'Block' -and (& $hit $_) }).Count
-"$prof|$on|$allow|$block"`);
-  const m = out.match(/^(\w+)\|(\w*)\|(\d+)\|(\d+)$/m);
+$cats = @(Get-NetConnectionProfile | Where-Object { $_.IPv4Connectivity -ne 'Disconnected' } | ForEach-Object { if ([string]$_.NetworkCategory -eq 'DomainAuthenticated') { 'Domain' } else { [string]$_.NetworkCategory } } | Select-Object -Unique)
+if (-not $cats.Count) { $cats = @('Public') }
+$on = @($cats | Where-Object { [string](Get-NetFirewallProfile -Name $_).Enabled -eq 'True' })
+$closed = @($on | Where-Object { [string](Get-NetFirewallProfile -Name $_).AllowInboundRules -eq 'False' })
+$hit = { param($r) $p = [string]$r.Profile; $p -eq 'Any' -or @($on | Where-Object { $p -match $_ }).Count -gt 0 }
+$rules = @(Get-NetFirewallApplicationFilter -Program ${q(process.execPath)} | Get-NetFirewallRule | Where-Object { [string]$_.Enabled -eq 'True' -and [string]$_.Direction -eq 'Inbound' })
+$ports = @(Get-NetFirewallPortFilter -Protocol TCP | Where-Object { [string]$_.LocalPort -eq '${port}' } | Get-NetFirewallRule | Where-Object { [string]$_.Enabled -eq 'True' -and [string]$_.Direction -eq 'Inbound' -and [string]$_.Action -eq 'Allow' })
+$allow = @($rules | Where-Object { [string]$_.Action -eq 'Allow' -and (& $hit $_) }).Count + @($ports | Where-Object { & $hit $_ }).Count
+$block = @($rules | Where-Object { [string]$_.Action -eq 'Block' -and (& $hit $_) }).Count
+"FW|$($cats -join ',')|$($on.Count)|$allow|$block|$($closed -join ',')"`, 60_000);
+  const m = out.match(/^FW\|([\w,]*)\|(\d+)\|(\d+)\|(\d+)\|([\w,]*)$/m);
   if (!m) return null;
-  const [, network, on, allow, block] = m;
-  if (on === 'False') return { ok: true, network, reason: 'firewall off' };
+  const [, cats, on, allow, block, closed] = m;
+  const network = cats.split(',').join(' / ');
+  if (Number(on) === 0) return { ok: true, network, reason: 'firewall off' };
+  if (closed) return { ok: false, network, closed: true, reason: `Windows is set to block all incoming connections on the ${closed.toLowerCase().split(',').join(' / ')} network, allowed apps too` };
   if (Number(block) > 0) return { ok: false, network, reason: 'a firewall rule blocks tgiFlyDay' };
   if (Number(allow) === 0) return { ok: false, network, reason: 'no firewall rule lets tgiFlyDay in' };
   return { ok: true, network, reason: 'allowed' };
 }
 
 /**
- * Let phones and the kiosk in: one Windows permission prompt, then a firewall rule that
- * allows tgiFlyDay (and removes rules that block it). True when the prompt was accepted.
+ * Let phones and the kiosk in: one Windows permission prompt, then firewall rules that allow
+ * tgiFlyDay's program and its port on every kind of network (and remove the block rules
+ * Windows adds when its own "allow access" question is answered for the wrong network).
+ * accepted: the prompt was accepted; error: what Windows said went wrong, if anything.
  */
-export async function firewallAllow(): Promise<boolean> {
-  if (process.platform !== 'win32') return false;
+export async function firewallAllow(port = 8080): Promise<{ accepted: boolean; error: string }> {
+  if (process.platform !== 'win32') return { accepted: false, error: '' };
   const q = (x: string) => `'${x.replace(/'/g, "''")}'`;
-  const inner = `$exe = ${q(process.execPath)}
-Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { $_.Action -eq 'Block' } | Remove-NetFirewallRule
-Get-NetFirewallRule -DisplayName 'tgiFlyDay','TGI FlyDay' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-New-NetFirewallRule -DisplayName 'tgiFlyDay' -Description 'Phones and the pilot kiosk reach tgiFlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null`;
+  const log = join(tmpdir(), `tgiflyday-firewall-${process.pid}.txt`);
+  try { rmSync(log, { force: true }); } catch {}
+  const inner = `$ErrorActionPreference = 'Stop'
+$exe = ${q(process.execPath)}
+$log = ${q(log)}
+try {
+  Get-NetFirewallApplicationFilter -Program $exe -ErrorAction SilentlyContinue | Get-NetFirewallRule -ErrorAction SilentlyContinue | Where-Object { [string]$_.Action -eq 'Block' } | Remove-NetFirewallRule
+  Get-NetFirewallRule -DisplayName 'tgiFlyDay','TGI FlyDay','tgiFlyDay (port ${port})' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+  New-NetFirewallRule -DisplayName 'tgiFlyDay' -Description 'Phones and the pilot kiosk reach tgiFlyDay' -Direction Inbound -Program $exe -Action Allow -Profile Any | Out-Null
+  New-NetFirewallRule -DisplayName 'tgiFlyDay (port ${port})' -Description 'Phones and the pilot kiosk reach tgiFlyDay' -Direction Inbound -Protocol TCP -LocalPort ${port} -Action Allow -Profile Any | Out-Null
+  'ok' | Out-File -FilePath $log -Encoding utf8
+} catch {
+  ('error: ' + $_.Exception.Message) | Out-File -FilePath $log -Encoding utf8
+}`;
   const encoded = Buffer.from(inner, 'utf16le').toString('base64');
   const out = await psAsync(`try { Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-NonInteractive','-EncodedCommand','${encoded}'; 'yes' } catch { 'no' }`, 120_000);
-  return out.endsWith('yes');
+  const accepted = out.endsWith('yes');
+  let said = '';
+  try { said = readFileSync(log, 'utf8').replace(/^﻿/, '').trim(); rmSync(log, { force: true }); } catch {}
+  const error = !accepted ? '' : said.startsWith('error: ') ? said.slice(7).replace(/\s+/g, ' ').slice(0, 300) : said === 'ok' ? '' : 'the change ran but did not report back';
+  return { accepted, error };
 }
 
 /** Start this program again (after an update), in its own minimised window on Windows. */

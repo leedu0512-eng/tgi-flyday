@@ -1195,8 +1195,10 @@ async function showInfo(info) {
   const qrs = await Promise.all(SCREENS.map(([path]) => qrFor(url(path))));
   $('kioskInfo').innerHTML = `
     ${fw && !fw.ok ? `<div class="fw-warn"><b>Phones and the kiosk can't reach this PC.</b>
-      <span>Windows Firewall: ${esc(fw.reason)} on this ${esc(fw.network.toLowerCase())} network.</span>
-      <button class="btn primary" id="fwFix">Let them in</button><small>Windows asks for permission once.</small></div>` : ''}
+      ${fw.closed
+        ? `<span>Windows Firewall: ${esc(fw.reason)}.</span><small>Windows Security → Firewall &amp; network protection → the network marked active → untick <b>Blocks all incoming connections, including those in the list of allowed apps</b>. Then restart tgiFlyDay.</small>`
+        : `<span>Windows Firewall: ${esc(fw.reason)} (${esc(fw.network.toLowerCase())} network).</span>
+      <button class="btn primary" id="fwFix">Let them in</button><small>Use this button, not Windows' own "allow access" box: that one only allows the networks ticked in it. Windows asks for permission once.</small>`}</div>` : ''}
     <div class="screen-link main">
       <div class="qr">${qrs[0]}</div>
       <div><b>${SCREENS[0][1]}</b><code>${esc(url('/me'))}</code><span class="hint">${SCREENS[0][2]} The big screen and the kiosk show this QR code too.</span></div>
@@ -1217,7 +1219,10 @@ async function showInfo(info) {
     e.target.textContent = 'Check the Windows prompt…';
     try {
       const r = await post('/api/firewall/allow');
-      toast(r.firewall?.ok ? 'Done: phones and the kiosk can get in now.' : r.accepted ? 'Still blocked: check Windows Firewall settings.' : 'Windows said no: nothing changed.', !!r.firewall?.ok);
+      toast(r.firewall?.ok ? 'Done: phones and the kiosk can get in now.'
+        : !r.accepted ? 'Windows said no: nothing changed.'
+        : r.error ? `Windows could not change the firewall: ${r.error}`
+        : `Still blocked: ${r.firewall?.reason ?? 'check Windows Firewall settings'}.`, !!r.firewall?.ok);
       showInfo({ ...info, firewall: r.firewall });
     } catch (err) { toast(err.message); e.target.disabled = false; }
   });
