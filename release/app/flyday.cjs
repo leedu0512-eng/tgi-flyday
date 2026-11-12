@@ -289,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.12-1905" : "dev";
+var VERSION = true ? "2026.11.12-1906" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -428,6 +428,7 @@ var NIGHT_GRACE_MS = 5 * 6e4;
 var LIGHTS_OFF_AFTER_MS = 6e4;
 var LIGHT_MARGIN = 10;
 var PRESENCE_EVERY_MS = 15 * 6e4;
+var ACTIVE_MS = 15 * 6e4;
 var PRESENCE_START_WAIT_MS = 2 * 6e4;
 var LIGHT_STALE_MS = 3 * 6e4;
 var OLD_DEFAULT_TEXTS = {
@@ -514,6 +515,10 @@ var Engine = class {
   firstTickAt = null;
   /** The last presence row that went to the outbox, for the RD console. */
   presenceSent = null;
+  /** When somebody last used tgiFlyDay (kiosk, phone, console) or a lap was timed: somebody is here. */
+  lastActivity = null;
+  /** The latest time lightTick saw, for presence decisions made without a clock at hand. */
+  seenNow = 0;
   nightSnoozeUntil = 0;
   clock = {
     phase: "stopped",
@@ -953,6 +958,8 @@ var Engine = class {
       this.onChange();
     }
     this.firstTickAt ??= now;
+    this.seenNow = now;
+    if (this.presenceAt !== null) this.presenceNow("change", now);
     if (this.presenceAt === null) {
       if (this.light.state !== "unknown" || this.clock.phase !== "stopped" || now - this.firstTickAt >= PRESENCE_START_WAIT_MS) {
         this.presenceNow("start", now);
@@ -977,21 +984,31 @@ var Engine = class {
     }
     this.onChange();
   }
+  /** Somebody used tgiFlyDay just now (kiosk, phone, console): somebody is here. */
+  noteActivity(now) {
+    this.lastActivity = now;
+    this.seenNow = Math.max(this.seenNow, now);
+    if (this.presenceAt !== null) this.presenceNow("change", now);
+  }
   /**
-   * For the outbox: is anybody at the venue? Lights on, or practice running = yes; lights off
-   * with practice stopped = no; no light reading and practice stopped = can't tell (null).
-   * Sent only when it changes.
+   * For Flyday: is anybody at the venue? Every clue counts, strongest first: practice running;
+   * somebody used tgiFlyDay or flew a timed lap in the last ACTIVE_MS; the kiosk webcam sees the
+   * lights on. Lights off with none of those = nobody; no clue at all = can't tell (null).
+   * A row goes out when the answer changes (and as a heartbeat); the lights and practice ride along.
    */
   presenceNow(source, now = null) {
+    const t = now ?? this.seenNow;
     const flying = this.clock.phase !== "stopped";
     const l = this.light.state;
-    const present = l === "on" || flying ? true : l === "off" ? false : null;
-    const key = `${present}|${l}|${flying}`;
+    const recent = this.lastActivity !== null && t - this.lastActivity < ACTIVE_MS;
+    const why2 = flying ? "practice" : recent ? "activity" : l === "on" ? "lights on" : l === "off" ? "lights off" : "no clue";
+    const present = flying || recent || l === "on" ? true : l === "off" ? false : null;
+    const key = String(present);
     if (key === this.presence && source !== "heartbeat" && source !== "start") return;
     this.presence = key;
     if (now !== null) this.presenceAt = now;
-    this.presenceSent = { present, lights: l, practice: flying, source, at: now ?? this.presenceSent?.at ?? null };
-    this.onEvent("presence", { present, source, lights: l, level: this.light.level, practice: flying });
+    this.presenceSent = { present, lights: l, practice: flying, why: why2, source, at: now ?? this.presenceSent?.at ?? null };
+    this.onEvent("presence", { present, why: why2, source, lights: l, level: this.light.level, practice: flying });
   }
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
   endOfDay() {
@@ -1338,6 +1355,7 @@ var Engine = class {
     const id = this.heats[live.heat]?.[t.slot] ?? null;
     if (!id) return;
     if (at < live.startAt - 500) return;
+    this.lastActivity = Math.max(this.lastActivity ?? 0, at);
     const list = live.passes.get(id) ?? [];
     const prev = list.at(-1);
     if (prev !== void 0 && at - prev < MIN_LAP_MS) return;
@@ -3407,6 +3425,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     if (req.method !== "POST") return json(res, 405, { error: "Use POST." });
     try {
       const result = API2[path](await readBody(req));
+      if (path !== "/api/light" && path !== "/api/arm-measured") engine.noteActivity(Date.now());
       restorePhotos();
       engine.tick(Date.now());
       return json(res, 200, { ok: true, result: result ?? null });

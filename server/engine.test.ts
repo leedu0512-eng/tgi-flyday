@@ -1190,42 +1190,44 @@ test('lights: dark for a minute means off; off during practice asks "Still flyin
   // Presence: lights on = here; practice keeps it so through the dark minutes (the lights still
   // show in each row); off and stopped = gone.
   const pres = events.filter(([t]) => t === 'presence').map(([, d]) => d);
-  assert.equal(pres[0].present, true);
-  assert.ok(pres.some((d) => d.present === true && d.lights === 'off' && d.practice), 'dark but flying: still here');
-  assert.deepEqual([pres.at(-1).present, pres.at(-1).lights, pres.at(-1).practice], [false, 'off', false]);
+  assert.deepEqual(pres.map((d) => d.present), [true, false], 'here from the lights on until practice ends in the dark');
+  assert.deepEqual([pres.at(-1).why, pres.at(-1).lights, pres.at(-1).practice], ['lights off', 'off', false]);
 });
 
-test('presence: somebody is here with the lights on or practice running, nobody with lights off and stopped, null when nobody can tell', () => {
+test('presence: every clue counts (practice, recent use, lights); a row only when the answer changes', () => {
   const events: [string, any][] = [];
   let id = 0;
   const e = new Engine({ config: { freeFlight: true } as any }, { newId: () => `p${++id}`, onEvent: (t, d) => events.push([t, d]) });
-  const presence = () => events.filter(([t]) => t === 'presence').map(([, d]) => d);
-  // No kiosk readings, practice starts: somebody is flying.
-  e.walkIn('Chirp'); e.tick(1000);
-  assert.deepEqual(presence().map((d) => [d.present, d.source, d.practice]), [[true, 'session', true]]);
-  // Lights on while flying: still here, and the lights are news.
-  e.lightReading(120, 2000);
-  assert.deepEqual(presence().map((d) => [d.present, d.lights, d.practice]).at(-1), [true, 'on', true]);
-  // Stopped by hand with the lights on: still here, practice off.
-  e.action('stop', 3000);
-  assert.deepEqual(presence().map((d) => [d.present, d.lights, d.practice]).at(-1), [true, 'on', false]);
-  assert.equal(presence().length, 3);
-  // Lights off: gone.
-  e.lightReading(5, 10_000); e.lightReading(5, 80_000);
-  assert.deepEqual(presence().at(-1), { present: false, source: 'lights', lights: 'off', level: 5, practice: false });
-  // Kiosk stops reading: can't tell.
-  const t = 80_000 + 3 * 60_000 + 1;
+  const rows = () => events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.why]);
+  const M = 60_000;
+  e.lightTick(0);
+  // Practice starts (nobody has to read the lights for that).
+  e.walkIn('Chirp'); e.tick(1000); e.lightTick(1000);
+  assert.deepEqual(rows().at(-1), [true, 'practice']);
+  const n = rows().length;
+  // Lights on, then practice stopped with the lights on: still here, nothing new to say.
+  e.lightReading(120, 2000); e.action('stop', 3000); e.lightTick(3000);
+  assert.equal(rows().length, n);
+  // Lights off, nobody touches anything: gone after the dark minute.
+  e.lightReading(5, 4000); e.lightReading(5, 4000 + M); e.lightTick(4000 + M);
+  assert.deepEqual(rows().at(-1), [false, 'lights off']);
+  // Somebody signs in at the kiosk in the dark: here again, for 15 minutes from then.
+  e.noteActivity(10 * M);
+  assert.deepEqual(rows().at(-1), [true, 'activity']);
+  for (let k = 11; k <= 24; k++) { e.lightReading(5, k * M); e.lightTick(k * M); } // the kiosk keeps reading: dark
+  assert.deepEqual(rows().at(-1), [true, 'activity']);
+  e.lightReading(5, 25 * M); e.lightTick(25 * M);
+  assert.deepEqual(rows().at(-1), [false, 'lights off']);
+  // The kiosk stops reading and nobody uses tgiFlyDay: can't tell.
+  const t = 25 * M + 3 * M + 1;
   e.lightTick(t);
-  // That row counts as the first one (no separate start row), then every 15 minutes, change or not.
-  assert.deepEqual(presence().slice(4).map((d) => [d.present, d.source]), [[null, 'lights']]);
-  e.lightTick(t + 14 * 60_000);
-  assert.equal(presence().length, 5);
-  e.lightTick(t + 15 * 60_000);
-  assert.deepEqual(presence().slice(5).map((d) => [d.present, d.source]), [[null, 'heartbeat']]);
-  e.lightTick(t + 29 * 60_000);
-  assert.equal(presence().length, 6);
-  e.lightTick(t + 30 * 60_000);
-  assert.equal(presence().length, 7);
+  assert.deepEqual(rows().at(-1), [null, 'no clue']);
+  const m = rows().length;
+  // Then a heartbeat every 15 minutes, change or not.
+  e.lightTick(t + 14 * M);
+  assert.equal(rows().length, m);
+  e.lightTick(t + 15 * M);
+  assert.equal(rows().length, m + 1);
   assert.equal(e.presenceSent?.source, 'heartbeat');
 });
 
@@ -1287,18 +1289,15 @@ test('lights: off while stopped asks nothing; switched off, or End of the day of
   assert.equal(snap.config.cloud.keySet, true);
 });
 
-test('presence: a new row when the lights change, even while practice keeps "somebody is here" the same', () => {
+test('presence: the lights changing during practice is no news (somebody is here either way)', () => {
   const events: [string, any][] = [];
   const e = new Engine({ config: { freeFlight: true } as any }, { newId: () => 'p1', onEvent: (t, d) => events.push([t, d]) });
-  const rows = () => events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.lights, d.practice]);
+  const rows = () => events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.why]);
   e.lightTick(0);
-  e.walkIn('Chirp'); e.tick(1000);
-  e.lightTick(1000);
-  assert.deepEqual(rows().at(-1), [true, 'unknown', true]);
+  e.walkIn('Chirp'); e.tick(1000); e.lightTick(1000);
   const n = rows().length;
-  e.lightReading(60, 2000);
-  assert.equal(rows().length, n + 1, 'lights unknown -> on is news for Flyday');
-  assert.deepEqual(rows().at(-1), [true, 'on', true]);
-  e.lightReading(62, 22_000);
-  assert.equal(rows().length, n + 1, 'no change, no row');
+  e.lightReading(60, 2000); e.lightTick(2000);
+  e.lightReading(5, 3000); e.lightReading(5, 70_000); e.lightTick(70_000);
+  assert.equal(rows().length, n);
+  assert.deepEqual(rows().at(-1), [true, 'practice']);
 });

@@ -65,6 +65,8 @@ const LIGHTS_OFF_AFTER_MS = 60_000;
 const LIGHT_MARGIN = 10;
 /** Presence goes out at least this often, change or not. */
 export const PRESENCE_EVERY_MS = 15 * 60_000;
+/** Somebody used tgiFlyDay within this long: they're still here. */
+export const ACTIVE_MS = 15 * 60_000;
 /** After a start, the first presence row waits this long at most for the kiosk's light reading. */
 export const PRESENCE_START_WAIT_MS = 2 * 60_000;
 /** No reading from the kiosk for this long: lights unknown. */
@@ -162,7 +164,11 @@ export class Engine {
   /** The first lightTick: the start row waits a little for the kiosk's first light reading. */
   private firstTickAt: number | null = null;
   /** The last presence row that went to the outbox, for the RD console. */
-  presenceSent: { present: boolean | null; lights: string; practice: boolean; source: string; at: number | null } | null = null;
+  presenceSent: { present: boolean | null; lights: string; practice: boolean; why: string; source: string; at: number | null } | null = null;
+  /** When somebody last used tgiFlyDay (kiosk, phone, console) or a lap was timed: somebody is here. */
+  lastActivity: number | null = null;
+  /** The latest time lightTick saw, for presence decisions made without a clock at hand. */
+  private seenNow = 0;
   private nightSnoozeUntil = 0;
   clock: ClockState = {
     phase: 'stopped',
@@ -638,6 +644,9 @@ export class Engine {
       this.onChange();
     }
     this.firstTickAt ??= now;
+    this.seenNow = now;
+    // Somebody-is-here can also end by itself (the last use was 15 minutes ago): look every second.
+    if (this.presenceAt !== null) this.presenceNow('change', now);
     if (this.presenceAt === null) {
       // Wait for the kiosk's first reading (it comes within seconds when the kiosk is on), so a
       // restart doesn't open with "can't tell"; after PRESENCE_START_WAIT_MS send what we know.
@@ -667,22 +676,32 @@ export class Engine {
     this.onChange();
   }
 
+  /** Somebody used tgiFlyDay just now (kiosk, phone, console): somebody is here. */
+  noteActivity(now: number) {
+    this.lastActivity = now;
+    this.seenNow = Math.max(this.seenNow, now);
+    if (this.presenceAt !== null) this.presenceNow('change', now);
+  }
+
   /**
-   * For the outbox: is anybody at the venue? Lights on, or practice running = yes; lights off
-   * with practice stopped = no; no light reading and practice stopped = can't tell (null).
-   * Sent only when it changes.
+   * For Flyday: is anybody at the venue? Every clue counts, strongest first: practice running;
+   * somebody used tgiFlyDay or flew a timed lap in the last ACTIVE_MS; the kiosk webcam sees the
+   * lights on. Lights off with none of those = nobody; no clue at all = can't tell (null).
+   * A row goes out when the answer changes (and as a heartbeat); the lights and practice ride along.
    */
-  private presenceNow(source: 'lights' | 'session' | 'start' | 'heartbeat', now: number | null = null) {
+  private presenceNow(source: 'lights' | 'session' | 'start' | 'heartbeat' | 'change', now: number | null = null) {
+    const t = now ?? this.seenNow;
     const flying = this.clock.phase !== 'stopped';
     const l = this.light.state;
-    const present = l === 'on' || flying ? true : l === 'off' ? false : null;
-    // A row whenever what Flyday shows would change: somebody here, the lights, or practice.
-    const key = `${present}|${l}|${flying}`;
+    const recent = this.lastActivity !== null && t - this.lastActivity < ACTIVE_MS;
+    const why = flying ? 'practice' : recent ? 'activity' : l === 'on' ? 'lights on' : l === 'off' ? 'lights off' : 'no clue';
+    const present = flying || recent || l === 'on' ? true : l === 'off' ? false : null;
+    const key = String(present);
     if (key === this.presence && source !== 'heartbeat' && source !== 'start') return;
     this.presence = key;
     if (now !== null) this.presenceAt = now;
-    this.presenceSent = { present, lights: l, practice: flying, source, at: now ?? this.presenceSent?.at ?? null };
-    this.onEvent('presence', { present, source, lights: l, level: this.light.level, practice: flying });
+    this.presenceSent = { present, lights: l, practice: flying, why, source, at: now ?? this.presenceSent?.at ?? null };
+    this.onEvent('presence', { present, why, source, lights: l, level: this.light.level, practice: flying });
   }
 
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
@@ -1030,6 +1049,7 @@ export class Engine {
     const id = this.heats[live.heat]?.[t.slot] ?? null;
     if (!id) return;
     if (at < live.startAt - 500) return; // before the start BEEP
+    this.lastActivity = Math.max(this.lastActivity ?? 0, at); // somebody is flying
     const list = live.passes.get(id) ?? [];
     const prev = list.at(-1);
     if (prev !== undefined && at - prev < MIN_LAP_MS) return;

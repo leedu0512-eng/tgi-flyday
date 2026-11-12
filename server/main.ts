@@ -419,6 +419,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (req.method !== 'POST') return json(res, 405, { error: 'Use POST.' });
     try {
       const result = API[path](await readBody(req));
+      // A person did something (the kiosk's light readings and the console's own measuring don't count).
+      if (path !== '/api/light' && path !== '/api/arm-measured') engine.noteActivity(Date.now());
       // A pilot who just signed in (or came back) gets their remembered photo at once,
       // so it's already in the answer: the kiosk asks "Is this you?".
       restorePhotos();
