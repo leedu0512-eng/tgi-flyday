@@ -1,9 +1,9 @@
 {
- "version": "2026.11.12-1858",
+ "version": "2026.11.12-1905",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "2a79af5f299b40c99f5527a0d555d5cac7e755010f08377b0535e23e2b45973c"
+   "sha256": "3305b5ad6a81f83cb6933d39bd8f0e1a6b382ed934d1b8847e6677fff36d6e6e"
   },
   {
    "path": "web/assets/avatars.js",
@@ -151,7 +151,7 @@
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "41a71f1b88108911631e42db7a51756660f2450112db4b278c1c862af4bc5407"
+   "sha256": "b2d921c77e9421f2c1c93df3e8e658a731a9c221d975ecde0ccc9b424b6a80a3"
   },
   {
    "path": "web/me.html",
