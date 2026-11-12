@@ -289,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.12-1842" : "dev";
+var VERSION = true ? "2026.11.12-1858" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -506,6 +506,7 @@ var Engine = class {
   /** Room lights as the kiosk webcam sees them. */
   light = { state: "unknown", level: null, at: null, darkSince: null, problem: "", kioskAt: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
+  /** What the last presence row said (present|lights|practice), to send only on a change. */
   presence = void 0;
   /** When presence last went out (lightTick's clock); null before the first. */
   presenceAt = null;
@@ -985,8 +986,9 @@ var Engine = class {
     const flying = this.clock.phase !== "stopped";
     const l = this.light.state;
     const present = l === "on" || flying ? true : l === "off" ? false : null;
-    if (present === this.presence && source !== "heartbeat" && source !== "start") return;
-    this.presence = present;
+    const key = `${present}|${l}|${flying}`;
+    if (key === this.presence && source !== "heartbeat" && source !== "start") return;
+    this.presence = key;
     if (now !== null) this.presenceAt = now;
     this.presenceSent = { present, lights: l, practice: flying, source, at: now ?? this.presenceSent?.at ?? null };
     this.onEvent("presence", { present, source, lights: l, level: this.light.level, practice: flying });

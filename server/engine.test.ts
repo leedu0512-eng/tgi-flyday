@@ -1187,8 +1187,12 @@ test('lights: dark for a minute means off; off during practice asks "Still flyin
   assert.deepEqual(end?.[1].pilots, ['Chirp']);
   assert.deepEqual(events.filter(([t]) => t === 'lights').map(([, d]) => d.on), [true, false, true, false]);
   assert.equal(events.filter(([t]) => t !== 'presence')[1][0], 'session.start');
-  // Presence: lights on = here; practice keeps it so through the dark minutes; off and stopped = gone.
-  assert.deepEqual(events.filter(([t]) => t === 'presence').map(([, d]) => d.present), [true, false]);
+  // Presence: lights on = here; practice keeps it so through the dark minutes (the lights still
+  // show in each row); off and stopped = gone.
+  const pres = events.filter(([t]) => t === 'presence').map(([, d]) => d);
+  assert.equal(pres[0].present, true);
+  assert.ok(pres.some((d) => d.present === true && d.lights === 'off' && d.practice), 'dark but flying: still here');
+  assert.deepEqual([pres.at(-1).present, pres.at(-1).lights, pres.at(-1).practice], [false, 'off', false]);
 });
 
 test('presence: somebody is here with the lights on or practice running, nobody with lights off and stopped, null when nobody can tell', () => {
@@ -1199,12 +1203,13 @@ test('presence: somebody is here with the lights on or practice running, nobody 
   // No kiosk readings, practice starts: somebody is flying.
   e.walkIn('Chirp'); e.tick(1000);
   assert.deepEqual(presence().map((d) => [d.present, d.source, d.practice]), [[true, 'session', true]]);
-  // Lights on while flying: no change, nothing sent.
+  // Lights on while flying: still here, and the lights are news.
   e.lightReading(120, 2000);
-  assert.equal(presence().length, 1);
-  // Stopped by hand with the lights on: still here.
+  assert.deepEqual(presence().map((d) => [d.present, d.lights, d.practice]).at(-1), [true, 'on', true]);
+  // Stopped by hand with the lights on: still here, practice off.
   e.action('stop', 3000);
-  assert.equal(presence().length, 1);
+  assert.deepEqual(presence().map((d) => [d.present, d.lights, d.practice]).at(-1), [true, 'on', false]);
+  assert.equal(presence().length, 3);
   // Lights off: gone.
   e.lightReading(5, 10_000); e.lightReading(5, 80_000);
   assert.deepEqual(presence().at(-1), { present: false, source: 'lights', lights: 'off', level: 5, practice: false });
@@ -1212,15 +1217,15 @@ test('presence: somebody is here with the lights on or practice running, nobody 
   const t = 80_000 + 3 * 60_000 + 1;
   e.lightTick(t);
   // That row counts as the first one (no separate start row), then every 15 minutes, change or not.
-  assert.deepEqual(presence().slice(2).map((d) => [d.present, d.source]), [[null, 'lights']]);
+  assert.deepEqual(presence().slice(4).map((d) => [d.present, d.source]), [[null, 'lights']]);
   e.lightTick(t + 14 * 60_000);
-  assert.equal(presence().length, 3);
-  e.lightTick(t + 15 * 60_000);
-  assert.deepEqual(presence().slice(3).map((d) => [d.present, d.source]), [[null, 'heartbeat']]);
-  e.lightTick(t + 29 * 60_000);
-  assert.equal(presence().length, 4);
-  e.lightTick(t + 30 * 60_000);
   assert.equal(presence().length, 5);
+  e.lightTick(t + 15 * 60_000);
+  assert.deepEqual(presence().slice(5).map((d) => [d.present, d.source]), [[null, 'heartbeat']]);
+  e.lightTick(t + 29 * 60_000);
+  assert.equal(presence().length, 6);
+  e.lightTick(t + 30 * 60_000);
+  assert.equal(presence().length, 7);
   assert.equal(e.presenceSent?.source, 'heartbeat');
 });
 
@@ -1280,4 +1285,20 @@ test('lights: off while stopped asks nothing; switched off, or End of the day of
   const snap = e.snapshot(0) as any;
   assert.equal(snap.config.cloud.key, '', 'the key stays on the RD PC');
   assert.equal(snap.config.cloud.keySet, true);
+});
+
+test('presence: a new row when the lights change, even while practice keeps "somebody is here" the same', () => {
+  const events: [string, any][] = [];
+  const e = new Engine({ config: { freeFlight: true } as any }, { newId: () => 'p1', onEvent: (t, d) => events.push([t, d]) });
+  const rows = () => events.filter(([t]) => t === 'presence').map(([, d]) => [d.present, d.lights, d.practice]);
+  e.lightTick(0);
+  e.walkIn('Chirp'); e.tick(1000);
+  e.lightTick(1000);
+  assert.deepEqual(rows().at(-1), [true, 'unknown', true]);
+  const n = rows().length;
+  e.lightReading(60, 2000);
+  assert.equal(rows().length, n + 1, 'lights unknown -> on is news for Flyday');
+  assert.deepEqual(rows().at(-1), [true, 'on', true]);
+  e.lightReading(62, 22_000);
+  assert.equal(rows().length, n + 1, 'no change, no row');
 });

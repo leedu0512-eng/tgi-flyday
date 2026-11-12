@@ -155,7 +155,8 @@ export class Engine {
   light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null; problem: string; kioskAt: number | null } =
     { state: 'unknown', level: null, at: null, darkSince: null, problem: '', kioskAt: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
-  private presence: boolean | null | undefined = undefined;
+  /** What the last presence row said (present|lights|practice), to send only on a change. */
+  private presence: string | undefined = undefined;
   /** When presence last went out (lightTick's clock); null before the first. */
   private presenceAt: number | null = null;
   /** The first lightTick: the start row waits a little for the kiosk's first light reading. */
@@ -675,8 +676,10 @@ export class Engine {
     const flying = this.clock.phase !== 'stopped';
     const l = this.light.state;
     const present = l === 'on' || flying ? true : l === 'off' ? false : null;
-    if (present === this.presence && source !== 'heartbeat' && source !== 'start') return;
-    this.presence = present;
+    // A row whenever what Flyday shows would change: somebody here, the lights, or practice.
+    const key = `${present}|${l}|${flying}`;
+    if (key === this.presence && source !== 'heartbeat' && source !== 'start') return;
+    this.presence = key;
     if (now !== null) this.presenceAt = now;
     this.presenceSent = { present, lights: l, practice: flying, source, at: now ?? this.presenceSent?.at ?? null };
     this.onEvent('presence', { present, source, lights: l, level: this.light.level, practice: flying });
