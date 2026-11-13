@@ -1301,3 +1301,27 @@ test('presence: the lights changing during practice is no news (somebody is here
   assert.equal(rows().length, n);
   assert.deepEqual(rows().at(-1), [true, 'practice']);
 });
+
+test('presence tells Flyday why there is no light reading (lightsNote, kioskSeenAt)', () => {
+  const events: [string, any][] = [];
+  const e = new Engine({}, { onEvent: (t, d) => events.push([t, d]) });
+  const last = () => events.filter(([t]) => t === 'presence').at(-1)![1];
+  // Never heard from the kiosk.
+  e.lightTick(1000); e.lightTick(1000 + 120_000);
+  assert.equal(last().lightsNote, "the kiosk hasn't reported since tgiFlyDay started");
+  assert.equal(last().kioskSeenAt, null);
+  // The kiosk says why it can't read: that reason goes along with the heartbeat.
+  e.lightProblem('the webcam is in use by another program, or not working', 900_000);
+  e.lightTick(1000 + 120_000 + 15 * 60_000);
+  assert.equal(last().lightsNote, 'the webcam is in use by another program, or not working');
+  assert.equal(last().kioskSeenAt, 900_000);
+  // Then silence for more than 3 minutes: it isn't reporting, last heard stays.
+  e.lightTick(1000 + 120_000 + 30 * 60_000);
+  assert.equal(last().lightsNote, "the kiosk isn't reporting");
+  assert.equal(last().kioskSeenAt, 900_000);
+  // A real reading: no note.
+  e.lightReading(120, 3_000_000);
+  assert.equal(last().lights, 'on');
+  assert.equal(last().lightsNote, null);
+  assert.equal(last().kioskSeenAt, 3_000_000);
+});

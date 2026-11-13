@@ -158,7 +158,7 @@ export interface UploadBody {
   session: null | { id: string; started_at: string; ended_at: string | null; end_reason: string | null; timed: boolean };
   pilots: { id: string; person: null; local_pilot: string; callsign: string; club_quad: boolean }[];
   laps: { id: string; pilot: string; round: number; heat: number; free_flight: boolean; channel: string | null; lap: number; ms: number | null; crossed_at: string | null }[];
-  presence: { id: string; at: string; present: boolean | null; lights: string; practice: boolean }[];
+  presence: { id: string; at: string; present: boolean | null; lights: string; practice: boolean; lights_note: string | null; kiosk_seen_at: string | null }[];
 }
 
 export interface OutboxRow { id: string; venue: string; at: string; type: string; data: Record<string, any> }
@@ -200,7 +200,12 @@ export function toUploads(rows: OutboxRow[], install: string, kioskName: string,
     if (r.type === 'lights') { out.push({ body: null as any, rows: 1 }); continue; }
     if (r.type === 'presence') {
       const last = out.at(-1);
-      const item = { id: stableId(install, 'presence', r.id), at: r.at, present: d.present ?? null, lights: String(d.lights ?? 'unknown'), practice: !!d.practice };
+      const item = {
+        id: stableId(install, 'presence', r.id), at: r.at, present: d.present ?? null, lights: String(d.lights ?? 'unknown'), practice: !!d.practice,
+        // Why the kiosk gave no light reading (portal agreed 13.11.2026: optional, ≤ 120 characters; a date or null, never junk).
+        lights_note: typeof d.lightsNote === 'string' && d.lightsNote ? d.lightsNote.slice(0, 120) : null,
+        kiosk_seen_at: iso(d.kioskSeenAt),
+      };
       if (last?.body && last.body.session === null && last.body.presence.length && last.body.presence.length < 200) { last.body.presence.push(item); last.rows++; }
       else { const b = base(r.venue); b.presence.push(item); out.push({ body: b, rows: 1 }); }
       continue;

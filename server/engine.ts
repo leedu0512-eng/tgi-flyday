@@ -701,7 +701,24 @@ export class Engine {
     this.presence = key;
     if (now !== null) this.presenceAt = now;
     this.presenceSent = { present, lights: l, practice: flying, why, source, at: now ?? this.presenceSent?.at ?? null };
-    this.onEvent('presence', { present, why, source, lights: l, level: this.light.level, practice: flying });
+    const { note: lightsNote, seenAt: kioskSeenAt } = this.kioskNote(t);
+    this.onEvent('presence', { present, why, source, lights: l, level: this.light.level, practice: flying, lightsNote, kioskSeenAt });
+  }
+
+  /**
+   * Why there's no light reading, for Flyday (null while the webcam reads fine): the kiosk's own
+   * reason when it spoke in the last 3 minutes, else that it isn't reporting. With the last time
+   * the kiosk spoke at all (null: not since tgiFlyDay started).
+   */
+  kioskNote(now: number): { note: string | null; seenAt: number | null } {
+    const k = this.light;
+    const seenAt = k.kioskAt;
+    if (k.state !== 'unknown') return { note: null, seenAt };
+    const fresh = seenAt !== null && now - seenAt < LIGHT_STALE_MS;
+    const note = fresh && k.problem ? k.problem
+      : seenAt === null ? "the kiosk hasn't reported since tgiFlyDay started"
+      : fresh ? 'no light reading yet' : "the kiosk isn't reporting";
+    return { note: note.slice(0, 120), seenAt };
   }
 
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */

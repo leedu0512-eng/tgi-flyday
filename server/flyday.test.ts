@@ -104,3 +104,20 @@ test('a big upload goes in parts under the limit, each with the pilots its laps 
   // One lap can't be split further.
   assert.equal(splitBody({ ...body, laps: laps.slice(0, 1), pilots: pilots.slice(0, 1) }), null);
 });
+
+test('presence items carry lights_note and kiosk_seen_at (null when absent, never junk)', () => {
+  const T = Date.UTC(2026, 10, 13, 8, 0);
+  const rows = [
+    row('presence', T, { present: null, lights: 'unknown', practice: false, lightsNote: 'x'.repeat(200), kioskSeenAt: T - 60_000 }),
+    row('presence', T + 1, { present: true, lights: 'on', practice: false, lightsNote: null, kioskSeenAt: T }),
+    row('presence', T + 2, { present: true, lights: 'on', practice: false }), // older row, before the fields existed
+    row('presence', T + 3, { present: null, lights: 'unknown', practice: false, lightsNote: '', kioskSeenAt: 'nonsense' }),
+  ];
+  const [one] = toUploads(rows, 'k7f3x9q2m4p8w1z', 'PC', 'v', new Map());
+  const p = one.body!.presence;
+  assert.equal(p[0].lights_note, 'x'.repeat(120));
+  assert.equal(p[0].kiosk_seen_at, new Date(T - 60_000).toISOString());
+  assert.deepEqual([p[1].lights_note, p[1].kiosk_seen_at], [null, new Date(T).toISOString()]);
+  assert.deepEqual([p[2].lights_note, p[2].kiosk_seen_at], [null, null]);
+  assert.deepEqual([p[3].lights_note, p[3].kiosk_seen_at], [null, null]);
+});

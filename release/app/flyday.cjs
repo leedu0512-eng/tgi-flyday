@@ -289,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.12-1908" : "dev";
+var VERSION = true ? "2026.11.13-1138" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -1008,7 +1008,21 @@ var Engine = class {
     this.presence = key;
     if (now !== null) this.presenceAt = now;
     this.presenceSent = { present, lights: l, practice: flying, why: why2, source, at: now ?? this.presenceSent?.at ?? null };
-    this.onEvent("presence", { present, why: why2, source, lights: l, level: this.light.level, practice: flying });
+    const { note: lightsNote, seenAt: kioskSeenAt } = this.kioskNote(t);
+    this.onEvent("presence", { present, why: why2, source, lights: l, level: this.light.level, practice: flying, lightsNote, kioskSeenAt });
+  }
+  /**
+   * Why there's no light reading, for Flyday (null while the webcam reads fine): the kiosk's own
+   * reason when it spoke in the last 3 minutes, else that it isn't reporting. With the last time
+   * the kiosk spoke at all (null: not since tgiFlyDay started).
+   */
+  kioskNote(now) {
+    const k = this.light;
+    const seenAt = k.kioskAt;
+    if (k.state !== "unknown") return { note: null, seenAt };
+    const fresh = seenAt !== null && now - seenAt < LIGHT_STALE_MS;
+    const note = fresh && k.problem ? k.problem : seenAt === null ? "the kiosk hasn't reported since tgiFlyDay started" : fresh ? "no light reading yet" : "the kiosk isn't reporting";
+    return { note: note.slice(0, 120), seenAt };
   }
   /** Nobody is flying any more: stop, everyone off the list (photos and usual channels stay remembered). */
   endOfDay() {
@@ -2802,7 +2816,16 @@ function toUploads(rows, install2, kioskName, version, notes) {
     }
     if (r.type === "presence") {
       const last = out.at(-1);
-      const item = { id: stableId(install2, "presence", r.id), at: r.at, present: d.present ?? null, lights: String(d.lights ?? "unknown"), practice: !!d.practice };
+      const item = {
+        id: stableId(install2, "presence", r.id),
+        at: r.at,
+        present: d.present ?? null,
+        lights: String(d.lights ?? "unknown"),
+        practice: !!d.practice,
+        // Why the kiosk gave no light reading (portal agreed 13.11.2026: optional, ≤ 120 characters; a date or null, never junk).
+        lights_note: typeof d.lightsNote === "string" && d.lightsNote ? d.lightsNote.slice(0, 120) : null,
+        kiosk_seen_at: iso(d.kioskSeenAt)
+      };
       if (last?.body && last.body.session === null && last.body.presence.length && last.body.presence.length < 200) {
         last.body.presence.push(item);
         last.rows++;
