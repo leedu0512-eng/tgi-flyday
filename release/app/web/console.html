@@ -220,8 +220,9 @@
   <div class="drawer-head"><h2>Spectrum analyser</h2></div>
   <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
   <section class="drawer-sec spec-wrap">
-    <div id="specLanes" class="spec-lanes" aria-label="Channels in use, with the signal on each"></div>
-    <p class="hint">Levels are dB above the noise floor (the board isn't calibrated). A lane turns red at 6 dB or more. Each lane shows who flies that channel in the current heat, so a signal with no pilot, or a pilot with no signal, stands out.</p>
+    <div class="seg" role="group" aria-label="Which channels"><button id="specUsed" type="button">Used channels</button><button id="specAll" type="button">All channels</button></div>
+    <div id="specLanes" class="spec-lanes" aria-label="The band, with a bar for each channel"></div>
+    <p class="hint">The orange line is the band as the board sees it, to scale; each bar is a channel, as wide as the band its level is measured over (±8 MHz). Levels are dB above the noise floor (the board isn't calibrated); a bar turns red at 6 dB or more. Under each channel used in the current heat: who flies it, so a signal with no pilot, or a pilot with no signal, stands out.</p>
   </section>
   <section class="drawer-sec spec-controls">
     <div class="defaults-row">
@@ -552,38 +553,55 @@ function lanesNow() {
   const seen = new Set();
   return list.filter((l) => state.channelMhz?.[l.ch] && !seen.has(l.ch) && seen.add(l.ch)).map((l) => ({ ...l, mhz: state.channelMhz[l.ch] })).sort((a, b) => a.mhz - b.mhz);
 }
+const BAND_ROWS = { L: 0, R: 1, F: 2 };
+let specAll = false;
+try { specAll = localStorage.getItem('tgiflyday.specAll') === '1'; } catch {}
 function drawSpectrum() {
-  const sp = state.spectrum ?? {}, lanes = lanesNow();
-  const W = 1000, H = 380, top = 70, bottom = 330;
-  if (!lanes.length) { $('specLanes').innerHTML = '<p class="hint">No channels in use.</p>'; return; }
-  const lo = lanes[0].mhz - 22, hi = lanes.at(-1).mhz + 22;
+  const sp = state.spectrum ?? {}, used = lanesNow(), mhzOf = state.channelMhz ?? {};
+  const W = 1000, H = 400, HALF = 8; // a bar is the band its level is measured over: ±8 MHz
+  const rows = specAll ? 3 : 1, labelTop = 12, rowH = specAll ? 30 : 46;
+  const top = labelTop + rows * rowH + 6, bottom = specAll ? 330 : 318;
+  if (!used.length && !specAll) { $('specLanes').innerHTML = '<p class="hint">No channels in use.</p>'; return; }
+  // The x range: the used channels with some room, or the whole of L, R and F.
+  const all = Object.entries(mhzOf).filter(([ch]) => /^[LRF][1-8]$/.test(ch)).map(([ch, mhz]) => ({ ch, mhz }));
+  const shown = specAll ? all : used;
+  const lo = Math.min(...shown.map((c) => c.mhz)) - (specAll ? 18 : 26), hi = Math.max(...shown.map((c) => c.mhz)) + (specAll ? 18 : 26);
   const X = (f) => ((f - lo) / (hi - lo)) * W;
   const Y = (db) => bottom - (Math.max(0, Math.min(40, db)) / 40) * (bottom - top);
   const flying = ['running', 'freeflight'].includes(state.clock?.phase);
   const live = sp.state === 'connected' && Array.isArray(sp.db) && sp.db.length;
+  const usedBy = new Map(used.map((l) => [l.ch, l]));
   // Max hold: per viewer, starts again when the sweep's range changes.
   const key = `${sp.f0}|${sp.db?.length}`;
   if (!$('specHold').checked || key !== specHoldKey) { specHold = null; specHoldKey = key; }
-  if ($('specHold').checked && live) specHold = specHold ? specHold.map((v, i) => Math.max(v, sp.db[i])) : [...sp.db];
+  if ($('specHold').checked && live) specHold = specHold ? specHold.map((v, i) => Math.max(v, sp.db[i] ?? 0)) : [...sp.db];
   const path = (db) => db.map((v, i) => [sp.f0 + i, v]).filter(([f]) => f >= lo && f <= hi).map(([f, v], k) => `${k ? 'L' : 'M'}${X(f).toFixed(1)},${Y(v).toFixed(1)}`).join('');
   let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">`;
-  lanes.forEach((l, i) => {
-    const a = i ? X((lanes[i - 1].mhz + l.mhz) / 2) : 0, b = i < lanes.length - 1 ? X((l.mhz + lanes[i + 1].mhz) / 2) : W;
-    const lv = live ? sp.channels?.[l.ch] : undefined, taken = lv !== undefined && lv >= 6;
-    const note = !live ? '' : taken && !l.pilot ? 'signal, no pilot' : l.pilot && !taken && flying ? 'no signal' : '';
-    svg += `<rect x="${a}" y="0" width="${b - a}" height="${H}" class="lane${taken ? ' taken' : ''}"/>`
-      + `<text x="${(a + b) / 2}" y="30" class="ln">${esc(l.ch)}</text>`
-      + `<text x="${(a + b) / 2}" y="50" class="lm">${l.mhz} MHz${lv !== undefined ? ` · ${lv > 0 ? '+' : ''}${Math.round(lv)} dB` : ''}</text>`
-      + `<text x="${(a + b) / 2}" y="356" class="lp${l.pilot ? '' : ' none'}">${esc(l.pilot || 'no pilot')}</text>`
-      + (note ? `<text x="${(a + b) / 2}" y="374" class="lw">${note}</text>` : '')
-      + `<line x1="${X(l.mhz)}" y1="${top}" x2="${X(l.mhz)}" y2="${bottom}" class="lc"/>`;
-    if (i) svg += `<line x1="${a}" y1="0" x2="${a}" y2="${H}" class="ldiv"/>`;
-  });
+  // Frequency ticks.
+  for (let f = Math.ceil(lo / 50) * 50; f <= hi; f += 50) svg += `<line x1="${X(f)}" y1="${top}" x2="${X(f)}" y2="${bottom}" class="tick"/><text x="${X(f)}" y="${bottom + 14}" class="tk">${f}</text>`;
+  // The bars: every channel shown, exactly its measured width, under the trace.
+  const bars = (specAll ? all : used).slice().sort((a, b) => a.mhz - b.mhz);
+  for (const c of bars) {
+    const lv = live ? sp.channels?.[c.ch] : undefined, taken = lv !== undefined && lv >= 6, u = usedBy.get(c.ch);
+    const a = X(c.mhz - HALF), b = X(c.mhz + HALF), mid = X(c.mhz);
+    const row = specAll ? BAND_ROWS[c.ch[0]] ?? 0 : 0, ly = labelTop + row * rowH;
+    svg += `<rect x="${a}" y="${top}" width="${b - a}" height="${bottom - top}" class="bar${taken ? ' taken' : ''}${u ? ' used' : ''}"/>`;
+    svg += `<line x1="${mid}" y1="${ly + (specAll ? 20 : 34)}" x2="${mid}" y2="${top}" class="lead${u ? ' used' : ''}"/>`;
+    if (specAll) svg += `<text x="${mid}" y="${ly + 16}" class="ls${taken ? ' taken' : ''}${u ? ' used' : ''}">${esc(c.ch)}</text>`;
+    else svg += `<text x="${mid}" y="${ly + 18}" class="ln${taken ? ' taken' : ''}">${esc(c.ch)}</text><text x="${mid}" y="${ly + 34}" class="lm">${c.mhz}${lv !== undefined ? ` · ${lv > 0 ? '+' : ''}${Math.round(lv)} dB` : ''}</text>`;
+    if (u) {
+      const note = !live ? '' : taken && !u.pilot ? 'signal, no pilot' : u.pilot && !taken && flying ? 'no signal' : '';
+      svg += `<text x="${mid}" y="${bottom + (specAll ? 34 : 34)}" class="lp${u.pilot ? '' : ' none'}">${esc(u.pilot || 'no pilot')}</text>`;
+      if (note) svg += `<text x="${mid}" y="${bottom + 52}" class="lw">${note}</text>`;
+    }
+  }
   svg += `<line x1="0" y1="${Y(6)}" x2="${W}" y2="${Y(6)}" class="l6"/>`;
   if (specHold && live) svg += `<path d="${path(specHold)}" class="hold"/>`;
   if (live) svg += `<path d="${path(sp.db)}" class="trace"/>`;
   else svg += `<text x="${W / 2}" y="${(top + bottom) / 2}" class="lm">no reading</text>`;
   $('specLanes').innerHTML = svg + '</svg>';
+  $('specUsed').classList.toggle('on', !specAll);
+  $('specAll').classList.toggle('on', specAll);
   // Controls follow the server's settings.
   const cfg = state.config.spectrum ?? { enabled: true, gain: 48 };
   $('specOn').checked = cfg.enabled;
@@ -591,6 +609,7 @@ function drawSpectrum() {
   $('specGainV').textContent = $('specGain').value;
   $('specClear').hidden = !$('specHold').checked;
 }
+for (const [id, v] of [['specUsed', false], ['specAll', true]]) $(id).onclick = () => { specAll = v; try { localStorage.setItem('tgiflyday.specAll', v ? '1' : '0'); } catch {} drawSpectrum(); };
 $('specOn').onchange = (e) => act('/api/config', { spectrum: { enabled: e.target.checked } });
 $('specGain').oninput = () => { $('specGainV').textContent = $('specGain').value; };
 $('specGain').onchange = () => act('/api/config', { spectrum: { gain: Number($('specGain').value) } });
@@ -601,7 +620,8 @@ const onRdPc = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 if (onRdPc) {
   import('/assets/spectrum.js').then(({ startReader }) => {
     const reader = startReader({
-      channels: () => (state ? lanesNow().map((l) => l.mhz) : []),
+      // The whole of L, R and F every time, so any console can switch to All channels at once.
+      channels: () => (state ? Object.entries(state.channelMhz ?? {}).filter(([ch]) => /^[LRF][1-8]$/.test(ch)).map(([, mhz]) => mhz) : []),
       status: (text) => { readerNote = text; },
       post: (body) => post('/api/spectrum', body),
     });
