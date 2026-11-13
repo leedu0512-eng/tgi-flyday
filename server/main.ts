@@ -143,7 +143,7 @@ const store = saver(DATA_FILE, () => engine.toSaved());
 const pairing = new Install(resolve(DATA_FILE, '..'));
 outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostname(), (m) => console.log(new Date().toLocaleTimeString(), m), pairing);
 /** What the screens get: the engine's state plus how the outbox and the Flyday pairing are doing (no secret, no token). */
-const snapshot = (now: number) => ({ ...engine.snapshot(now), outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
+const snapshot = (now: number) => ({ ...engine.snapshot(now), trackdayUrl: pairing.state.trackdayUrl, outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
 /** Hello to Flyday: approval, token, send on or off, all decided there. Then send what's waiting. */
 async function helloFlyday() {
   await pairing.hello(outbox!.base(), outbox!.venue(), hostname(), VERSION);

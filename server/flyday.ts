@@ -61,6 +61,24 @@ export interface InstallState {
   helloError: string;
   /** Flyday's hello said `update: true`: update once practice is stopped and nobody is signed in. Not saved. */
   updateRequested?: boolean;
+  /**
+   * The track-day pay address for the big screen's QR (contracts/trackday-pay.md), from Flyday's
+   * hello as `trackday_url`. Kept on this PC, so the QR works with no internet; '' = the built-in
+   * Montonio link. Only https addresses on hobizone.org are taken.
+   */
+  trackdayUrl: string;
+}
+
+/** A track-day pay address Flyday may set: https on hobizone.org only, or '' for the built-in link. */
+export function cleanTrackdayUrl(v: unknown): string | null {
+  if (v === null) return '';
+  if (typeof v !== 'string' || v.length > 300) return null;
+  try {
+    const u = new URL(v.trim());
+    return u.protocol === 'https:' && /^(www\.)?hobizone\.org$/i.test(u.hostname) ? u.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /** What the screens may see: no secret, no token. */
@@ -86,6 +104,7 @@ export class Install {
       send: saved.send === true,
       lastHello: typeof saved.lastHello === 'number' ? saved.lastHello : null,
       helloError: '',
+      trackdayUrl: cleanTrackdayUrl(saved.trackdayUrl ?? null) ?? '',
     };
     this.save();
   }
@@ -133,6 +152,8 @@ export class Install {
         s.status = 'approved';
         if (typeof body.token === 'string' && body.token) s.token = body.token;
         s.send = body.send !== false && !!s.token;
+        // The big screen's track-day QR: a new address, or null for the built-in one; left out = keep.
+        if ('trackday_url' in body) { const u = cleanTrackdayUrl(body.trackday_url); if (u !== null) s.trackdayUrl = u; }
       } else if (body.status === 'revoked') {
         s.status = 'revoked'; s.token = ''; s.send = false;
       } else {

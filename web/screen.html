@@ -83,7 +83,8 @@ function plates(heat, pm) {
  * track day first (shown for `secs`), then joining the club, and back.
  */
 const CARDS = [
-  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', secs: 30 },
+  // The pay address comes from Flyday (state.trackdayUrl, contracts/trackday-pay.md); this is the fallback.
+  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', builtIn: 'https://pay.montonio.com/3di-bmx-ofqo', secs: 30 },
   { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', secs: 15, cls: 'join' },
 ];
 let view = (() => { try { return localStorage.getItem('tgiflyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
@@ -161,6 +162,9 @@ function payCard() { return '<div id="cardSlot"></div>'; }
 function placeCard() {
   const slot = document.getElementById('cardSlot');
   if (!slot) return;
+  // Flyday gave a new pay address: draw the panel again with its QR.
+  const pay = state?.trackdayUrl || CARDS[0].builtIn;
+  if (pay !== CARDS[0].url) { CARDS[0].url = pay; cardEl = null; }
   if (!cardEl) {
     cardEl = document.createElement('div');
     cardEl.className = 'card-flip';

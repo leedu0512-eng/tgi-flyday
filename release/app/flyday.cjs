@@ -289,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.13-1138" : "dev";
+var VERSION = true ? "2026.11.13-1439" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2682,6 +2682,16 @@ function pairingCodeOf(secret) {
   for (let i = 0; i < 6; i++) s += A[h[i] % A.length];
   return `${s.slice(0, 3)}-${s.slice(3)}`;
 }
+function cleanTrackdayUrl(v) {
+  if (v === null) return "";
+  if (typeof v !== "string" || v.length > 300) return null;
+  try {
+    const u = new URL(v.trim());
+    return u.protocol === "https:" && /^(www\.)?hobizone\.org$/i.test(u.hostname) ? u.href : null;
+  } catch {
+    return null;
+  }
+}
 function publicInstall(s) {
   return { id: s.id, pairingCode: s.pairingCode, status: s.status, send: s.send, lastHello: s.lastHello, helloError: s.helloError };
 }
@@ -2704,7 +2714,8 @@ var Install = class {
       token: typeof saved2.token === "string" ? saved2.token : "",
       send: saved2.send === true,
       lastHello: typeof saved2.lastHello === "number" ? saved2.lastHello : null,
-      helloError: ""
+      helloError: "",
+      trackdayUrl: cleanTrackdayUrl(saved2.trackdayUrl ?? null) ?? ""
     };
     this.save();
   }
@@ -2753,6 +2764,10 @@ var Install = class {
         s.status = "approved";
         if (typeof body.token === "string" && body.token) s.token = body.token;
         s.send = body.send !== false && !!s.token;
+        if ("trackday_url" in body) {
+          const u = cleanTrackdayUrl(body.trackday_url);
+          if (u !== null) s.trackdayUrl = u;
+        }
       } else if (body.status === "revoked") {
         s.status = "revoked";
         s.token = "";
@@ -3194,7 +3209,7 @@ var engine = new Engine(saved, {
 var store = saver(DATA_FILE, () => engine.toSaved());
 var pairing = new Install((0, import_node_path6.resolve)(DATA_FILE, ".."));
 outbox = new Outbox((0, import_node_path6.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
-var snapshot = (now) => ({ ...engine.snapshot(now), outbox: { ...outbox.status(), venue: outbox.venue(), base: outbox.base(), flyday: publicInstall(pairing.state) } });
+var snapshot = (now) => ({ ...engine.snapshot(now), trackdayUrl: pairing.state.trackdayUrl, outbox: { ...outbox.status(), venue: outbox.venue(), base: outbox.base(), flyday: publicInstall(pairing.state) } });
 async function helloFlyday() {
   await pairing.hello(outbox.base(), outbox.venue(), (0, import_node_os2.hostname)(), VERSION);
   stateDirty = true;
