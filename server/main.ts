@@ -194,6 +194,7 @@ setInterval(() => {
   engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
   engine.finishTick(Date.now());
   engine.lightTick(Date.now());
+  engine.spectrumTick(Date.now());
   if (stateDirty) {
     stateDirty = false;
     broadcast('state', snapshot(Date.now()));
@@ -280,6 +281,12 @@ const API: Record<string, Handler> = {
   '/api/config': (b) => engine.setConfig(b),
   '/api/compact': () => engine.compact(),
   // Kiosk webcam: the room's brightness (0–255). Answers whether the kiosk should keep reading it.
+  // The RD PC's console reading the spectrum analyser: a sweep, or why there isn't one.
+  '/api/spectrum': (b) => {
+    if (typeof b.problem === 'string') engine.spectrumProblem(b.problem, Date.now());
+    else engine.spectrumReading(b.f0, b.db, Date.now());
+    return { enabled: engine.config.spectrum.enabled, gain: engine.config.spectrum.gain };
+  },
   '/api/light': (b) => {
     if (typeof b.problem === 'string') engine.lightProblem(b.problem, Date.now());
     else engine.lightReading(Number(b.level), Date.now());
@@ -420,7 +427,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     try {
       const result = API[path](await readBody(req));
       // A person did something (the kiosk's light readings and the console's own measuring don't count).
-      if (path !== '/api/light' && path !== '/api/arm-measured') engine.noteActivity(Date.now());
+      if (path !== '/api/light' && path !== '/api/spectrum' && path !== '/api/arm-measured') engine.noteActivity(Date.now());
       // A pilot who just signed in (or came back) gets their remembered photo at once,
       // so it's already in the answer: the kiosk asks "Is this you?".
       restorePhotos();

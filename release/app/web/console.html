@@ -219,10 +219,19 @@
 <section id="spectrumView" class="card drawer view" hidden aria-label="Spectrum analyser">
   <div class="drawer-head"><h2>Spectrum analyser</h2></div>
   <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
-  <section class="drawer-sec">
-    <h3>What it will do</h3>
-    <p>Listens to the 5.8 GHz band and shows which channels are noisy, so tgiFlyDay can steer pilots away from them when it hands out channels.</p>
-    <p class="hint">Not built yet. It runs on the Waveshare ESP32-C5 with a receiver module, cabled to this PC. Its settings (which port, how often it scans) will live on this page.</p>
+  <section class="drawer-sec spec-wrap">
+    <div id="specLanes" class="spec-lanes" aria-label="Channels in use, with the signal on each"></div>
+    <p class="hint">Levels are dB above the noise floor (the board isn't calibrated). A lane turns red at 6 dB or more. Each lane shows who flies that channel in the current heat, so a signal with no pilot, or a pilot with no signal, stands out.</p>
+  </section>
+  <section class="drawer-sec spec-controls">
+    <div class="defaults-row">
+      <button id="specConnect" class="btn small primary" hidden>Connect analyser</button>
+      <label class="toggle"><input type="checkbox" id="specOn"><span><b>Read the analyser</b></span></label>
+      <label class="toggle"><input type="checkbox" id="specHold"><span><b>Max hold</b></span></label>
+      <button id="specClear" class="btn small" hidden>Clear hold</button>
+    </div>
+    <label class="spec-gain">Gain <input type="range" id="specGain" min="0" max="80" step="1"> <span id="specGainV"></span></label>
+    <p class="hint" id="specWhere"></p>
   </section>
 </section>
 
@@ -290,7 +299,13 @@ function renderDevices() {
   $('spectrumSi').className = `si ${sp.state === 'connected' ? 'ok' : 'bad'}`;
   $('spectrumSi').title = sp.state === 'connected' ? 'Spectrum analyser connected' : 'Spectrum analyser not connected';
   devStatus($('vStatus'), v.state === 'online' ? 'ok' : 'bad', v.state === 'online' ? 'Online' : 'Not online', v.state === 'online' ? '' : 'No video inputs yet.');
-  devStatus($('sStatus'), sp.state === 'connected' ? 'ok' : 'bad', sp.state === 'connected' ? 'Connected' : 'Not connected', sp.state === 'connected' ? '' : 'No analyser cabled to this PC yet.');
+  const spOn = state.config.spectrum?.enabled !== false;
+  devStatus($('sStatus'), sp.state === 'connected' ? 'ok' : spOn ? 'bad' : 'idle', sp.state === 'connected' ? 'Connected' : spOn ? 'Not connected' : 'Switched off',
+    sp.state === 'connected' ? 'Reading the 5.8 GHz band about twice a second.'
+      : !spOn ? 'Tick "Read the analyser" to start again.'
+      : sp.problem && sp.readerAt && Date.now() - sp.readerAt < 60_000 ? `The RD PC says: ${sp.problem}`
+      : readerNote || 'The analyser is read by the RD console on the RD PC (the board is cabled there). Open it there and click Connect analyser once.');
+  if (!$('spectrumView').hidden) drawSpectrum();
   renderTimerView();
   renderClubIcon();
   renderClubView();
@@ -524,6 +539,80 @@ $('finishQuick').onclick = (e) => { const b = e.target.closest('[data-finish]');
 setInterval(() => { if (state) { renderFinishTag(); renderTimeView(); } }, 1000);
 
 // ---------- lap timer page ----------
+// ---------- spectrum analyser ----------
+// The RD console on the RD PC reads the board (assets/spectrum.js) and posts each sweep; every
+// console draws from state.spectrum. Lanes = the channels in use in the current heat.
+let readerNote = '', specHold = null, specHoldKey = '';
+try { $('specHold').checked = localStorage.getItem('tgiflyday.specHold') === '1'; } catch {}
+function lanesNow() {
+  const h = state.heats?.[state.clock?.heat ?? 0] ?? state.heats?.[0];
+  const pilots = pilotMap(state);
+  const list = h ? h.slots.map((s) => ({ ch: s.channel, pilot: s.pilotId ? pilots.get(s.pilotId)?.callsign ?? '' : '' }))
+    : (state.config.channels ?? []).map((ch) => ({ ch, pilot: '' }));
+  const seen = new Set();
+  return list.filter((l) => state.channelMhz?.[l.ch] && !seen.has(l.ch) && seen.add(l.ch)).map((l) => ({ ...l, mhz: state.channelMhz[l.ch] })).sort((a, b) => a.mhz - b.mhz);
+}
+function drawSpectrum() {
+  const sp = state.spectrum ?? {}, lanes = lanesNow();
+  const W = 1000, H = 380, top = 70, bottom = 330;
+  if (!lanes.length) { $('specLanes').innerHTML = '<p class="hint">No channels in use.</p>'; return; }
+  const lo = lanes[0].mhz - 22, hi = lanes.at(-1).mhz + 22;
+  const X = (f) => ((f - lo) / (hi - lo)) * W;
+  const Y = (db) => bottom - (Math.max(0, Math.min(40, db)) / 40) * (bottom - top);
+  const flying = ['running', 'freeflight'].includes(state.clock?.phase);
+  const live = sp.state === 'connected' && Array.isArray(sp.db) && sp.db.length;
+  // Max hold: per viewer, starts again when the sweep's range changes.
+  const key = `${sp.f0}|${sp.db?.length}`;
+  if (!$('specHold').checked || key !== specHoldKey) { specHold = null; specHoldKey = key; }
+  if ($('specHold').checked && live) specHold = specHold ? specHold.map((v, i) => Math.max(v, sp.db[i])) : [...sp.db];
+  const path = (db) => db.map((v, i) => [sp.f0 + i, v]).filter(([f]) => f >= lo && f <= hi).map(([f, v], k) => `${k ? 'L' : 'M'}${X(f).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">`;
+  lanes.forEach((l, i) => {
+    const a = i ? X((lanes[i - 1].mhz + l.mhz) / 2) : 0, b = i < lanes.length - 1 ? X((l.mhz + lanes[i + 1].mhz) / 2) : W;
+    const lv = live ? sp.channels?.[l.ch] : undefined, taken = lv !== undefined && lv >= 6;
+    const note = !live ? '' : taken && !l.pilot ? 'signal, no pilot' : l.pilot && !taken && flying ? 'no signal' : '';
+    svg += `<rect x="${a}" y="0" width="${b - a}" height="${H}" class="lane${taken ? ' taken' : ''}"/>`
+      + `<text x="${(a + b) / 2}" y="30" class="ln">${esc(l.ch)}</text>`
+      + `<text x="${(a + b) / 2}" y="50" class="lm">${l.mhz} MHz${lv !== undefined ? ` · ${lv > 0 ? '+' : ''}${Math.round(lv)} dB` : ''}</text>`
+      + `<text x="${(a + b) / 2}" y="356" class="lp${l.pilot ? '' : ' none'}">${esc(l.pilot || 'no pilot')}</text>`
+      + (note ? `<text x="${(a + b) / 2}" y="374" class="lw">${note}</text>` : '')
+      + `<line x1="${X(l.mhz)}" y1="${top}" x2="${X(l.mhz)}" y2="${bottom}" class="lc"/>`;
+    if (i) svg += `<line x1="${a}" y1="0" x2="${a}" y2="${H}" class="ldiv"/>`;
+  });
+  svg += `<line x1="0" y1="${Y(6)}" x2="${W}" y2="${Y(6)}" class="l6"/>`;
+  if (specHold && live) svg += `<path d="${path(specHold)}" class="hold"/>`;
+  if (live) svg += `<path d="${path(sp.db)}" class="trace"/>`;
+  else svg += `<text x="${W / 2}" y="${(top + bottom) / 2}" class="lm">no reading</text>`;
+  $('specLanes').innerHTML = svg + '</svg>';
+  // Controls follow the server's settings.
+  const cfg = state.config.spectrum ?? { enabled: true, gain: 48 };
+  $('specOn').checked = cfg.enabled;
+  if (document.activeElement !== $('specGain')) $('specGain').value = cfg.gain;
+  $('specGainV').textContent = $('specGain').value;
+  $('specClear').hidden = !$('specHold').checked;
+}
+$('specOn').onchange = (e) => act('/api/config', { spectrum: { enabled: e.target.checked } });
+$('specGain').oninput = () => { $('specGainV').textContent = $('specGain').value; };
+$('specGain').onchange = () => act('/api/config', { spectrum: { gain: Number($('specGain').value) } });
+$('specHold').onchange = (e) => { try { localStorage.setItem('tgiflyday.specHold', e.target.checked ? '1' : '0'); } catch {} specHold = null; drawSpectrum(); };
+$('specClear').onclick = () => { specHold = null; drawSpectrum(); };
+// On the RD PC itself (localhost), this console reads the board.
+const onRdPc = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+if (onRdPc) {
+  import('/assets/spectrum.js').then(({ startReader }) => {
+    const reader = startReader({
+      channels: () => (state ? lanesNow().map((l) => l.mhz) : []),
+      status: (text) => { readerNote = text; },
+      post: (body) => post('/api/spectrum', body),
+    });
+    $('specConnect').hidden = false;
+    $('specConnect').onclick = () => reader.connect();
+  }).catch(() => {});
+  $('specWhere').textContent = 'This console is on the RD PC: it reads the board. Click Connect analyser once and pick the board (its native USB socket); after that it reconnects by itself.';
+} else {
+  $('specWhere').textContent = 'The board is read by the RD console on the RD PC; this page shows what it sees. Connecting is done there.';
+}
+
 function devStatus(el, kind, head, text) {
   el.className = `dev-status ${kind}`;
   el.innerHTML = `<b>${esc(head)}</b>${text ? `<span>${esc(text)}</span>` : ''}`;

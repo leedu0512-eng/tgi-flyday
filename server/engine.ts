@@ -14,6 +14,7 @@ import {
   type SavedData,
   type SessionDefaults,
   type LightsConfig,
+  type SpectrumConfig,
   type CloudConfig,
   type TimerCommand,
   type TimerConfig,
@@ -65,6 +66,30 @@ const LIGHTS_OFF_AFTER_MS = 60_000;
 const LIGHT_MARGIN = 10;
 /** Presence goes out at least this often, change or not. */
 export const PRESENCE_EVERY_MS = 15 * 60_000;
+/** No sweep from the analyser for this long: not connected. */
+export const SPECTRUM_STALE_MS = 5000;
+/** A channel is taken when its level is this many dB above the noise floor. */
+export const SPECTRUM_TAKEN_DB = 6;
+/** The band around a channel's centre its level is measured over (±, MHz). */
+const SPECTRUM_HALF_MHZ = 8;
+
+/**
+ * dB above floor per channel: the mean power (in linear terms, not the mean of dB values) of the
+ * 1 MHz bins within ±8 MHz of its centre. Channels the trace doesn't cover are left out.
+ */
+export function spectrumLevels(f0: number, db: number[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [ch, mhz] of Object.entries(CHANNEL_MHZ)) {
+    let sum = 0, n = 0;
+    for (let f = mhz - SPECTRUM_HALF_MHZ; f <= mhz + SPECTRUM_HALF_MHZ; f++) {
+      const i = Math.round(f - f0);
+      if (i >= 0 && i < db.length) { sum += 10 ** (db[i] / 10); n++; }
+    }
+    if (n >= SPECTRUM_HALF_MHZ) out[ch] = Math.round(10 * Math.log10(sum / n) * 10) / 10;
+  }
+  return out;
+}
+
 /** Somebody used tgiFlyDay within this long: they're still here. */
 export const ACTIVE_MS = 15 * 60_000;
 /** After a start, the first presence row waits this long at most for the kiosk's light reading. */
@@ -153,6 +178,20 @@ export class Engine {
   private autoStartPending = false;
   /** End of the day: the "still flying?" question is up until this time (ms), or null. */
   night: { deadline: number; why: 'late' | 'lights' } | null = null;
+  /**
+   * The spectrum analyser as the RD PC's console reads it (web/assets/spectrum.js): a trace in
+   * dB above the noise floor, 1 MHz bins from f0, and per-channel levels worked out from it.
+   * No reading for SPECTRUM_STALE_MS = not connected.
+   */
+  spectrum: {
+    state: 'off' | 'connected';
+    f0: number | null;
+    db: number[];
+    channels: Record<string, number>;
+    at: number | null;
+    problem: string;
+    readerAt: number | null;
+  } = { state: 'off', f0: null, db: [], channels: {}, at: null, problem: '', readerAt: null };
   /** Room lights as the kiosk webcam sees them. */
   light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null; problem: string; kioskAt: number | null } =
     { state: 'unknown', level: null, at: null, darkSince: null, problem: '', kioskAt: null };
@@ -231,6 +270,7 @@ export class Engine {
       sound: { ...DEFAULT_CONFIG.sound, ...(saved.sound ?? {}) },
       timer: { ...DEFAULT_CONFIG.timer, ...(saved.timer ?? {}) },
       lights: { ...DEFAULT_CONFIG.lights, ...(saved.lights ?? {}) },
+      spectrum: { ...DEFAULT_CONFIG.spectrum, ...(saved.spectrum ?? {}) },
       cloud: { ...DEFAULT_CONFIG.cloud, ...(saved.cloud ?? {}) },
     };
     // Saved by an older version: the start sequence no longer has ready beeps by default.
@@ -621,6 +661,36 @@ export class Engine {
       if (l.state !== 'on' && (l.state === 'unknown' || n >= dark + LIGHT_MARGIN)) this.lightsChanged('on', now);
     }
     this.onChange();
+  }
+
+  /**
+   * A sweep from the spectrum analyser: `db` = dB above the noise floor in 1 MHz bins starting at
+   * `f0` MHz. Levels per channel (mean power within ±8 MHz of its centre) are worked out here.
+   */
+  spectrumReading(f0: unknown, db: unknown, now: number) {
+    const start = Number(f0);
+    if (!Number.isFinite(start) || start < 4000 || start > 7000) throw new EngineError('f0 is the first bin in MHz.');
+    if (!Array.isArray(db) || db.length < 1 || db.length > 1000) throw new EngineError('db is a list of up to 1000 levels.');
+    const levels = db.map((v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(-20, Math.min(100, Math.round(n * 10) / 10)) : 0; });
+    const sp = this.spectrum;
+    Object.assign(sp, { state: 'connected', f0: Math.round(start), db: levels, channels: spectrumLevels(Math.round(start), levels), at: now, problem: '', readerAt: now });
+    this.onChange();
+  }
+
+  /** The reader on the RD PC couldn't read the board, and says why. */
+  spectrumProblem(problem: string, now: number) {
+    this.spectrum.problem = String(problem).replace(/\s+/g, ' ').trim().slice(0, 300);
+    this.spectrum.readerAt = now;
+    this.onChange();
+  }
+
+  /** Every second: no sweep for a few seconds = the analyser isn't connected. */
+  spectrumTick(now: number) {
+    const sp = this.spectrum;
+    if (sp.state === 'connected' && (sp.at === null || now - sp.at > SPECTRUM_STALE_MS)) {
+      sp.state = 'off';
+      this.onChange();
+    }
   }
 
   /** The kiosk couldn't read the light, and says why (shown on the console). The light state isn't touched. */
@@ -1898,6 +1968,7 @@ export class Engine {
     if (patch.nightStopAt !== undefined && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== undefined) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.lights !== undefined) next.lights = cleanLights(patch.lights, next.lights);
+    if (patch.spectrum !== undefined) next.spectrum = cleanSpectrum(patch.spectrum, next.spectrum);
     if (patch.cloud !== undefined) next.cloud = cleanCloud(patch.cloud, next.cloud);
     if (patch.callouts !== undefined) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== undefined) next.sound = cleanSound(patch.sound, next.sound);
@@ -1996,6 +2067,7 @@ export class Engine {
         cloud: { ...this.config.cloud, key: '', keySet: !!this.config.cloud.key },
       },
       light: this.light,
+      spectrum: this.spectrum,
       presenceSent: this.presenceSent,
       clock: this.clock,
       pilots: [...this.pilots.values()].sort((a, b) => a.callsign.localeCompare(b.callsign)),
@@ -2050,6 +2122,17 @@ function cleanTimer(patch: Partial<TimerConfig>, current: TimerConfig): TimerCon
   }
   if (patch.user !== undefined) out.user = String(patch.user).trim().slice(0, 60);
   if (patch.password !== undefined && patch.password !== '') out.password = String(patch.password).slice(0, 100);
+  return out;
+}
+
+function cleanSpectrum(patch: Partial<SpectrumConfig>, current: SpectrumConfig): SpectrumConfig {
+  const out = { ...current };
+  if (patch.enabled !== undefined) out.enabled = Boolean(patch.enabled);
+  if (patch.gain !== undefined) {
+    const n = Math.round(Number(patch.gain));
+    if (!(n >= 0 && n <= 127)) throw new EngineError('Gain is 0 to 127.');
+    out.gain = n;
+  }
   return out;
 }
 

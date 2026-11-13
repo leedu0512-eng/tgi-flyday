@@ -289,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.13-1439" : "dev";
+var VERSION = true ? "2026.11.13-1949" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -313,6 +313,7 @@ var DEFAULT_CONFIG = {
   timer: { enabled: false, host: "", user: "admin", password: "rotorhazard" },
   sessionDefaults: null,
   lights: { enabled: true, dark: 40 },
+  spectrum: { enabled: true, gain: 48 },
   cloud: { enabled: false, url: "", key: "", venue: "" },
   callouts: {
     sessionStartStop: true,
@@ -428,6 +429,23 @@ var NIGHT_GRACE_MS = 5 * 6e4;
 var LIGHTS_OFF_AFTER_MS = 6e4;
 var LIGHT_MARGIN = 10;
 var PRESENCE_EVERY_MS = 15 * 6e4;
+var SPECTRUM_STALE_MS = 5e3;
+var SPECTRUM_HALF_MHZ = 8;
+function spectrumLevels(f0, db) {
+  const out = {};
+  for (const [ch, mhz] of Object.entries(CHANNEL_MHZ)) {
+    let sum = 0, n = 0;
+    for (let f = mhz - SPECTRUM_HALF_MHZ; f <= mhz + SPECTRUM_HALF_MHZ; f++) {
+      const i = Math.round(f - f0);
+      if (i >= 0 && i < db.length) {
+        sum += 10 ** (db[i] / 10);
+        n++;
+      }
+    }
+    if (n >= SPECTRUM_HALF_MHZ) out[ch] = Math.round(10 * Math.log10(sum / n) * 10) / 10;
+  }
+  return out;
+}
 var ACTIVE_MS = 15 * 6e4;
 var PRESENCE_START_WAIT_MS = 2 * 6e4;
 var LIGHT_STALE_MS = 3 * 6e4;
@@ -504,6 +522,12 @@ var Engine = class {
   autoStartPending = false;
   /** End of the day: the "still flying?" question is up until this time (ms), or null. */
   night = null;
+  /**
+   * The spectrum analyser as the RD PC's console reads it (web/assets/spectrum.js): a trace in
+   * dB above the noise floor, 1 MHz bins from f0, and per-channel levels worked out from it.
+   * No reading for SPECTRUM_STALE_MS = not connected.
+   */
+  spectrum = { state: "off", f0: null, db: [], channels: {}, at: null, problem: "", readerAt: null };
   /** Room lights as the kiosk webcam sees them. */
   light = { state: "unknown", level: null, at: null, darkSince: null, problem: "", kioskAt: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
@@ -579,6 +603,7 @@ var Engine = class {
       sound: { ...DEFAULT_CONFIG.sound, ...saved2.sound ?? {} },
       timer: { ...DEFAULT_CONFIG.timer, ...saved2.timer ?? {} },
       lights: { ...DEFAULT_CONFIG.lights, ...saved2.lights ?? {} },
+      spectrum: { ...DEFAULT_CONFIG.spectrum, ...saved2.spectrum ?? {} },
       cloud: { ...DEFAULT_CONFIG.cloud, ...saved2.cloud ?? {} }
     };
     if ((data.version ?? 1) < 2 && data.config) this.config.callouts.readyBeeps = false;
@@ -937,6 +962,36 @@ var Engine = class {
       if (l.state !== "on" && (l.state === "unknown" || n >= dark + LIGHT_MARGIN)) this.lightsChanged("on", now);
     }
     this.onChange();
+  }
+  /**
+   * A sweep from the spectrum analyser: `db` = dB above the noise floor in 1 MHz bins starting at
+   * `f0` MHz. Levels per channel (mean power within ±8 MHz of its centre) are worked out here.
+   */
+  spectrumReading(f0, db, now) {
+    const start = Number(f0);
+    if (!Number.isFinite(start) || start < 4e3 || start > 7e3) throw new EngineError("f0 is the first bin in MHz.");
+    if (!Array.isArray(db) || db.length < 1 || db.length > 1e3) throw new EngineError("db is a list of up to 1000 levels.");
+    const levels = db.map((v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(-20, Math.min(100, Math.round(n * 10) / 10)) : 0;
+    });
+    const sp = this.spectrum;
+    Object.assign(sp, { state: "connected", f0: Math.round(start), db: levels, channels: spectrumLevels(Math.round(start), levels), at: now, problem: "", readerAt: now });
+    this.onChange();
+  }
+  /** The reader on the RD PC couldn't read the board, and says why. */
+  spectrumProblem(problem, now) {
+    this.spectrum.problem = String(problem).replace(/\s+/g, " ").trim().slice(0, 300);
+    this.spectrum.readerAt = now;
+    this.onChange();
+  }
+  /** Every second: no sweep for a few seconds = the analyser isn't connected. */
+  spectrumTick(now) {
+    const sp = this.spectrum;
+    if (sp.state === "connected" && (sp.at === null || now - sp.at > SPECTRUM_STALE_MS)) {
+      sp.state = "off";
+      this.onChange();
+    }
   }
   /** The kiosk couldn't read the light, and says why (shown on the console). The light state isn't touched. */
   lightProblem(problem, now) {
@@ -2163,6 +2218,7 @@ var Engine = class {
     if (patch.nightStopAt !== void 0 && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== void 0) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.lights !== void 0) next.lights = cleanLights(patch.lights, next.lights);
+    if (patch.spectrum !== void 0) next.spectrum = cleanSpectrum(patch.spectrum, next.spectrum);
     if (patch.cloud !== void 0) next.cloud = cleanCloud(patch.cloud, next.cloud);
     if (patch.callouts !== void 0) next.callouts = cleanCallouts(patch.callouts, next.callouts);
     if (patch.sound !== void 0) next.sound = cleanSound(patch.sound, next.sound);
@@ -2252,6 +2308,7 @@ var Engine = class {
         cloud: { ...this.config.cloud, key: "", keySet: !!this.config.cloud.key }
       },
       light: this.light,
+      spectrum: this.spectrum,
       presenceSent: this.presenceSent,
       clock: this.clock,
       pilots: [...this.pilots.values()].sort((a, b) => a.callsign.localeCompare(b.callsign)),
@@ -2304,6 +2361,16 @@ function cleanTimer(patch, current) {
   }
   if (patch.user !== void 0) out.user = String(patch.user).trim().slice(0, 60);
   if (patch.password !== void 0 && patch.password !== "") out.password = String(patch.password).slice(0, 100);
+  return out;
+}
+function cleanSpectrum(patch, current) {
+  const out = { ...current };
+  if (patch.enabled !== void 0) out.enabled = Boolean(patch.enabled);
+  if (patch.gain !== void 0) {
+    const n = Math.round(Number(patch.gain));
+    if (!(n >= 0 && n <= 127)) throw new EngineError("Gain is 0 to 127.");
+    out.gain = n;
+  }
   return out;
 }
 function cleanLights(patch, current) {
@@ -3252,6 +3319,7 @@ setInterval(() => {
   engine.nightTick(Date.now(), d.getHours() * 60 + d.getMinutes());
   engine.finishTick(Date.now());
   engine.lightTick(Date.now());
+  engine.spectrumTick(Date.now());
   if (stateDirty) {
     stateDirty = false;
     broadcast("state", snapshot(Date.now()));
@@ -3332,6 +3400,12 @@ var API2 = {
   "/api/config": (b) => engine.setConfig(b),
   "/api/compact": () => engine.compact(),
   // Kiosk webcam: the room's brightness (0–255). Answers whether the kiosk should keep reading it.
+  // The RD PC's console reading the spectrum analyser: a sweep, or why there isn't one.
+  "/api/spectrum": (b) => {
+    if (typeof b.problem === "string") engine.spectrumProblem(b.problem, Date.now());
+    else engine.spectrumReading(b.f0, b.db, Date.now());
+    return { enabled: engine.config.spectrum.enabled, gain: engine.config.spectrum.gain };
+  },
   "/api/light": (b) => {
     if (typeof b.problem === "string") engine.lightProblem(b.problem, Date.now());
     else engine.lightReading(Number(b.level), Date.now());
@@ -3463,7 +3537,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     if (req.method !== "POST") return json(res, 405, { error: "Use POST." });
     try {
       const result = API2[path](await readBody(req));
-      if (path !== "/api/light" && path !== "/api/arm-measured") engine.noteActivity(Date.now());
+      if (path !== "/api/light" && path !== "/api/spectrum" && path !== "/api/arm-measured") engine.noteActivity(Date.now());
       restorePhotos();
       engine.tick(Date.now());
       return json(res, 200, { ok: true, result: result ?? null });

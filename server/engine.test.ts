@@ -1,7 +1,7 @@
 // Run with:  node --test server/engine.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Engine } from './engine.ts';
+import { Engine, spectrumLevels, SPECTRUM_STALE_MS } from './engine.ts';
 import type { AudioEvent } from './types.ts';
 
 function setup(random = 0.5) {
@@ -1324,4 +1324,31 @@ test('presence tells Flyday why there is no light reading (lightsNote, kioskSeen
   assert.equal(last().lights, 'on');
   assert.equal(last().lightsNote, null);
   assert.equal(last().kioskSeenAt, 3_000_000);
+});
+
+test('spectrum: levels per channel from the trace, taken at 6 dB, not connected after 5 s', () => {
+  const e = new Engine({});
+  // 5630..5950 MHz in 1 MHz bins; a VTX on R1 (5658) about 20 dB up, a little bump on F4 (5800).
+  const f0 = 5630, db = Array.from({ length: 321 }, (_, i) => {
+    const f = f0 + i;
+    return Math.abs(f - 5658) <= 6 ? 20 : Math.abs(f - 5800) <= 3 ? 3 : 0;
+  });
+  e.spectrumReading(f0, db, 1000);
+  const sp = e.snapshot(1000).spectrum;
+  assert.equal(sp.state, 'connected');
+  assert.ok(sp.channels.R1 > 15, `R1 ${sp.channels.R1}`);
+  assert.ok(sp.channels.F4 < 6, `F4 ${sp.channels.F4}`);
+  assert.equal(sp.channels.R2, 0);
+  assert.equal(sp.channels.L1, undefined, 'L1 is outside the sweep');
+  assert.equal(spectrumLevels(5630, db).R1, sp.channels.R1);
+  e.spectrumTick(1000 + SPECTRUM_STALE_MS);
+  assert.equal(e.spectrum.state, 'connected');
+  e.spectrumTick(1000 + SPECTRUM_STALE_MS + 1);
+  assert.equal(e.spectrum.state, 'off');
+  e.spectrumProblem('no board', 9000);
+  assert.equal(e.spectrum.problem, 'no board');
+  assert.throws(() => e.spectrumReading(100, db, 1), /f0/);
+  assert.throws(() => e.setConfig({ spectrum: { gain: 200 } as any }), /0 to 127/);
+  e.setConfig({ spectrum: { gain: 30 } as any });
+  assert.deepEqual(e.config.spectrum, { enabled: true, gain: 30 });
 });

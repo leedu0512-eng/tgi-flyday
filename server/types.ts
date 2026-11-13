@@ -44,6 +44,8 @@ export interface Config {
   sessionDefaults: SessionDefaults | null;
   /** Room lights from the kiosk webcam. */
   lights: LightsConfig;
+  /** The spectrum analyser. */
+  spectrum: SpectrumConfig;
   /** Sending the outbox online. */
   cloud: CloudConfig;
   /** Which callouts the voice makes, and when. */
@@ -59,6 +61,14 @@ export interface ClubQuad {
   channel: string;
   /** Out of action: nobody is put on it. */
   broken: boolean;
+}
+
+/** The spectrum analyser (ESP32-C5 with ESPsoup firmware on the RD PC's USB). */
+export interface SpectrumConfig {
+  /** Read the board (off: the RD PC's console lets it go). */
+  enabled: boolean;
+  /** Receiver gain sent as "GAIN MANUAL <n>" (fixed: automatic gain makes levels jump). */
+  gain: number;
 }
 
 /** Room lights, read by the kiosk's webcam. */
@@ -295,6 +305,7 @@ export const DEFAULT_CONFIG: Config = {
   timer: { enabled: false, host: '', user: 'admin', password: 'rotorhazard' },
   sessionDefaults: null,
   lights: { enabled: true, dark: 40 },
+  spectrum: { enabled: true, gain: 48 },
   cloud: { enabled: false, url: '', key: '', venue: '' },
   callouts: {
     sessionStartStop: true,

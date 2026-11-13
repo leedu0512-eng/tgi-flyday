@@ -948,3 +948,22 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .ok-text { color: #22C55E; }
 .outbox .pair { font-size: 14px; line-height: 1.4; }
 .outbox .pair-code { display: block; margin-top: 4px; font-family: 'Big Shoulders Stencil', sans-serif; font-size: 40px; letter-spacing: 0.08em; color: #FFFFFF; }
+
+/* Spectrum analyser page: one lane per channel in use, pit board style. */
+.spec-lanes svg { width: 100%; height: auto; aspect-ratio: 1000 / 380; display: block; background: #0B0B0B; border: 1px solid var(--line); border-radius: var(--radius); }
+.spec-lanes .lane { fill: #111111; }
+.spec-lanes .lane.taken { fill: rgba(255,59,48,.18); }
+.spec-lanes .ldiv { stroke: #FFFFFF; stroke-width: 2; }
+.spec-lanes .lc { stroke: #2A2A2A; stroke-width: 1; stroke-dasharray: 3 4; }
+.spec-lanes .l6 { stroke: rgba(255,59,48,.55); stroke-width: 1; stroke-dasharray: 6 5; }
+.spec-lanes .trace { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linejoin: round; }
+.spec-lanes .hold { fill: none; stroke: rgba(255,107,0,.35); stroke-width: 1.4; }
+.spec-lanes text { text-anchor: middle; fill: #FFFFFF; }
+.spec-lanes .ln { font-family: var(--stencil, var(--display)); font-size: 26px; font-weight: 800; }
+.spec-lanes .lane.taken + .ln { fill: #FF3B30; }
+.spec-lanes .lm { font-family: var(--body, sans-serif); font-size: 13px; fill: var(--muted); }
+.spec-lanes .lp { font-family: var(--display); font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.spec-lanes .lp.none { fill: var(--muted); font-weight: 500; }
+.spec-lanes .lw { font-family: var(--body, sans-serif); font-size: 12px; fill: #FF3B30; font-weight: 700; }
+.spec-controls .spec-gain { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-weight: 700; }
+.spec-controls .spec-gain input { flex: 1; max-width: 360px; accent-color: var(--accent); }
