@@ -87,6 +87,33 @@ function rememberChannel(pilotId: string) {
   }
 }
 
+/**
+ * Cards and tags for the kiosk's card reader: each card's number and the pilot name it belongs
+ * to (data/cards.json). Stays on this PC: card numbers are never shown on a screen or uploaded.
+ */
+const CARDS_FILE = join(resolve(DATA_FILE, '..'), 'cards.json');
+const cards: Record<string, string> = (() => {
+  try { return JSON.parse(readFileSync(CARDS_FILE, 'utf8')); } catch { return {}; }
+})();
+/** What the reader typed, as one card number: 4 to 20 letters and digits, capitals. */
+function cardId(v: unknown): string {
+  const id = String(v ?? '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  if (id.length < 4 || id.length > 20) throw new EngineError("That card couldn't be read. Tap it again.");
+  return id;
+}
+function saveCards() {
+  try {
+    mkdirSync(resolve(CARDS_FILE, '..'), { recursive: true });
+    writeFileSync(CARDS_FILE, JSON.stringify(cards, null, 1));
+  } catch {}
+}
+/** A pilot goes home: the photo stays remembered under their name for next time. */
+function sendHome(pilotId: string) {
+  rememberPhoto(pilotId);
+  engine.leave(pilotId);
+  try { unlink(photoFile(pilotId)).catch(() => {}); } catch {}
+}
+
 /** Pilots without a photo whose name has a remembered one get it back. */
 function restorePhotos() {
   for (const p of engine.pilots.values()) {
@@ -257,15 +284,42 @@ const API: Record<string, Handler> = {
     const k = known[knownKey(String(b.name ?? ''))];
     const r = engine.walkIn(b.name, k?.channel, b.club === undefined ? !!k?.club : !!b.club);
     rememberChannel(r.pilot.id);
+    // A new card at the reader: "Who's this?" answered, the card is theirs from now on.
+    if (b.card !== undefined) {
+      cards[cardId(b.card)] = r.pilot.callsign;
+      saveCards();
+      engine.noteCardTap(r.pilot.callsign, 'in', Date.now());
+    }
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
-  '/api/still-flying': () => engine.stillFlying(Date.now()),
-  '/api/leave': (b) => {
-    // Gone from the session; the photo stays remembered under their name for next time.
-    rememberPhoto(String(b.pilotId));
-    engine.leave(String(b.pilotId));
-    try { unlink(photoFile(String(b.pilotId))).catch(() => {}); } catch {}
+  // The kiosk's card reader: a known card signs its pilot in, or out when they're signed in.
+  '/api/card': (b) => {
+    const id = cardId(b.card);
+    const name = cards[id];
+    if (!name) return { action: 'new' };
+    const here = engine.pilotNamed(name);
+    if (here) rememberPhoto(here.id); // in case this tap sends them home
+    const k = known[knownKey(name)];
+    const r = engine.cardTap(name, Date.now(), k?.channel, !!k?.club);
+    if (r.action === 'out') {
+      if (here && !engine.pilots.has(here.id)) try { unlink(photoFile(here.id)).catch(() => {}); } catch {}
+      return r;
+    }
+    rememberChannel(r.pilot.id);
+    return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
+  // "Not you?" after a card tap: the card belongs to nobody again, and whoever it just signed in goes.
+  '/api/card/forget': (b) => {
+    const id = cardId(b.card);
+    const name = cards[id];
+    delete cards[id];
+    saveCards();
+    const p = name && b.pilotId ? engine.pilots.get(String(b.pilotId)) : undefined;
+    if (p && p.callsign.toLowerCase() === name!.toLowerCase()) sendHome(p.id);
+    return { action: 'new' };
+  },
+  '/api/still-flying': () => engine.stillFlying(Date.now()),
+  '/api/leave': (b) => sendHome(String(b.pilotId)),
   '/api/slot': (b) => engine.setSlot(Number(b.heat), Number(b.slot), b.pilotId ?? null),
   '/api/pilot/add': (b) => engine.addPilot(b.callsign),
   '/api/pilot/update': (b) => {

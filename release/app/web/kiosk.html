@@ -44,6 +44,7 @@ let usual = null;   // the channel this pilot flew last time
 let club = null;    // "I don't have my own quad": null = as last time (remembered by name), else tapped
 let knownClub = false; // this name flew a club quad last time
 let doneMsg = null;
+let card = null;    // a new card being named ("Who's this?"), its number
 let idleTimer;
 let me = null;      // the pilot who just signed in, for the photo step
 let shot = null;    // the photo just taken, as a JPEG data URL
@@ -69,6 +70,7 @@ function go(v) {
   view = v;
   render();
   clearTimeout(idleTimer);
+  if (v === 'home') card = null;
   if (v !== 'home') idleTimer = setTimeout(() => { name = ''; go('home'); }, 45000);
 }
 
@@ -90,7 +92,8 @@ function nameView() {
     .filter((p) => !name || p.callsign.toLowerCase().includes(name.toLowerCase()))
     .slice(0, 8);
   return `<div class="name-view"><button class="btn back" data-go="home">← Back</button>
-    <h1>Your pilot name</h1>
+    <h1>${card ? 'New card! Your pilot name' : 'Your pilot name'}</h1>
+    ${card ? '<p class="hint card-hint">Type it once. Next time, just tap your card: once to sign in, once more to go home.</p>' : ''}
     <input class="input name-input" id="nameInput" value="${esc(name)}" maxlength="24" autocomplete="off" inputmode="none" placeholder="Callsign">
     ${clubButton()}
     <div class="suggest">${known.map((p) => `<button data-pick="${esc(p.callsign)}">${esc(NAME(p.callsign))}</button>`).join('')}</div>
@@ -259,7 +262,7 @@ function doneView() {
   // After signing in: a QR code that opens this pilot's own phone page, already as them.
   const qr = doneMsg.qr ? `<div class="done-qr"><div id="doneQr"></div><span>Your heat on your phone: scan me</span></div>` : '';
   return `<div class="done ${qr ? 'with-qr' : ''}"><div><div class="big-msg">${doneMsg.title}</div><p>${doneMsg.text}</p>
-    <div class="confirm-row"><button class="big primary" data-go="home">OK</button></div></div>${qr}</div>`;
+    <div class="confirm-row">${doneMsg.notYou ? `<button class="big" data-not-you>Not ${esc(NAME(doneMsg.notYou.callsign))}?</button>` : ''}<button class="big primary" data-go="home">OK</button></div></div>${qr}</div>`;
 }
 async function fillDoneQr(callsign) {
   try {
@@ -416,15 +419,90 @@ async function toSlots() {
   if (busy) return;
   busy = true;
   try {
-    const r = await post('/api/walkin', { name, ...(club === null || !clubAvailable() ? {} : { club }) });
-    const ch = esc(r.channel);
-    const mates = r.mates?.length ? ` You share it with ${r.mates.map((m) => `${esc(NAME(m.callsign))}${m.heat >= 0 ? ` (heat ${m.heat + 1})` : ''}`).join(', ')}.` : '';
-    signedIn(r.pilot, {
-      title: r.already ? `You're already in heat ${r.heat + 1}` : `Heat ${r.heat + 1} · ${ch}`,
-      text: r.quad
-        ? `${esc(NAME(r.pilot.callsign))}, you fly club quad <b>${esc(r.quad)}</b>, video on <b>${ch}</b>.${mates}${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}`
-        : `${esc(NAME(r.pilot.callsign))}, set your video to <b>${ch}</b>.${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}<br><small>Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.</small>`,
-    });
+    const r = await post('/api/walkin', { name, ...(club === null || !clubAvailable() ? {} : { club }), ...(card ? { card } : {}) });
+    card = null;
+    signedIn(r.pilot, walkInMsg(r));
+  } catch (err) { toast(err.message); }
+  finally { busy = false; }
+}
+
+/** The "you're in" screen after a walk-in (Fly today, or a card tap). */
+function walkInMsg(r, welcome = '') {
+  const ch = esc(r.channel);
+  const mates = r.mates?.length ? ` You share it with ${r.mates.map((m) => `${esc(NAME(m.callsign))}${m.heat >= 0 ? ` (heat ${m.heat + 1})` : ''}`).join(', ')}.` : '';
+  return {
+    title: r.already ? `You're already in heat ${r.heat + 1} · ${ch}` : `${welcome}Heat ${r.heat + 1} · ${ch}`,
+    text: r.quad
+      ? `${esc(NAME(r.pilot.callsign))}, you fly club quad <b>${esc(r.quad)}</b>, video on <b>${ch}</b>.${mates}${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}`
+      : `${esc(NAME(r.pilot.callsign))}, set your video to <b>${ch}</b>.${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}<br><small>Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.</small>`,
+  };
+}
+
+// ---------- card reader ----------
+// A USB card reader at the kiosk works as a keyboard: a tap types the card's number and Enter,
+// much faster than anyone types. Keys that come that fast are a card; anything slower goes
+// where it was typed, as usual. The big screen's sign-in panel leaves this to the real kiosk.
+const CARD_GAP_MS = 50;     // the reader types a key at least this often
+const CARD_MIN = 4;
+let keyBuf = [], keyFlush;
+function flushKeys() {
+  clearTimeout(keyFlush);
+  const typed = keyBuf.map((k) => k.key).join('');
+  keyBuf = [];
+  if (!typed || view !== 'name') return;
+  name = (name + typed).slice(0, 24);
+  const input = $('nameInput');
+  if (input) { input.value = name; refreshSuggestions(); updateKeys(); lookUpKnown(); }
+}
+if (!EMBED) window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  const now = performance.now();
+  const last = keyBuf.at(-1);
+  if (last && now - last.t > CARD_GAP_MS) flushKeys(); // too slow for a card: a person typing
+  if (e.key === 'Enter' && keyBuf.length >= CARD_MIN) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = keyBuf.map((k) => k.key).join('');
+    keyBuf = [];
+    clearTimeout(keyFlush);
+    return cardTapped(id);
+  }
+  if (e.key.length === 1 && /[0-9A-Za-z]/.test(e.key)) {
+    e.preventDefault();
+    e.stopPropagation();
+    keyBuf.push({ key: e.key, t: now });
+    clearTimeout(keyFlush);
+    keyFlush = setTimeout(flushKeys, CARD_GAP_MS * 2);
+    return;
+  }
+  flushKeys();
+}, true);
+
+async function cardTapped(id) {
+  if (busy) return;
+  busy = true;
+  try {
+    const r = await post('/api/card', { card: id });
+    stopCamera();
+    me = null; shot = null; leaving = null; mover = null;
+    if (r.action === 'new') {
+      flow = 'join'; name = ''; usual = null; club = null; knownClub = false; card = id;
+      return go('name');
+    }
+    if (r.action === 'out') {
+      doneMsg = { title: `Bye, ${esc(NAME(r.callsign))}!`, text: r.again ? "You're signed out. See you next time!" : 'Your slot is free again. See you next time!' };
+      go('done');
+      setTimeout(() => { if (view === 'done') go('home'); }, 6000);
+      return;
+    }
+    const msg = walkInMsg(r, r.again ? '' : `Welcome, ${esc(NAME(r.pilot.callsign))}! `);
+    // Just signed in by this tap: "Not you?" undoes it and frees the card for its real owner.
+    if (!r.again) msg.notYou = { card: id, pilotId: r.pilot.id, callsign: r.pilot.callsign };
+    // A card is quick: no "Is this you?" and no QR. Only a pilot with no photo yet gets the camera.
+    if (!r.again && !r.pilot.photo && camOK) { signedIn(r.pilot, msg); doneMsg.qr = null; return; }
+    doneMsg = msg;
+    go('done');
+    setTimeout(() => { if (view === 'done') go('home'); }, 8000);
   } catch (err) { toast(err.message); }
   finally { busy = false; }
 }
@@ -484,6 +562,13 @@ $('view').addEventListener('click', async (e) => {
         : { title: "You're signed in", text: `${esc(NAME(pilot.callsign))}, the race director will put you in a heat. Watch the big screen for your name.` });
     } catch (err) { toast(err.message); }
     return;
+  }
+  if (t.hasAttribute('data-not-you')) {
+    const n = doneMsg?.notYou;
+    if (!n) return go('home');
+    try { await post('/api/card/forget', { card: n.card, pilotId: n.pilotId }); } catch (err) { return toast(err.message); }
+    flow = 'join'; name = ''; usual = null; club = null; knownClub = false; card = n.card;
+    return go('name');
   }
   if (t.hasAttribute('data-photo-ok') || t.hasAttribute('data-skip')) return finish();
   if (t.hasAttribute('data-retake') || t.hasAttribute('data-again')) { shot = null; return go('camera'); }

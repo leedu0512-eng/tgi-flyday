@@ -1352,3 +1352,47 @@ test('spectrum: levels per channel from the trace, taken at 6 dB, not connected 
   e.setConfig({ spectrum: { gain: 30 } as any });
   assert.deepEqual(e.config.spectrum, { enabled: true, gain: 30 });
 });
+
+test('card reader: a tap signs in with a welcome, the next tap signs out with a bye; a double tap changes nothing', () => {
+  const { e, said } = setup();
+  let r = e.cardTap('Chirp', 0);
+  assert.equal(r.action, 'in');
+  assert.equal(r.again, false);
+  assert.ok(e.pilotNamed('chirp'));
+  assert.equal(said().at(-1), 'Welcome, Chirp.');
+  // Tapped twice in a row: still in, nothing said.
+  const n = said().length;
+  r = e.cardTap('Chirp', 3000);
+  assert.equal(r.action, 'in');
+  assert.equal(r.again, true);
+  assert.equal(said().length, n);
+  // Later: out.
+  r = e.cardTap('Chirp', 60_000);
+  assert.equal(r.action, 'out');
+  assert.equal(e.pilotNamed('Chirp'), undefined);
+  assert.match(said().at(-1)!, /^Bye, Chirp\./);
+  // A double tap on the way out doesn't sign them back in.
+  r = e.cardTap('Chirp', 62_000);
+  assert.equal(r.action, 'out');
+  assert.equal(r.again, true);
+  assert.equal(e.pilotNamed('Chirp'), undefined);
+  // Next week: in again, on the channel they flew.
+  r = e.cardTap('Chirp', 7 * 86400_000, 'F2');
+  assert.equal(r.action, 'in');
+  assert.equal(e.channelOf((r as any).heat, (r as any).slot), 'F2');
+});
+
+test('card reader: signed in by typing, a tap signs out; just linked, a tap does nothing; callouts can be switched off', () => {
+  const { e, said } = setup();
+  e.walkIn('Bewoo');
+  assert.equal(e.cardTap('Bewoo', 0).action, 'out');
+  e.walkIn('Kiwi');
+  e.noteCardTap('Kiwi', 'in', 100_000); // the card was just linked at the kiosk
+  const r = e.cardTap('Kiwi', 105_000);
+  assert.equal(r.action, 'in');
+  assert.ok(e.pilotNamed('Kiwi'));
+  e.setConfig({ callouts: { cardTaps: false } } as any);
+  const n = said().length;
+  e.cardTap('Kiwi', 200_000);
+  assert.equal(said().length, n);
+});

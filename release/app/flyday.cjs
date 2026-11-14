@@ -289,7 +289,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.13-2142" : "dev";
+var VERSION = true ? "2026.11.15-0041" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -328,6 +328,7 @@ var DEFAULT_CONFIG = {
     freeFlight: true,
     heatsChanged: true,
     sessionEnd: true,
+    cardTaps: true,
     gatePassBeep: false,
     gatePassVoice: true,
     texts: {
@@ -357,7 +358,9 @@ var DEFAULT_CONFIG = {
       gatePass: "{name}, {laptime}",
       paused: "Paused.",
       pausedAfterHeat: "Paused after this heat. Hold on, the heats are being sorted out.",
-      resumed: "Resumed."
+      resumed: "Resumed.",
+      cardIn: "Welcome, {name}.",
+      cardOut: "Bye, {name}. See you next time!"
     }
   },
   sound: {
@@ -446,6 +449,7 @@ function spectrumLevels(f0, db) {
   }
   return out;
 }
+var CARD_AGAIN_MS = 2e4;
 var ACTIVE_MS = 15 * 6e4;
 var PRESENCE_START_WAIT_MS = 2 * 6e4;
 var LIGHT_STALE_MS = 3 * 6e4;
@@ -1800,6 +1804,44 @@ var Engine = class {
   leave(pilotId) {
     this.deletePilot(pilotId);
   }
+  /** The signed-in pilot with this name, if any. */
+  pilotNamed(name) {
+    const key = cleanName(name).toLowerCase();
+    for (const p of this.pilots.values()) if (p.callsign.toLowerCase() === key) return p;
+    return void 0;
+  }
+  /** When each name last tapped their card (lowercased), and what it did. */
+  cardTaps = /* @__PURE__ */ new Map();
+  /** A card was just linked to this name at the kiosk: the next tap within a moment does nothing. */
+  noteCardTap(name, action, now) {
+    this.cardTaps.set(cleanName(name).toLowerCase(), { at: now, action });
+  }
+  /**
+   * Kiosk card reader, one reader for both ways: a tap signs the pilot in (like Fly today), the
+   * next tap signs them out (like Going home). A second tap within CARD_AGAIN_MS changes nothing,
+   * so tapping twice doesn't send anyone home: it shows what the first tap did.
+   */
+  cardTap(name, now, usual, club = false) {
+    const key = cleanName(name).toLowerCase();
+    const last = this.cardTaps.get(key);
+    const here = this.pilotNamed(name);
+    const again = !!last && now - last.at < CARD_AGAIN_MS && last.action === "in" === !!here;
+    const say = (k, who) => {
+      if (this.config.callouts.cardTaps) this.say(fillText(this.config.callouts.texts[k], { name: who.spokenName || who.callsign }));
+    };
+    if (again && !here) return { action: "out", again, callsign: cleanName(name) };
+    if (here && !again) {
+      const gone = { callsign: here.callsign, spokenName: here.spokenName };
+      this.leave(here.id);
+      this.cardTaps.set(key, { at: now, action: "out" });
+      say("cardOut", gone);
+      return { action: "out", again: false, callsign: gone.callsign };
+    }
+    const r = this.walkIn(name, usual, club);
+    if (!again) this.cardTaps.set(key, { at: now, action: "in" });
+    if (!again) say("cardIn", r.pilot);
+    return { action: "in", again, ...r };
+  }
   /** RD: put any pilot in any slot (or clear it with null). */
   setSlot(heat, slot, pilotId) {
     this.checkSlot(heat, slot);
@@ -2416,7 +2458,7 @@ function cleanCloud(patch, current) {
 }
 function cleanCallouts(patch, current) {
   const out = { ...current };
-  for (const k of ["sessionStartStop", "lineup", "arm", "readyBeeps", "finalBeeps", "timeUp", "pauseResume", "freeFlight", "heatsChanged", "sessionEnd", "gatePassBeep", "gatePassVoice"]) {
+  for (const k of ["sessionStartStop", "lineup", "arm", "readyBeeps", "finalBeeps", "timeUp", "pauseResume", "freeFlight", "heatsChanged", "sessionEnd", "gatePassBeep", "gatePassVoice", "cardTaps"]) {
     if (patch[k] !== void 0) out[k] = Boolean(patch[k]);
   }
   if (patch.texts && typeof patch.texts === "object") {
@@ -3227,6 +3269,35 @@ function rememberChannel(pilotId) {
     return;
   }
 }
+var CARDS_FILE = (0, import_node_path6.join)((0, import_node_path6.resolve)(DATA_FILE, ".."), "cards.json");
+var cards = (() => {
+  try {
+    return JSON.parse((0, import_node_fs6.readFileSync)(CARDS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+})();
+function cardId(v) {
+  const id = String(v ?? "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+  if (id.length < 4 || id.length > 20) throw new EngineError("That card couldn't be read. Tap it again.");
+  return id;
+}
+function saveCards() {
+  try {
+    (0, import_node_fs6.mkdirSync)((0, import_node_path6.resolve)(CARDS_FILE, ".."), { recursive: true });
+    (0, import_node_fs6.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
+  } catch {
+  }
+}
+function sendHome(pilotId) {
+  rememberPhoto(pilotId);
+  engine.leave(pilotId);
+  try {
+    (0, import_promises2.unlink)(photoFile(pilotId)).catch(() => {
+    });
+  } catch {
+  }
+}
 function restorePhotos() {
   for (const p of engine.pilots.values()) {
     if (p.photo) continue;
@@ -3370,18 +3441,45 @@ var API2 = {
     const k = known[knownKey(String(b.name ?? ""))];
     const r = engine.walkIn(b.name, k?.channel, b.club === void 0 ? !!k?.club : !!b.club);
     rememberChannel(r.pilot.id);
+    if (b.card !== void 0) {
+      cards[cardId(b.card)] = r.pilot.callsign;
+      saveCards();
+      engine.noteCardTap(r.pilot.callsign, "in", Date.now());
+    }
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
-  "/api/still-flying": () => engine.stillFlying(Date.now()),
-  "/api/leave": (b) => {
-    rememberPhoto(String(b.pilotId));
-    engine.leave(String(b.pilotId));
-    try {
-      (0, import_promises2.unlink)(photoFile(String(b.pilotId))).catch(() => {
-      });
-    } catch {
+  // The kiosk's card reader: a known card signs its pilot in, or out when they're signed in.
+  "/api/card": (b) => {
+    const id = cardId(b.card);
+    const name = cards[id];
+    if (!name) return { action: "new" };
+    const here = engine.pilotNamed(name);
+    if (here) rememberPhoto(here.id);
+    const k = known[knownKey(name)];
+    const r = engine.cardTap(name, Date.now(), k?.channel, !!k?.club);
+    if (r.action === "out") {
+      if (here && !engine.pilots.has(here.id)) try {
+        (0, import_promises2.unlink)(photoFile(here.id)).catch(() => {
+        });
+      } catch {
+      }
+      return r;
     }
+    rememberChannel(r.pilot.id);
+    return { ...r, channel: engine.channelOf(r.heat, r.slot) };
   },
+  // "Not you?" after a card tap: the card belongs to nobody again, and whoever it just signed in goes.
+  "/api/card/forget": (b) => {
+    const id = cardId(b.card);
+    const name = cards[id];
+    delete cards[id];
+    saveCards();
+    const p = name && b.pilotId ? engine.pilots.get(String(b.pilotId)) : void 0;
+    if (p && p.callsign.toLowerCase() === name.toLowerCase()) sendHome(p.id);
+    return { action: "new" };
+  },
+  "/api/still-flying": () => engine.stillFlying(Date.now()),
+  "/api/leave": (b) => sendHome(String(b.pilotId)),
   "/api/slot": (b) => engine.setSlot(Number(b.heat), Number(b.slot), b.pilotId ?? null),
   "/api/pilot/add": (b) => engine.addPilot(b.callsign),
   "/api/pilot/update": (b) => {

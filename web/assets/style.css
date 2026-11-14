@@ -975,3 +975,4 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .spec-wrap .seg button.on { background: var(--accent); color: #000; }
 .spec-controls .spec-gain { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-weight: 700; }
 .spec-controls .spec-gain input { flex: 1; max-width: 360px; accent-color: var(--accent); }
+.kiosk .card-hint { font-size: 20px; margin: -4px 0 14px; color: var(--muted); }

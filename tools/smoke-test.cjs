@@ -90,6 +90,35 @@ async function typeKeys(scope, text) {
     s = await state();
     check(!s.pilots.some((p) => p.id === ghost.id), 'Going home removes the pilot');
 
+    // Card reader (a USB reader types the card number and Enter, very fast).
+    const tap = async (id) => { await k.keyboard.type(id, { delay: 4 }); await k.keyboard.press('Enter'); };
+    await k.click('[data-go=home]').catch(() => {});
+    await tap('04A1B2C3');
+    await k.waitForSelector('.card-hint', { timeout: 5000 });
+    check(true, 'card: a new card asks for the name');
+    await k.keyboard.type('Ta', { delay: 120 }); // a person on a real keyboard: goes in the box
+    await typeKeys(k, 'p');
+    check(await k.inputValue('#nameInput') === 'Tap', 'card: slow typing still goes in the name box');
+    await k.click('[data-next]');
+    await k.waitForSelector('[data-snap], .done:not(.photo-step)', { timeout: 5000 });
+    if (await k.$('[data-snap]')) { await k.click('[data-snap]'); await k.waitForSelector('[data-use]', { timeout: 6000 }); await k.click('[data-use]'); }
+    s = await state();
+    check(s.pilots.some((p) => p.callsign === 'Tap'), 'card: named and signed in');
+    await tap('04A1B2C3');
+    await k.waitForTimeout(400);
+    s = await state();
+    check(s.pilots.some((p) => p.callsign === 'Tap'), 'card: a tap right after linking keeps them in');
+    await post('/api/leave', { pilotId: s.pilots.find((p) => p.callsign === 'Tap').id });
+    await k.click('[data-go=home]').catch(() => {});
+    await tap('04A1B2C3');
+    await k.waitForSelector('.done .big-msg', { timeout: 5000 });
+    check(/Welcome, Tap/i.test(await k.textContent('.done .big-msg')), 'card: a known card signs in with a welcome, no photo step');
+    await k.click('[data-not-you]');
+    await k.waitForSelector('.card-hint', { timeout: 5000 });
+    s = await state();
+    check(!s.pilots.some((p) => p.callsign === 'Tap'), 'card: "Not you?" undoes the sign-in and asks the name again');
+    await k.click('[data-go=home]');
+
     // "I don't have my own quad": a club quad, on its channel.
     await k.click('[data-flow=join]');
     await typeKeys(k, 'Kit');

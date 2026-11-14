@@ -90,6 +90,8 @@ export function spectrumLevels(f0: number, db: number[]): Record<string, number>
   return out;
 }
 
+/** A second card tap this soon after the first changes nothing (a double tap doesn't sign anyone out). */
+export const CARD_AGAIN_MS = 20_000;
 /** Somebody used tgiFlyDay within this long: they're still here. */
 export const ACTIVE_MS = 15 * 60_000;
 /** After a start, the first presence row waits this long at most for the kiosk's light reading. */
@@ -1532,6 +1534,51 @@ export class Engine {
     this.deletePilot(pilotId);
   }
 
+  /** The signed-in pilot with this name, if any. */
+  pilotNamed(name: string): Pilot | undefined {
+    const key = cleanName(name).toLowerCase();
+    for (const p of this.pilots.values()) if (p.callsign.toLowerCase() === key) return p;
+    return undefined;
+  }
+
+  /** When each name last tapped their card (lowercased), and what it did. */
+  private cardTaps = new Map<string, { at: number; action: 'in' | 'out' }>();
+
+  /** A card was just linked to this name at the kiosk: the next tap within a moment does nothing. */
+  noteCardTap(name: string, action: 'in' | 'out', now: number) {
+    this.cardTaps.set(cleanName(name).toLowerCase(), { at: now, action });
+  }
+
+  /**
+   * Kiosk card reader, one reader for both ways: a tap signs the pilot in (like Fly today), the
+   * next tap signs them out (like Going home). A second tap within CARD_AGAIN_MS changes nothing,
+   * so tapping twice doesn't send anyone home: it shows what the first tap did.
+   */
+  cardTap(name: string, now: number, usual?: string, club = false):
+    | ({ action: 'in'; again: boolean } & ReturnType<Engine['walkIn']>)
+    | { action: 'out'; again: boolean; callsign: string } {
+    const key = cleanName(name).toLowerCase();
+    const last = this.cardTaps.get(key);
+    const here = this.pilotNamed(name);
+    // The same as a moment ago (in and still here, or out and still gone): a double tap.
+    const again = !!last && now - last.at < CARD_AGAIN_MS && (last.action === 'in') === !!here;
+    const say = (k: 'cardIn' | 'cardOut', who: Pilot | { callsign: string; spokenName?: string }) => {
+      if (this.config.callouts.cardTaps) this.say(fillText(this.config.callouts.texts[k], { name: who.spokenName || who.callsign }));
+    };
+    if (again && !here) return { action: 'out', again, callsign: cleanName(name) };
+    if (here && !again) {
+      const gone = { callsign: here.callsign, spokenName: here.spokenName };
+      this.leave(here.id);
+      this.cardTaps.set(key, { at: now, action: 'out' });
+      say('cardOut', gone);
+      return { action: 'out', again: false, callsign: gone.callsign };
+    }
+    const r = this.walkIn(name, usual, club);
+    if (!again) this.cardTaps.set(key, { at: now, action: 'in' });
+    if (!again) say('cardIn', r.pilot);
+    return { action: 'in', again, ...r };
+  }
+
   /** RD: put any pilot in any slot (or clear it with null). */
   setSlot(heat: number, slot: number, pilotId: string | null) {
     this.checkSlot(heat, slot);
@@ -2186,7 +2233,7 @@ function cleanCloud(patch: Partial<CloudConfig>, current: CloudConfig): CloudCon
 
 function cleanCallouts(patch: Partial<Config['callouts']>, current: Config['callouts']): Config['callouts'] {
   const out = { ...current };
-  for (const k of ['sessionStartStop', 'lineup', 'arm', 'readyBeeps', 'finalBeeps', 'timeUp', 'pauseResume', 'freeFlight', 'heatsChanged', 'sessionEnd', 'gatePassBeep', 'gatePassVoice'] as const) {
+  for (const k of ['sessionStartStop', 'lineup', 'arm', 'readyBeeps', 'finalBeeps', 'timeUp', 'pauseResume', 'freeFlight', 'heatsChanged', 'sessionEnd', 'gatePassBeep', 'gatePassVoice', 'cardTaps'] as const) {
     if (patch[k] !== undefined) out[k] = Boolean(patch[k]);
   }
   if (patch.texts && typeof patch.texts === 'object') {

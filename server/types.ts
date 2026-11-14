@@ -142,6 +142,8 @@ export interface CalloutSettings {
   heatsChanged: boolean;
   /** The session's end time: warnings, last round, the end. */
   sessionEnd: boolean;
+  /** Card reader at the kiosk: "Welcome, {name}" / "Bye, {name}". */
+  cardTaps: boolean;
   /** Lap timer: a short beep on every gate pass. */
   gatePassBeep: boolean;
   /** Lap timer: say the lap on every gate pass (wording: texts.gatePass). */
@@ -198,6 +200,10 @@ export interface CalloutTexts {
   /** The heat ended and the RD had asked to pause after it. */
   pausedAfterHeat: string;
   resumed: string;
+  /** A card tap signed a pilot in. {name} */
+  cardIn: string;
+  /** A card tap signed a pilot out. {name} */
+  cardOut: string;
 }
 
 export type BeepStyle = 'standard' | 'loud' | 'horn' | 'whistle';
@@ -320,6 +326,7 @@ export const DEFAULT_CONFIG: Config = {
     freeFlight: true,
     heatsChanged: true,
     sessionEnd: true,
+    cardTaps: true,
     gatePassBeep: false,
     gatePassVoice: true,
     texts: {
@@ -350,6 +357,8 @@ export const DEFAULT_CONFIG: Config = {
       paused: 'Paused.',
       pausedAfterHeat: 'Paused after this heat. Hold on, the heats are being sorted out.',
       resumed: 'Resumed.',
+      cardIn: 'Welcome, {name}.',
+      cardOut: 'Bye, {name}. See you next time!',
     },
   },
   sound: {
