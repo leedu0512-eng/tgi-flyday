@@ -18,6 +18,7 @@
     <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
     <div class="sub">Practice · RD console</div>
     <div class="spacer"></div>
+    <span id="langSw"></span>
     <div class="status-icons">
       <button class="si" id="timeSi" type="button" data-view="time" title="Time of day. Click: when this session ends"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="wallclock" class="num"></span><span id="finishTag" class="finish-tag"></span></button>
       <button class="si" id="sessionSi" type="button" title="Session time. Click: the heats"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="14" r="7"/><path d="M12 14V10M10 3h4M12 3v4M18 7l1.5-1.5"/></svg><span id="sessionTime" class="num"></span></button>
@@ -195,7 +196,7 @@
       <button id="finishClear" class="btn">No end time</button>
     </div>
     <div class="finish-quick" id="finishQuick"></div>
-    <p class="hint">The voice warns 30, 20 and 10 minutes before. When the time comes, the round being flown is finished first (every heat in it gets its turn), then practice stops and everyone stays signed in. In free flight, or before a round has started, it stops right away. The end time is for this session only: it's cleared when practice stops.</p>
+    <p class="hint">The voice warns 30, 20 and 10 minutes before. When the time comes, the round being flown is finished first (every heat in it gets its turn), then practice stops and starts clean for next time (everyone off the list, setup back to the defaults). In free flight, or before a round has started, it stops right away. The end time is for this session only: it's cleared when practice stops.</p>
   </section>
 </section>
 <section id="clubView" class="card drawer view" hidden aria-label="Club quads">
@@ -252,6 +253,7 @@ setInterval(() => {
 }, 250);
 
 const $ = (id) => document.getElementById(id);
+$('langSw').innerHTML = langSwitch('head');
 // The RD console is the screen that plays callouts and tones (on by default).
 const sound = new Sound('tgiflyday.sound', true);
 setInterval(() => renderSound(), 1000);

@@ -21,6 +21,7 @@
 
 <header class="m-top">
   <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span id="langSw"></span>
   <span id="wallclock" class="wallclock num"></span>
 </header>
 
@@ -75,6 +76,7 @@ import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs
 // RD remote for a phone. Controls the same session as the console, but makes no sound:
 // callouts always come from the RD PC.
 const $ = (id) => document.getElementById(id);
+$('langSw').innerHTML = langSwitch('head');
 let state = null;
 let openPilot = null;
 

@@ -234,6 +234,18 @@ function fitNames() {
 
 function renderTrackDay() {
   const data = tdData();
+  // Nothing from the portal yet: the flipping pay / join card, as before.
+  if (!data) {
+    $('main').className = 'pb-main';
+    $('main').innerHTML = `<div class="pb-board td-board">
+        <div class="plank top"><span class="heat">${tr('TRACK DAY')}</span></div>
+        <div class="plank clock-plank"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
+        <div class="plank bar td-name"><span class="label">${new Date().toLocaleDateString(LANG === 'et' ? 'et-EE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+      </div>${payCard()}`;
+    placeCard();
+    fitClock($('dayClock'));
+    return;
+  }
   if (tdPane === 'thanks' && !data?.thanks?.names?.length) tdPane = 'main';
   const pay = state?.trackdayUrl || CARDS[0].builtIn;
   CARDS[0].url = pay;

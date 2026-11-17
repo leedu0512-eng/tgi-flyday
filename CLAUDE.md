@@ -21,7 +21,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - Screens are plain HTML + JS modules in `web/`, sharing `web/assets/common.js` and `web/assets/style.css`.
 - The venue has no Wi-Fi: everything local is wired. It must work fully offline.
 - The RD PC runs Windows. Keep `start.bat` working.
-- English UI and callouts.
+- UI in English and Estonian (EST/ENG switch on every screen, see Languages below); voice callouts stay English.
 
 ## Identity
 
@@ -30,6 +30,18 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - Colours (HOBIzone): black #000000 ground, panels #111111 / #1A1A1A, bright orange #FF6B00 accent, white #FFFFFF, muted #9A9A9A. Phases: changeover orange, arm #FF3B30, flying / free flight #22C55E. Pilot slots follow FAI LED order.
 - Type (all bundled in `web/assets/fonts`, OFL): Big Shoulders Stencil for clocks, the wordmark and big board words; Big Shoulders Display for labels, headings and names; Archivo for body text and forms. Spectator screen is a pit board (planks, white race plates, orange next-heat board, chequered strip).
 - Logo markup: `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>`, sized with font-size.
+
+## Languages (Janno 17.11.2026)
+
+- Every screen has an EST / ENG switch (`langSwitch()` in web/assets/i18n.js; kiosk: under the three big buttons; big screen, phone, RD console, RD phone: in the header). One language at a time, remembered per device (localStorage `tgiflyday.lang`; `?lang=et|en` overrides). Default English. The embedded kiosk on the big screen follows the screen (same origin).
+- Pages stay written in English. In Estonian, i18n.js swaps every text node and title / placeholder / aria-label / alt that matches a key of `ET` in web/assets/i18n-et.js exactly (trimmed), or one of `ET_PATTERNS` (values like "Heat 3", channel menu rows), as it appears (MutationObserver), so plain markup and server messages need nothing. Sentences with values or markup use `tr('… {name} …', { name })` (exported from common.js as `tr`, never `t`: many handlers have a local `t`). A missing key just stays English. Mark a subtree `data-no-i18n` to leave it alone.
+- Words: heat = grupp, channel = kanal, practice = trenn, sign in = registreeru, race director = trenni juht, quad = droon, arm = armi (the big ARM stays), default settings = vaikesätted. Check new Estonian with the Estonian tools (spell_check). Callout texts (what the voice says) are not translated.
+- Text from the portal can come as `{ et, en }` (screen.html `pick()`); a plain string is shown as it is.
+
+## TrackDay screen (Janno 17.11.2026, on branch `bilingual` until the portal's screen door exists)
+
+- screen.html `renderTrackDay()`, TrackDay view while no drone practice runs. Main pane (45 s): big clock + date, this week's calendar (‹ › one week back, two ahead; back to this week after 60 s untouched; "updated HH:MM"), the pay QR (`trackday_url`). Thank-you pane (20 s): the portal's title, the names fitted as big as they fit (`fitNames`, binary search; 50–70 names expected), the Join the club QR. One QR per pane (Janno). Touching the week buttons holds the turns for a minute.
+- Data: `state.trackdayScreen` = { events [{id, start, end, all_day, kind track | drone | class | other, title}], updated, thanks {title, names} } from the portal door (asked for in inbox/portal, 17.11.2026; not built yet: the RD PC should fetch it, keep the last good copy in data/, put it in the state). `?demo` shows made-up data, `?pane=thanks` opens on the thank-you pane. No data: the old flipping pay / join card.
 
 ## Pilot photos
 
