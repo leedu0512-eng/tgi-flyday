@@ -185,7 +185,7 @@ var import_node_os = require("node:os");
 var import_promises = require("node:readline/promises");
 var import_node_path2 = require("node:path");
 var PROFILES = (0, import_node_path2.join)(process.env.LOCALAPPDATA ?? ".", "TGI-FlyDay");
-var EDGE_FLAGS = ["--no-first-run", "--hide-crash-restore-bubble", "--disable-session-crashed-bubble"];
+var EDGE_FLAGS = ["--no-first-run", "--hide-crash-restore-bubble", "--disable-session-crashed-bubble", "--disable-features=Translate"];
 function ps(script, inherit = false) {
   const encoded = Buffer.from(script, "utf16le").toString("base64");
   try {
@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1936" : "dev";
+var VERSION = true ? "2026.11.17-1937" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {

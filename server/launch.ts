@@ -10,7 +10,7 @@ import { createInterface } from 'node:readline/promises';
 import { join } from 'node:path';
 
 const PROFILES = join(process.env.LOCALAPPDATA ?? '.', 'TGI-FlyDay');
-const EDGE_FLAGS = ['--no-first-run', '--hide-crash-restore-bubble', '--disable-session-crashed-bubble'];
+const EDGE_FLAGS = ['--no-first-run', '--hide-crash-restore-bubble', '--disable-session-crashed-bubble', '--disable-features=Translate'];
 
 function ps(script: string, inherit = false): string {
   const encoded = Buffer.from(script, 'utf16le').toString('base64');

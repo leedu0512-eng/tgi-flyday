@@ -16,6 +16,8 @@ export const LANG = (() => {
   } catch { return 'en'; }
 })();
 document.documentElement.lang = LANG;
+// The page is already in the language picked: browsers mustn't offer to translate it (Janno 17.11.2026).
+document.documentElement.setAttribute('translate', 'no');
 
 /** Estonian for this English text, or null. */
 function lookup(en) {

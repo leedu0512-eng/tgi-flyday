@@ -20,4 +20,4 @@ if errorlevel 1 (
 )
 
 rem The webcam (pilot photos) works on this http page only when Edge is told it's fine.
-start "" msedge --kiosk http://%RDPC%:8080/kiosk --edge-kiosk-type=fullscreen --unsafely-treat-insecure-origin-as-secure=http://%RDPC%:8080 --use-fake-ui-for-media-stream --no-first-run --hide-crash-restore-bubble --disable-session-crashed-bubble --user-data-dir="%LOCALAPPDATA%\TGI-FlyDay\kiosk"
+start "" msedge --kiosk http://%RDPC%:8080/kiosk --edge-kiosk-type=fullscreen --unsafely-treat-insecure-origin-as-secure=http://%RDPC%:8080 --use-fake-ui-for-media-stream --no-first-run --hide-crash-restore-bubble --disable-session-crashed-bubble --disable-features=Translate --user-data-dir="%LOCALAPPDATA%\TGI-FlyDay\kiosk"
