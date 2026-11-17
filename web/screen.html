@@ -22,6 +22,7 @@
     <span id="wallclock" class="wallclock num"></span>
     <div class="pb-qr" title="Your heat on your phone"><span>Your heat<br>on your phone</span><i id="meQr"></i></div>
     <button id="signinBtn" class="pb-signin">Sign in</button>
+    <span id="langSw"></span>
   </header>
   <div id="main" class="pb-main"></div>
   <div id="next" class="pb-next"></div>
@@ -36,11 +37,12 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt, tr, langSwitch } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
 const $ = (id) => document.getElementById(id);
+$('langSw').innerHTML = langSwitch('head');
 let state = null;
 
 const WORD = {
@@ -239,7 +241,7 @@ function render() {
   $('main').className = 'pb-main';
   $('main').innerHTML = `
     <div class="pb-board">
-      <div class="plank top"><span class="heat">HEAT ${c.heat + 1}</span><span class="word ${key}">${WORD[key].toUpperCase()}</span></div>
+      <div class="plank top"><span class="heat">HEAT ${c.heat + 1}</span><span class="word ${key}">${tr(WORD[key]).toUpperCase()}</span></div>
       <div class="plank clock-plank"><span id="bigclock" class="bigclock num"></span></div>
       <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
     </div>

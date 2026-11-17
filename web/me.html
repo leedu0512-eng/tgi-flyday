@@ -21,6 +21,7 @@
 <div class="offline-banner">Lost connection to the race PC. Reconnecting…</div>
 <header class="me-top">
   <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span id="langSw"></span>
   <span id="wallclock" class="wallclock num"></span>
 </header>
 <main id="view"></main>
@@ -35,9 +36,10 @@
 <script type="module">
 // A pilot's own page on their phone (QR code on the kiosk and the big screen):
 // who am I, my heat and channel, am I flying, and Leave. Lap times come here later.
-import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark, faceOf, nightPrompt } from '/assets/common.js';
+import { connect, post, esc, NAME, SLOT_COLORS, pilotMap, wallClock, clockMs, fmt, photoUrl, uploadPhoto, heatsAhead, seatOf, timerMark, faceOf, nightPrompt, tr, langSwitch } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
+$('langSw').innerHTML = langSwitch('head');
 const KEY = 'tgiflyday.me';
 let state = null;
 let search = '';
@@ -81,7 +83,7 @@ const pilot = () => me && state?.pilots.find((p) => p.callsign.toLowerCase() ===
 function pickView() {
   const back = last && (state.pilots.find((p) => p.callsign.toLowerCase() === last.toLowerCase()) ?? null);
   const welcome = last ? `<div class="me-welcome"><span>Welcome back</span>
-      <button class="big primary" data-last>${esc(NAME(back?.callsign ?? last))}, that's me<small>${back ? 'Show my heat' : 'Sign me in: tgiFlyDay picks my heat and channel'}</small></button></div>` : '';
+      <button class="big primary" data-last>${tr("{name}, that's me", { name: esc(NAME(back?.callsign ?? last)) })}<small>${back ? 'Show my heat' : 'Sign me in: tgiFlyDay picks my heat and channel'}</small></button></div>` : '';
   return `${welcome}<h1>${last ? 'Or' : 'Who are you?'}</h1>
     <input id="search" class="input" placeholder="Your pilot name" value="${esc(search)}" autocomplete="off" autocapitalize="words" enterkeyhint="go">
     <div id="pickRest">${pickRest()}</div>`;
@@ -96,7 +98,7 @@ function pickRest() {
         ${seat ? `<span class="chip" style="background:${SLOT_COLORS[seat.slot]}">${esc(seat.channel)}${timerMark(state, seat.slot)}</span>` : '<span class="chip none">–</span>'}
         <span>${esc(NAME(p.callsign))}</span><small>${seat ? `Heat ${seat.heat + 1}` : 'No heat'}</small>
       </button>`).join('') || `<p class="hint">${search ? 'Nobody by that name yet.' : 'Nobody has signed in yet.'}</p>`}</div>
-    ${search.trim() ? `<button class="big primary" data-signin>Sign in as ${esc(NAME(search.trim()))}<small>tgiFlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
+    ${search.trim() ? `<button class="big primary" data-signin>${tr('Sign in as {name}', { name: esc(NAME(search.trim())) })}<small>tgiFlyDay picks your heat and channel</small></button>` : '<p class="hint">Not on the list? Type your name to sign in.</p>'}`;
 }
 
 // ---------- my heat ----------
@@ -114,7 +116,7 @@ function status(p, seat) {
   if (c.phase === 'waiting') return { cls: 'idle', big: 'Waiting', small: 'For pilots to join.' };
   const n = heatsAhead(state, seat.heat, p.id);
   const min = Math.max(1, Math.round((n * (state.config.heatSeconds + state.config.changeoverSeconds)) / 60));
-  return { cls: 'wait', big: `${n} heat${n === 1 ? '' : 's'} before yours`, small: `About ${min} min.` };
+  return { cls: 'wait', big: n === 1 ? tr('1 heat before yours') : tr('{n} heats before yours', { n }), small: tr('About {min} min.', { min }) };
 }
 
 function meView(p) {
@@ -125,8 +127,8 @@ function meView(p) {
     .map((s, i) => ({ s, i, q: s.pilotId && pm.get(s.pilotId) }))
     .filter((x) => x.q && x.q.id !== p.id) : [];
   if (confirmLeave) {
-    return `<div class="me-confirm"><h1>Leave, ${esc(NAME(p.callsign))}?</h1>
-      <p>${seat ? `Your slot in heat ${seat.heat + 1} will be free for someone else.` : "You'll be off today's list."}</p>
+    return `<div class="me-confirm"><h1>${tr('Leave, {name}?', { name: esc(NAME(p.callsign)) })}</h1>
+      <p>${seat ? tr('Your slot in heat {heat} will be free for someone else.', { heat: seat.heat + 1 }) : tr("You'll be off today's list.")}</p>
       <button class="big primary" data-leave-yes>Yes, I'm going home</button>
       <button class="big" data-leave-no>Cancel</button></div>`;
   }
@@ -155,8 +157,8 @@ function clubLine(p) {
   const q = (state.config.clubQuads ?? []).find((c) => c.name.toLowerCase() === p.quad?.toLowerCase());
   if (!q) return '';
   const mates = state.pilots.filter((x) => x.id !== p.id && x.quad?.toLowerCase() === q.name.toLowerCase())
-    .map((x) => { const st = seatOf(state, x.id); return `${esc(NAME(x.callsign))}${st ? ` (heat ${st.heat + 1})` : ''}`; });
-  return `<div class="me-club"><small>Club quad</small><b>${esc(q.name)}</b>${mates.length ? `<span>Shared with ${mates.join(', ')}</span>` : ''}</div>`;
+    .map((x) => { const st = seatOf(state, x.id); return `${esc(NAME(x.callsign))}${st ? ` (${tr('heat {heat}', { heat: st.heat + 1 })})` : ''}`; });
+  return `<div class="me-club"><small>Club quad</small><b>${esc(q.name)}</b>${mates.length ? `<span>${tr('Shared with {who}', { who: mates.join(', ') })}</span>` : ''}</div>`;
 }
 
 // ---------- laps ----------
@@ -185,10 +187,10 @@ function lapsView() {
     const key = `${r.round}-${r.heat}-${r.at}`;
     const latest = i === laps.runs.length - 1;
     const open = !closedRuns.has(key) && (openRuns.has(key) || r.live || latest);
-    const title = r.free ? `Round ${r.round}, heat ${r.heat + 1} · free flight` : `Round ${r.round}, heat ${r.heat + 1}`;
+    const title = tr(r.free ? 'Round {round}, heat {heat} · free flight' : 'Round {round}, heat {heat}', { round: r.round, heat: r.heat + 1 });
     return `<details class="me-run ${r.live ? 'live' : ''}" data-run="${key}" ${open ? 'open' : ''}>
       <summary><span>${title}${r.live ? ' <i class="now">flying</i>' : ''}</span>
-        <span class="sum">${r.best3 != null ? `3C <b class="${tone(r.best3, laps.best3)}">${lapTime(r.best3)}</b>` : `${r.laps.length} lap${r.laps.length === 1 ? '' : 's'}`}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
+        <span class="sum">${r.best3 != null ? `3C <b class="${tone(r.best3, laps.best3)}">${lapTime(r.best3)}</b>` : r.laps.length === 1 ? tr('1 lap') : tr('{n} laps', { n: r.laps.length })}${i === laps.pbRun ? badge(laps.pbIsSb) : ''}</span></summary>
       <ol>${r.laps.map((ms, j) => `<li class="${r.best3At >= 0 && j >= r.best3At && j < r.best3At + 3 ? 'b3' : ''} ${tone(ms, laps.bestLap)}">
         <span>Lap ${j + 1}</span><b>${lapTime(ms)}</b></li>`).join('')}</ol>
     </details>`;
@@ -290,7 +292,7 @@ async function signIn(name) {
     store.set(me);
     remember(me);
     search = '';
-    toast(`Heat ${r.heat + 1}, channel ${r.channel}`);
+    toast(tr('Heat {heat}, channel {ch}', { heat: r.heat + 1, ch: r.channel }));
   } catch (err) { toast(err.message); }
   render();
 }

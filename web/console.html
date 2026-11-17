@@ -243,7 +243,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt, qrSvg, now } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, clockMs, connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, Sound, wallClock, NAME, timerMark, faceOf, nightPrompt, qrSvg, now, tr, langSwitch } from '/assets/common.js';
 setInterval(() => {
   const [time, session] = wallClock(state).split(' · session ');
   $('wallclock').textContent = time;
@@ -434,7 +434,7 @@ function renderClubIcon() {
   $('clubCount').textContent = qs.length ? `${used}/${working.length}` : '0';
   $('clubSi').className = `si${broken ? ' warn' : ''}${view === 'club' ? ' active' : ''}`;
   $('clubSi').title = !qs.length ? 'Club quads: none set up'
-    : `Club quads: ${used} of ${working.length} working in use${shared ? ', some shared' : ''}${broken ? `, ${broken} broken` : ''}`;
+    : tr('Club quads: {used} of {n} working in use', { used, n: working.length }) + (shared ? tr(', some shared') : '') + (broken ? tr(', {n} broken', { n: broken }) : '');
 }
 function renderClubView(force = false) {
   if (!state || $('clubView').hidden) return;
@@ -759,7 +759,7 @@ function renderStatus() {
   $('meta').textContent = c.phase === 'stopped'
     ? 'Press Start session to begin the practice loop.'
     : c.phase === 'freeflight'
-    ? `Only heat ${c.heat + 1} has pilots, so it flies with no heat timer. Timed heats come back by themselves when another heat gets pilots.`
+    ? tr('Only heat {heat} has pilots, so it flies with no heat timer. Timed heats come back by themselves when another heat gets pilots.', { heat: c.heat + 1 })
     : c.phase === 'waiting'
     ? 'Every heat is empty. The session carries on by itself when a pilot joins.'
     : `Round ${c.round} · ${c.heatsRun} heat${c.heatsRun === 1 ? '' : 's'} flown this session`;
@@ -845,18 +845,19 @@ function renderSetup() {
     if (![...$('lightsDark').options].some((o) => +o.value === lt.dark)) $('lightsDark').add(new Option(String(lt.dark), lt.dark));
     $('lightsDark').value = String(lt.dark);
   }
-  $('lightNow').textContent = light.state === 'unknown' ? `Now: no reading from the kiosk webcam${light.problem ? ` (${light.problem})` : ''}.`
-    : `Now: lights ${light.state}, the picture's brightness is ${light.level}.`;
+  $('lightNow').textContent = light.state === 'unknown' ? (light.problem ? tr('Now: no reading from the kiosk webcam ({why}).', { why: light.problem }) : tr('Now: no reading from the kiosk webcam.'))
+    : tr(light.state === 'on' ? "Now: lights on, the picture's brightness is {level}." : "Now: lights off, the picture's brightness is {level}.", { level: light.level });
   renderOutbox();
   // What a clean start goes back to, and whether the setup differs from it now.
   const d = cfg.sessionDefaults ?? { heatSeconds: 180, changeoverSeconds: 120, heatCount: 4, channels: ['R1', 'R2', 'F2', 'F4', 'R7', 'R8'] };
   const same = d.heatSeconds === cfg.heatSeconds && d.changeoverSeconds === cfg.changeoverSeconds && d.heatCount === cfg.heatCount && d.channels.join() === cfg.channels.join();
-  $('defaultsNote').textContent = `${same ? 'This is the default setup' : 'Defaults'}${cfg.sessionDefaults ? '' : ' (built in)'}: ${fmt(d.heatSeconds * 1000)} heats, ${fmt(d.changeoverSeconds * 1000)} changeover, ${d.heatCount} heats, ${d.channels.join(' ')}. Practice goes back to this when it ends by itself.`;
+  $('defaultsNote').textContent = tr(`${same ? 'This is the default setup' : 'Defaults'}${cfg.sessionDefaults ? '' : ' (built in)'}: {heat} heats, {change} changeover, {n} heats, {ch}. Practice goes back to this when it ends by itself.`,
+    { heat: fmt(d.heatSeconds * 1000), change: fmt(d.changeoverSeconds * 1000), n: d.heatCount, ch: d.channels.join(' ') });
   $('saveDefaults').disabled = same && !!cfg.sessionDefaults;
   const box = $('slotChannels');
   if (!box.contains(document.activeElement)) {
     box.innerHTML = cfg.channels.map((ch, i) =>
-      `<select class="chip-select" data-slot="${i}" style="background:${SLOT_COLORS[i]}" aria-label="Channel for slot ${i + 1}">${channelOptions(state, ch, cfg.channels.filter((_, j) => j !== i))}</select>`).join('');
+      `<select class="chip-select" data-slot="${i}" style="background:${SLOT_COLORS[i]}" aria-label="${tr('Channel for slot {n}', { n: i + 1 })}">${channelOptions(state, ch, cfg.channels.filter((_, j) => j !== i))}</select>`).join('');
   }
 }
 for (const id of ['heatSeconds', 'changeoverSeconds']) {
@@ -870,17 +871,17 @@ $('nightStopAt').innerHTML = Array.from({ length: 12 }, (_, i) => 18 * 60 + i * 
   .map((m) => `<option value="${m}">${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}</option>`).join('');
 $('nightStopAt').onchange = (e) => act('/api/config', { nightStopAt: Number(e.target.value) });
 $('heatCount').onchange = (e) => act('/api/config', { heatCount: Number(e.target.value) }).then(() => renderSetup());
-const placedNote = (res) => res?.placed?.length ? ' ' + res.placed.map((x) => `${NAME(x.pilot.callsign)} moved to heat ${x.heat + 1} ${x.channel}`).join(' · ') : '';
+const placedNote = (res) => res?.placed?.length ? ' ' + res.placed.map((x) => tr('{name} moved to heat {heat} {ch}', { name: NAME(x.pilot.callsign), heat: x.heat + 1, ch: x.channel })).join(' · ') : '';
 $('perHeat').onchange = async (e) => {
   const res = await act('/api/pilots-per-heat', { count: Number(e.target.value) });
   e.target.blur();
-  if (res) toast(`${e.target.value} pilots per heat.${placedNote(res)}`, true);
+  if (res) toast(tr('{n} pilots per heat.', { n: e.target.value }) + placedNote(res), true);
 };
 $('slotChannels').onchange = async (e) => {
   const sel = e.target.closest('[data-slot]');
   if (!sel) return;
   sel.blur();
-  if (await act('/api/slot-channel', { slot: Number(sel.dataset.slot), channel: sel.value }) !== undefined) toast(`${sel.value} in every heat.`, true);
+  if (await act('/api/slot-channel', { slot: Number(sel.dataset.slot), channel: sel.value }) !== undefined) toast(tr('{ch} in every heat.', { ch: sel.value }), true);
 };
 $('lightsOn').onchange = (e) => act('/api/config', { lights: { enabled: e.target.checked } });
 $('lightsDark').innerHTML = [10, 15, 20, 25, 30, 40, 50, 60, 80, 100].map((n) => `<option value="${n}">${n}</option>`).join('');
@@ -889,7 +890,7 @@ $('lightsDark').onchange = (e) => { e.target.blur(); act('/api/config', { lights
 // ---------- online history (the outbox) ----------
 const ago = (t) => {
   const m = Math.round((Date.now() - t) / 60_000);
-  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+  return m < 1 ? tr('just now') : m < 60 ? tr('{n} min ago', { n: m }) : m < 48 * 60 ? tr('{n} h ago', { n: Math.round(m / 60) }) : tr('{n} days ago', { n: Math.round(m / 1440) });
 };
 function renderOutbox() {
   const cfg = state.config.cloud ?? {}, o = state.outbox ?? { pending: 0, sent: 0 };
@@ -897,32 +898,32 @@ function renderOutbox() {
   $('oVenue').placeholder = o.venue ?? '';
   const f = o.flyday ?? { status: 'new' };
   const sending = f.status === 'approved' && f.send;
-  const waiting = `${o.pending} event${o.pending === 1 ? '' : 's'} waiting`;
+  const waiting = o.pending === 1 ? tr('1 event waiting') : tr('{n} events waiting', { n: o.pending });
   $('oPair').innerHTML =
-    f.status === 'approved' ? `<b class="ok-text">Paired with Flyday</b>${f.send ? '' : ' · Flyday has sending switched off'}`
-    : f.status === 'revoked' ? '<b class="warn-text">Flyday has revoked this PC.</b> Approve it again in the Flyday admin.'
-    : `Approve this PC in the Flyday admin. Its code:<span class="pair-code">${esc(f.pairingCode ?? '')}</span>`;
-  $('outboxSum').textContent = !sending ? `· keeping, ${waiting}` : o.lastError ? '· not sending' : o.pending ? `· ${waiting}` : '· sent';
+    f.status === 'approved' ? `<b class="ok-text">${tr('Paired with Flyday')}</b>${f.send ? '' : ' · ' + tr('Flyday has sending switched off')}`
+    : f.status === 'revoked' ? `<b class="warn-text">${tr('Flyday has revoked this PC.')}</b> ${tr('Approve it again in the Flyday admin.')}`
+    : `${tr('Approve this PC in the Flyday admin. Its code:')}<span class="pair-code">${esc(f.pairingCode ?? '')}</span>`;
+  $('outboxSum').textContent = '· ' + (!sending ? tr('keeping, {w}', { w: waiting }) : o.lastError ? tr('not sending') : o.pending ? waiting : tr('sent'));
   $('outboxSum').className = (sending && o.lastError) || f.status === 'revoked' ? 'warn-text' : 'muted';
   $('oStatus').textContent = [
-    `${waiting} on this PC, ${o.sent} sent.`,
+    tr('{w} on this PC, {n} sent.', { w: waiting, n: o.sent }),
     `Flyday: ${o.base ?? ''}.`,
-    f.lastHello ? `Last heard from Flyday ${ago(f.lastHello)}.` : 'Not heard from Flyday yet.',
+    f.lastHello ? tr('Last heard from Flyday {ago}.', { ago: ago(f.lastHello) }) : tr('Not heard from Flyday yet.'),
     f.helloError ? `Flyday: ${f.helloError}.` : '',
-    o.lastOk ? `Last sent ${ago(o.lastOk)}.` : '',
-    sending && o.lastError ? `Last try failed: ${o.lastError}.${o.stopped ? ' Stopped until Send now.' : ' Trying again by itself.'}` : '',
+    o.lastOk ? tr('Last sent {ago}.', { ago: ago(o.lastOk) }) : '',
+    sending && o.lastError ? `${tr('Last try failed:')} ${o.lastError}. ${tr(o.stopped ? 'Stopped until Send now.' : 'Trying again by itself.')}` : '',
   ].filter(Boolean).join(' ');
   // Presence: what the kiosk webcam reports, and the last row that went to Flyday.
   const light = state.light ?? { state: 'unknown' }, p = state.presenceSent;
-  const said = (v) => (v === true ? 'somebody is here' : v === false ? 'nobody is here' : "can't tell");
-  const because = { practice: 'practice is on', activity: 'somebody used tgiFlyDay in the last 15 minutes', 'lights on': 'the lights are on', 'lights off': 'the lights are off and nobody has used tgiFlyDay for 15 minutes', 'no clue': 'no practice, nobody using tgiFlyDay and no light reading' };
+  const said = (v) => tr(v === true ? 'somebody is here' : v === false ? 'nobody is here' : "can't tell");
+  const because = Object.fromEntries(Object.entries({ practice: 'practice is on', activity: 'somebody used tgiFlyDay in the last 15 minutes', 'lights on': 'the lights are on', 'lights off': 'the lights are off and nobody has used tgiFlyDay for 15 minutes', 'no clue': 'no practice, nobody using tgiFlyDay and no light reading' }).map(([k, v]) => [k, tr(v)]));
   $('oPresence').innerHTML = [
-    light.state !== 'unknown' ? `Kiosk webcam: lights ${light.state} (brightness ${light.level}${light.at ? `, ${ago(light.at)}` : ''}).`
+    light.state !== 'unknown' ? tr(light.state === 'on' ? 'Kiosk webcam: lights on (brightness {level}{ago}).' : 'Kiosk webcam: lights off (brightness {level}{ago}).', { level: light.level, ago: light.at ? `, ${ago(light.at)}` : '' })
       : light.problem && light.kioskAt && Date.now() - light.kioskAt < 3 * 60_000
-        ? `<b class="warn-text">Kiosk webcam: no light reading.</b> The kiosk says: ${esc(light.problem)}.`
-        : `<b class="warn-text">Kiosk webcam: no light reading.</b> The kiosk isn't reporting at all${light.kioskAt ? ` (last heard ${ago(light.kioskAt)})` : ''}: is the kiosk screen open? An older kiosk page updates itself only on its start screen: tap Back there, or restart it with kiosk.sh.`,
-    p ? `Presence last sent: <b>${said(p.present)}</b>${p.why ? `, because ${esc(because[p.why] ?? p.why)}` : ''}${p.at ? ` (${ago(p.at)})` : ''}. Again when that changes, and every 15 minutes.`
-      : 'Presence: waiting for the kiosk\'s first light reading (at most 2 minutes after start).',
+        ? `<b class="warn-text">${tr('Kiosk webcam: no light reading.')}</b> ${tr('The kiosk says:')} ${esc(light.problem)}.`
+        : `<b class="warn-text">${tr('Kiosk webcam: no light reading.')}</b> ${tr("The kiosk isn't reporting at all{last}: is the kiosk screen open? An older kiosk page updates itself only on its start screen: tap Back there, or restart it with kiosk.sh.", { last: light.kioskAt ? ` (${tr('last heard {ago}', { ago: ago(light.kioskAt) })})` : '' })}`,
+    p ? `${tr('Presence last sent:')} <b>${said(p.present)}</b>${p.why ? `, ${tr('because')} ${esc(because[p.why] ?? p.why)}` : ''}${p.at ? ` (${ago(p.at)})` : ''}. ${tr('Again when that changes, and every 15 minutes.')}`
+      : tr("Presence: waiting for the kiosk's first light reading (at most 2 minutes after start)."),
   ].join(' ');
 }
 $('oSave').onclick = async () => {
