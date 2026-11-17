@@ -989,7 +989,7 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 
 .td-cal { display: grid; grid-template-rows: auto 1fr; gap: calc(1.2 * var(--u)); background: #111; border-left: calc(1.4 * var(--u)) solid #fff; padding: calc(1.6 * var(--u)) calc(1 * var(--uw)); min-height: 0; }
 .td-cal .cal-head { display: flex; align-items: center; gap: calc(1.2 * var(--uw)); }
-.td-cal .wk { all: unset; cursor: pointer; display: grid; place-items: center; width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border: calc(.3 * var(--u)) solid #333; border-radius: calc(1 * var(--u)); font: 900 calc(4.6 * var(--u))/1 var(--display); color: #fff; }
+.td-cal .wk { all: unset; cursor: pointer; display: grid; place-items: center; width: calc(3.2 * var(--u)); height: calc(3.2 * var(--u)); border: calc(.2 * var(--u)) solid #333; border-radius: calc(.6 * var(--u)); font: 900 calc(2.4 * var(--u))/1 var(--display); color: #fff; }
 .td-cal .wk:active { background: var(--accent); color: #000; }
 .td-cal .cal-title { display: flex; align-items: baseline; gap: calc(1.4 * var(--uw)); }
 .td-cal .cal-title b { font: 900 calc(4.4 * var(--u))/1 var(--display); text-transform: uppercase; letter-spacing: .04em; }
