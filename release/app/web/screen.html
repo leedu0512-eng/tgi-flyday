@@ -164,9 +164,9 @@ function demoData() {
     if (w === 0) {
       e(6, 12, 0, 14, 0, 'other', { et: 'Drooniralli', en: 'Drone rally' }, '#FF6F00', 'race');
       e(3, 16, 0, 17, 0, 'class', { et: 'Varblane', en: 'Sparrow' }, '#00A04A', 'off');
-      events.push({ id: 'band', start: at(4, 0, 0), end: at(6, 0, 0), all_day: true, kind: 'other', title: { et: 'Koolivaheaeg', en: 'School break' }, color: null, look: 'period' });
-      events.push({ id: 'bd1', start: at(1, 0, 0), end: null, all_day: true, kind: 'birthday', title: 'Chirp' });
-      events.push({ id: 'ms1', start: at(3, 0, 0), end: null, all_day: true, kind: 'milestone', title: { et: 'HOBIzone 5 aastat', en: 'HOBIzone turns 5' } });
+      events.push({ id: 'band', start: at(4, 0, 0), end: at(7, 0, 0), all_day: true, kind: 'other', title: { et: 'Koolivaheaeg', en: 'School break' }, color: null, look: 'period' });
+      events.push({ id: 'bd1', start: at(1, 0, 0), end: at(2, 0, 0), all_day: true, kind: 'birthday', title: 'Chirp' });
+      events.push({ id: 'ms1', start: at(3, 0, 0), end: at(4, 0, 0), all_day: true, kind: 'milestone', title: { et: 'HOBIzone 5 aastat', en: 'HOBIzone turns 5' } });
     }
   }
   const names = ['Karl', 'Sven', 'Mari', 'Liis', 'Kristjan', 'Mia', 'Leo', 'Rasmus', 'Hanna', 'Oskar', 'Laura', 'Markus', 'Eliise', 'Robin', 'Kaspar', 'Grete', 'Martin', 'Sofia', 'Andres', 'Kertu', 'Joonas', 'Emma', 'Tanel', 'Maria', 'Siim', 'Anna', 'Rein', 'Helen', 'Marko', 'Kadri', 'Funrent', 'Velvet', 'Priit', 'Triin', 'Aivar', 'Elisabeth', 'Henri', 'Johanna', 'Kevin', 'Merilin', 'Tõnu', 'Ülle', 'Jüri', 'Katrin', 'Taavi', 'Pille', 'Erik', 'Hobipood', 'Janek', 'Signe', 'Mihkel', 'Lisette', 'Toomas', 'Getter', 'Artur', 'Liisa'];
@@ -231,7 +231,9 @@ function calendarHtml(data) {
   // All-day events and multi-day periods: a row above the hours, on every day they cover.
   const bands = days.map((d) => {
     const next = new Date(d); next.setDate(next.getDate() + 1);
-    const here = evs.filter((e) => isBand(e) && new Date(e.start) < next && (e.end ? new Date(e.end) : new Date(e.start)) >= d);
+    // The end is exclusive (contract §5: all-day ends at 00:00 of the day after), so an event
+    // ending at midnight doesn't spill onto the next day; one without an end covers its start day.
+    const here = evs.filter((e) => isBand(e) && new Date(e.start) < next && (e.end ? new Date(e.end) > d : new Date(e.start) >= d));
     return `<div class="cg-band">${here.map((e) => block(e)).join('')}</div>`;
   }).join('');
   const hasBands = evs.some(isBand);
