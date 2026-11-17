@@ -1005,11 +1005,11 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .td-qr.join { border-top-color: var(--running); }
 .td-qr .pay-qr { width: min(100%, calc(38 * var(--u))); aspect-ratio: 1; }
 .td-qr .pay-qr svg { width: 100%; height: 100%; display: block; }
-.td-qr .txt { display: flex; flex-direction: column; align-items: center; gap: calc(1.4 * var(--u)); min-width: 0; }
-.td-qr h2 { margin: 0; font: 900 calc(4.4 * var(--u))/1.04 var(--display); text-transform: uppercase; overflow-wrap: anywhere; }
-.td-qr .price { margin: 0; font: 900 calc(4.6 * var(--u))/1.05 var(--stencil); color: var(--accent); text-transform: uppercase; }
+.td-qr .txt { display: flex; flex-direction: column; align-items: center; gap: calc(1.4 * var(--u)); min-width: 0; max-width: 100%; }
+.td-qr h2 { margin: 0; font: 900 calc(4.4 * var(--u))/1.04 var(--display); text-transform: uppercase; text-wrap: balance; max-width: 100%; }
+.td-qr .price { margin: 0; white-space: nowrap; max-width: 100%; overflow: hidden; font: 900 calc(4.6 * var(--u))/1.05 var(--stencil); color: var(--accent); text-transform: uppercase; }
 .td-qr.join .price { color: #16a34a; }
-.td-qr .cta { margin: 0; font: 800 calc(2.2 * var(--u))/1.2 var(--display); letter-spacing: .14em; text-transform: uppercase; color: #666; }
+.td-qr .cta { margin: 0; white-space: nowrap; max-width: 100%; overflow: hidden; font: 800 calc(2.2 * var(--u))/1.2 var(--display); letter-spacing: .14em; text-transform: uppercase; color: #666; }
 
 .pb-main.td2:has(.td-thanks) { grid-template-columns: 1fr calc(46 * var(--u)); }
 .pb-main.td2:has(.td-join-only) { grid-template-columns: 1fr; }
@@ -1017,7 +1017,7 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .td-join-only .td-qr { width: calc(70 * var(--u)); height: 100%; }
 .td-join-only .td-qr .pay-qr { width: calc(46 * var(--u)); }
 .td-thanks { display: grid; grid-template-rows: auto 1fr; gap: calc(2.4 * var(--u)); min-height: 0; background: #111; border-left: calc(1.4 * var(--u)) solid var(--accent); padding: calc(3 * var(--u)) calc(3 * var(--uw)); }
-.td-thanks h1 { margin: 0; font: 900 calc(7.4 * var(--u))/1 var(--stencil); text-transform: uppercase; color: var(--accent); letter-spacing: .01em; }
+.td-thanks h1 { margin: 0; text-wrap: balance; font: 900 calc(7.4 * var(--u))/1 var(--stencil); text-transform: uppercase; color: var(--accent); letter-spacing: .01em; }
 .td-thanks .names { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: .18em .5em; min-height: 0; overflow: hidden; font-family: var(--display); font-weight: 900; text-transform: uppercase; line-height: 1.05; }
 .td-thanks .names { gap: .22em .55em; }
 .td-thanks .names span { white-space: nowrap; display: inline-block; }

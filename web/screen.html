@@ -283,10 +283,10 @@ function calendarHtml(data) {
 function qrCardHtml(card, i, cls) {
   if (!cardQr.has(card.url)) {
     cardQr.set(card.url, '');
-    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); for (const el of document.querySelectorAll(`[data-qr="${i}"]`)) el.innerHTML = svg; });
+    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); for (const el of document.querySelectorAll(`[data-qr="${i}"]`)) el.innerHTML = svg; requestAnimationFrame(() => fitText()); });
   }
   return `<div class="td-qr ${cls}"><div class="pay-qr" data-qr="${i}">${cardQr.get(card.url)}</div>
-    <div class="txt"><h2>${esc(tr(card.title))}</h2><p class="price">${esc(tr(card.price))}</p><p class="cta">${esc(tr(card.cta))}</p></div></div>`;
+    <div class="txt"><h2 data-fit="2">${esc(tr(card.title))}</h2><p class="price" data-fit="1">${esc(tr(card.price))}</p><p class="cta" data-fit="1">${esc(tr(card.cta))}</p></div></div>`;
 }
 
 /**
@@ -319,10 +319,39 @@ function thanksHtml(data) {
   const t = data?.thanks;
   // No names from the portal yet: Join the club on its own.
   if (!t?.names?.length) return `<div class="td-join-only">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
-  return `<div class="td-thanks"><h1>${esc(pick(t.title))}</h1>
+  return `<div class="td-thanks"><h1 data-fit="1" data-fit-or="2">${esc(pick(t.title))}</h1>
     <div class="names" id="tdNames">${cloudFor(t)}</div></div>
     <div class="td-right">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
 }
+/**
+ * Headings that must fit their box (Janno 17.11.2026: English ran over, or left one word alone
+ * on a line): shrink until the text takes at most data-fit lines and no word sticks out, never
+ * below 55 % of the designed size. data-fit-or: when even that doesn't do it, allow that many
+ * lines at the designed size instead (wrapped evenly by text-wrap: balance in the CSS).
+ */
+function fitText(root = document) {
+  for (const el of root.querySelectorAll('[data-fit]')) {
+    el.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    const fits = (lines) => {
+      const cs = getComputedStyle(el);
+      const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.1;
+      return el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().height <= lines * lh * 1.15;
+    };
+    const tryLines = (lines) => {
+      for (let f = 1; f >= 0.55; f -= 0.03) {
+        el.style.fontSize = `${base * f}px`;
+        if (fits(lines)) return true;
+      }
+      return false;
+    };
+    if (tryLines(Number(el.dataset.fit))) continue;
+    el.style.fontSize = '';
+    if (el.dataset.fitOr) tryLines(Number(el.dataset.fitOr));
+  }
+}
+addEventListener('resize', () => requestAnimationFrame(() => fitText()));
+
 /** The biggest text at which every name fits in its box: no scrolling, no empty half-screen. */
 function fitNames() {
   const box = document.getElementById('tdNames');
@@ -356,7 +385,7 @@ function renderTrackDay(force = false) {
     </div>
     <div class="td-right">${qrCardHtml(CARDS[0], 0, 'pay')}</div>`;
   $('main').classList.toggle('td-thanks-pane', tdPane === 'thanks');
-  if (tdPane === 'thanks') requestAnimationFrame(fitNames);
+  requestAnimationFrame(() => { fitText($('main')); if (tdPane === 'thanks') fitNames(); });
 }
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-week]');
