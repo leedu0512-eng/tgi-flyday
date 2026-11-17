@@ -41,3 +41,28 @@ test('screen door: events, kinds, cancelled, join link only on hobizone.org, nam
   assert.equal(cleanScreen({ error: 'unauthorized' }), null);
   assert.equal(cleanScreen('<html>'), null);
 });
+
+test('kiosk screen: awake an hour around the day’s events, birthdays and closed don’t count', async () => {
+  const { kioskScreen, kioskHours } = await import('./screenfeed.ts');
+  const day = (h: number, m = 0) => new Date(2026, 10, 17, h, m).getTime();
+  const iso = (t: number) => new Date(t).toISOString();
+  const data = cleanScreen({ events: [
+    { id: 'bd', start: iso(day(0)), end: iso(new Date(2026, 10, 18).getTime()), all_day: true, kind: 'birthday', title: 'X' },
+    { id: 'shut', start: iso(day(9)), end: iso(day(12)), look: 'closed', title: 'Closed' },
+    { id: 'gone', start: iso(day(10)), end: iso(day(11)), cancelled: true, title: 'Off' },
+    { id: 'a', start: iso(day(17, 30)), end: iso(day(20)), kind: 'drone_practice', title: 'Drone' },
+    { id: 'b', start: iso(day(16)), end: iso(day(17, 30)), kind: 'class', title: 'Class' },
+  ] }, day(12))!;
+  assert.deepEqual(kioskHours(data, day(12)), { from: day(15), to: day(21) });
+  const at = (t: number, more = {}) => kioskScreen({ sleep: true, data, now: t, practice: false, lastActivity: null, ...more });
+  assert.equal(at(day(14, 59)).awake, false);
+  assert.equal(at(day(15)).awake, true);
+  assert.equal(at(day(20, 59)).awake, true);
+  assert.equal(at(day(21)).awake, false);
+  assert.equal(at(day(23), { practice: true }).why, 'practice');
+  assert.equal(at(day(23), { lastActivity: day(22, 50) }).why, 'activity');
+  assert.equal(at(day(23), { sleep: false }).awake, true);
+  assert.equal(kioskScreen({ sleep: true, data: null, now: day(3), practice: false, lastActivity: null }).why, 'no calendar');
+  const empty = cleanScreen({ events: [] }, day(12));
+  assert.deepEqual(kioskScreen({ sleep: true, data: empty, now: day(18), practice: false, lastActivity: null }), { awake: false, why: 'nothing on', from: null, to: null });
+});

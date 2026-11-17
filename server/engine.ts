@@ -2012,6 +2012,7 @@ export class Engine {
     if (patch.freeFlight !== undefined) next.freeFlight = Boolean(patch.freeFlight);
     if (patch.autoStart !== undefined) next.autoStart = Boolean(patch.autoStart);
     if (patch.nightStop !== undefined) next.nightStop = Boolean(patch.nightStop);
+    if (patch.kioskSleep !== undefined) next.kioskSleep = Boolean(patch.kioskSleep);
     if (patch.nightStopAt !== undefined && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== undefined) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.lights !== undefined) next.lights = cleanLights(patch.lights, next.lights);

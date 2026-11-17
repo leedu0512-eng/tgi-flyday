@@ -35,7 +35,8 @@ profile() {
 # A kiosk that is still open: close it, so there's never two.
 pkill -f "tgi-flyday-kiosk" 2>/dev/null && sleep 2
 
-# Keep the screen on: no blanking, no screensaver, no power saving (X11).
+# Keep the screen on: no blanking, no screensaver, no power saving (X11). The helper below
+# then switches it on and off by the calendar.
 if [ -n "$DISPLAY" ] && command -v xset >/dev/null 2>&1; then
   xset s off; xset s noblank; xset -dpms
 fi
@@ -48,6 +49,17 @@ fi
 
 echo "Waiting for tgiFlyDay on $RDPC ..."
 until (exec 3<>"/dev/tcp/$RDPC/$PORT") 2>/dev/null; do sleep 3; done
+
+# The screen on or dark as tgiFlyDay says (calendar hours, practice, somebody here): the helper
+# comes from the RD PC each time, so it updates with tgiFlyDay. Off in the RD console:
+# Settings -> Kiosk screen.
+pkill -f "tgi-flyday-screen" 2>/dev/null
+HELPER="$HOME/.config/tgi-flyday-screen.sh"
+mkdir -p "$HOME/.config"
+{ exec 3<>"/dev/tcp/$RDPC/$PORT" && printf 'GET /kiosk-screen.sh HTTP/1.0\r\nHost: %s\r\n\r\n' "$RDPC" >&3 \
+  && timeout 10 cat <&3 | sed '1,/^\r\{0,1\}$/d' > "$HELPER.new"; exec 3>&-; } 2>/dev/null
+if head -1 "$HELPER.new" 2>/dev/null | grep -q '^#!/bin/bash'; then mv "$HELPER.new" "$HELPER"; fi
+[ -f "$HELPER" ] && nohup $INHIBIT bash "$HELPER" "$RDPC" "$PORT" >"$HOME/.config/tgi-flyday-screen.log" 2>&1 &
 
 if [ -n "$BROWSER" ]; then
   DIR=$(profile "$BROWSER")

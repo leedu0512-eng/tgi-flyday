@@ -206,6 +206,11 @@
           <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
         </section>
         <section class="drawer-sec">
+          <h3>Kiosk screen</h3>
+          <label class="toggle wide"><input type="checkbox" id="kioskSleep"><span><b>Dark when nothing is on</b>: the kiosk PC's screen is on from an hour before the day's first event in the calendar until an hour after the last, and while practice runs or somebody uses tgiFlyDay. Otherwise it switches off (the PC keeps running), and comes back on by itself. A touch wakes it for 10 minutes. Off: always on, never the screensaver.</span></label>
+          <p class="hint" id="kioskScreenNow"></p>
+        </section>
+        <section class="drawer-sec">
           <h3>Online history <span id="outboxSum" class="muted"></span></h3>
           <div class="outbox" id="outboxBody">
             <p class="hint">Practice start and end, every timed heat with its laps and whether anybody is here are kept on this PC and sent to the Flyday server once Flyday has approved this PC, so pilots can look at their times at home. With no connection, they wait and go later.</p>
@@ -841,6 +846,8 @@ function renderSetup() {
   $('freeFlight').checked = cfg.freeFlight;
   $('autoStart').checked = cfg.autoStart !== false;
   $('nightStop').checked = cfg.nightStop !== false;
+  $('kioskSleep').checked = cfg.kioskSleep !== false;
+  renderKioskScreen();
   if (document.activeElement !== $('nightStopAt')) $('nightStopAt').value = String(cfg.nightStopAt ?? 1230);
   // Room lights from the kiosk webcam.
   const lt = cfg.lights ?? { enabled: true, dark: 40 }, light = state.light ?? { state: 'unknown' };
@@ -870,6 +877,21 @@ for (const id of ['heatSeconds', 'changeoverSeconds']) {
 $('freeFlight').onchange = (e) => act('/api/config', { freeFlight: e.target.checked });
 $('autoStart').onchange = (e) => act('/api/config', { autoStart: e.target.checked });
 $('nightStop').onchange = (e) => act('/api/config', { nightStop: e.target.checked });
+$('kioskSleep').onchange = (e) => act('/api/config', { kioskSleep: e.target.checked });
+/** What the kiosk PC's screen does now, and whether the kiosk PC is following it. */
+function renderKioskScreen() {
+  const k = state?.kioskScreen;
+  if (!k) return;
+  const hm = (t) => new Date(t).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' });
+  const hours = k.from !== null ? tr('Today on {from}–{to}.', { from: hm(k.from), to: hm(k.to) }) : tr('Nothing in the calendar today.');
+  const now = k.awake
+    ? tr({ off: 'On now (always on).', practice: 'On now: practice is running.', activity: 'On now: somebody used tgiFlyDay in the last 15 minutes.', 'no calendar': 'On now: no calendar from hobizone.org yet.', calendar: 'On now (calendar).' }[k.why] ?? 'On now.')
+    : tr('Dark now.');
+  const asked = k.askedAt && Date.now() - k.askedAt < 3 * 60_000
+    ? tr('The kiosk PC is following it.')
+    : tr('The kiosk PC isn\'t asking: start it with the new kiosk.sh (Linux).');
+  $('kioskScreenNow').textContent = `${now} ${k.why === 'off' ? '' : hours + ' '}${asked}`;
+}
 // 18:00 to 23:30, every half hour.
 $('nightStopAt').innerHTML = Array.from({ length: 12 }, (_, i) => 18 * 60 + i * 30)
   .map((m) => `<option value="${m}">${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}</option>`).join('');

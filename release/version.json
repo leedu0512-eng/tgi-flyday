@@ -1,9 +1,9 @@
 {
- "version": "2026.11.17-1734",
+ "version": "2026.11.17-1936",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "da68fc0948dc80c50e8ad488d3a48daf09b4c06e504515e15b5e826228a67377"
+   "sha256": "5afe3d923459170675ad8f5189ee3e92151993a41bcd5603682116a1eacd7307"
   },
   {
    "path": "web/assets/avatars.js",
@@ -59,7 +59,7 @@
   },
   {
    "path": "web/assets/i18n-et.js",
-   "sha256": "1677d9e2b3bc15c42c5d07d20a5a1df8f19b10ba41cab72dd8529a2548de86bc"
+   "sha256": "a8d01c0b498ed9ba50184951b3498d9d8616d5856d7fb0aa25e4e604bf1b226a"
   },
   {
    "path": "web/assets/i18n.js",
@@ -151,7 +151,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "24e2cd1a51c9c3360b5781578031900c541c3b2f3ef451a0b9062cf0df8989a8"
+   "sha256": "11ef6fb60edee0d53bdad84fd7ccf70aba906113f5d503d7f4b35da90ee45a10"
   },
   {
    "path": "web/favicon.ico",
@@ -160,6 +160,10 @@
   {
    "path": "web/index.html",
    "sha256": "882413e727b67ddd14347b8a3ced3dd1a507bae6c203c17bab6fcf302b4da1b9"
+  },
+  {
+   "path": "web/kiosk-screen.sh",
+   "sha256": "883b9150cc5da6ff1466efa747387301ddf3cd37818e384f888d77f8285c51db"
   },
   {
    "path": "web/kiosk.html",

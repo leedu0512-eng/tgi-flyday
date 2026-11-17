@@ -10,7 +10,7 @@ import { hostname, networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as sea from 'node:sea';
-import { ScreenFeed } from './screenfeed.ts';
+import { ScreenFeed, kioskScreen } from './screenfeed.ts';
 import { closeOldWindows, firewallAllow, firewallStatus, keepAwake, openBigScreen, openRdWindows, relaunch, tameConsole, type FirewallStatus } from './launch.ts';
 import { install, latest, tidy, why } from './update.ts';
 import { VERSION } from './version.ts';
@@ -172,7 +172,11 @@ const pairing = new Install(resolve(DATA_FILE, '..'));
 outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostname(), (m) => console.log(new Date().toLocaleTimeString(), m), pairing);
 /** What the screens get: the engine's state plus how the outbox and the Flyday pairing are doing (no secret, no token). */
 const screenFeed = new ScreenFeed(resolve(DATA_FILE, '..'));
-const snapshot = (now: number) => ({ ...engine.snapshot(now), trackdayUrl: pairing.state.trackdayUrl, trackdayScreen: screenFeed.data,
+/** The kiosk PC's screen on or dark (Janno 17.11.2026), and when the kiosk PC last asked. */
+let kioskAskedAt: number | null = null;
+const kioskNow = (now: number) => kioskScreen({ sleep: engine.config.kioskSleep !== false, data: screenFeed.data, now,
+  practice: engine.clock.phase !== 'stopped' && engine.clock.phase !== 'waiting', lastActivity: engine.lastActivity });
+const snapshot = (now: number) => ({ ...engine.snapshot(now), kioskScreen: { ...kioskNow(now), askedAt: kioskAskedAt }, trackdayUrl: pairing.state.trackdayUrl, trackdayScreen: screenFeed.data,
   trackdayScreenError: screenFeed.lastError, trackdayScreenTry: screenFeed.lastTry, outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
 /** Hello to Flyday: approval, token, send on or off, all decided there. Then send what's waiting. */
 async function helloFlyday() {
@@ -268,6 +272,7 @@ const TYPES: Record<string, string> = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
+  '.sh': 'text/plain; charset=utf-8',
 };
 
 async function readBody(req: IncomingMessage, limit = 100_000): Promise<any> {
@@ -429,6 +434,13 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   if (path === '/api/known' && req.method === 'GET') {
     const name = url.searchParams.get('name') ?? '';
     return json(res, 200, known[knownKey(name)] ?? {});
+  }
+  // The kiosk PC's helper (web/kiosk-screen.sh) asks every minute: one word, "on" or "dark".
+  if (path === '/api/kiosk-screen' && req.method === 'GET') {
+    kioskAskedAt = Date.now();
+    const k = kioskNow(kioskAskedAt);
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    return res.end(`${k.awake ? 'on' : 'dark'}\n`);
   }
   if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall: firewallNow() });
   // Console: "Let them in" (Windows Firewall), one permission prompt on this PC.

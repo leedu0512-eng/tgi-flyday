@@ -33,6 +33,12 @@ export interface Config {
    */
   nightStop: boolean;
   nightStopAt: number;
+  /**
+   * The kiosk PC's screen (Janno 17.11.2026): true = it goes dark outside the calendar's hours
+   * (an hour before the day's first event until an hour after the last) and comes back on by
+   * itself; false = always on. The PC itself never sleeps.
+   */
+  kioskSleep: boolean;
   /** Lap timer (RotorHazard) on the venue network. */
   timer: TimerConfig;
   /** The club's own quads (up to 8) for pilots without one. Each flies one fixed channel. */
@@ -302,6 +308,7 @@ export const DEFAULT_CONFIG: Config = {
   autoStart: true,
   nightStop: true,
   nightStopAt: 20 * 60 + 30,
+  kioskSleep: true,
   clubQuads: [
     { name: 'Club 1', channel: 'R1', broken: false },
     { name: 'Club 2', channel: 'R2', broken: false },

@@ -84,6 +84,51 @@ export function cleanScreen(body: any, now = Date.now()): ScreenData | null {
   };
 }
 
+// ---------- the kiosk PC's screen: awake while the calendar says something is on ----------
+
+export const KIOSK_PAD_MS = 60 * 60_000;
+/** Somebody used tgiFlyDay this recently: the kiosk stays awake (same as presence). */
+export const KIOSK_ACTIVE_MS = 15 * 60_000;
+
+/**
+ * Today's awake hours from the calendar: an hour before the first event until an hour after the
+ * last (local time of this PC). Birthdays, club days and cancelled or closed events don't count.
+ * An event without an end counts as two hours. Null: nothing on today.
+ */
+export function kioskHours(data: ScreenData | null, now: number, pad = KIOSK_PAD_MS): { from: number; to: number } | null {
+  if (!data) return null;
+  const d = new Date(now);
+  const day0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const day1 = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+  let from = Infinity, to = -Infinity;
+  for (const e of data.events) {
+    if (e.all_day || e.cancelled || e.kind === 'birthday' || e.kind === 'milestone' || e.look === 'closed' || e.look === 'off') continue;
+    const s = Date.parse(e.start);
+    const en = e.end ? Date.parse(e.end) : s + 2 * 3600_000;
+    if (en <= day0 || s >= day1) continue;
+    from = Math.min(from, s - pad);
+    to = Math.max(to, en + pad);
+  }
+  return from === Infinity ? null : { from, to };
+}
+
+export interface KioskScreen { awake: boolean; why: 'off' | 'practice' | 'activity' | 'no calendar' | 'calendar' | 'nothing on'; from: number | null; to: number | null }
+
+/**
+ * Should the kiosk screen be on now? Practice running or somebody using tgiFlyDay keeps it on,
+ * and without a calendar yet it stays on (never dark by mistake).
+ */
+export function kioskScreen(o: { sleep: boolean; data: ScreenData | null; now: number; practice: boolean; lastActivity: number | null }): KioskScreen {
+  const h = kioskHours(o.data, o.now);
+  const base = { from: h?.from ?? null, to: h?.to ?? null };
+  if (!o.sleep) return { awake: true, why: 'off', ...base };
+  if (o.practice) return { awake: true, why: 'practice', ...base };
+  if (o.lastActivity !== null && o.now - o.lastActivity < KIOSK_ACTIVE_MS) return { awake: true, why: 'activity', ...base };
+  if (!o.data) return { awake: true, why: 'no calendar', ...base };
+  if (h && o.now >= h.from && o.now < h.to) return { awake: true, why: 'calendar', ...base };
+  return { awake: false, why: h ? 'calendar' : 'nothing on', ...base };
+}
+
 export class ScreenFeed {
   data: ScreenData | null = null;
   lastError = '';

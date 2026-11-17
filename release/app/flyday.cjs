@@ -94,6 +94,34 @@ function cleanScreen(body, now = Date.now()) {
     refresh_after_s: Number.isFinite(every) ? Math.min(3600, Math.max(60, every)) : 600
   };
 }
+var KIOSK_PAD_MS = 60 * 6e4;
+var KIOSK_ACTIVE_MS = 15 * 6e4;
+function kioskHours(data, now, pad = KIOSK_PAD_MS) {
+  if (!data) return null;
+  const d = new Date(now);
+  const day0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const day1 = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+  let from = Infinity, to = -Infinity;
+  for (const e of data.events) {
+    if (e.all_day || e.cancelled || e.kind === "birthday" || e.kind === "milestone" || e.look === "closed" || e.look === "off") continue;
+    const s = Date.parse(e.start);
+    const en = e.end ? Date.parse(e.end) : s + 2 * 36e5;
+    if (en <= day0 || s >= day1) continue;
+    from = Math.min(from, s - pad);
+    to = Math.max(to, en + pad);
+  }
+  return from === Infinity ? null : { from, to };
+}
+function kioskScreen(o) {
+  const h = kioskHours(o.data, o.now);
+  const base = { from: h?.from ?? null, to: h?.to ?? null };
+  if (!o.sleep) return { awake: true, why: "off", ...base };
+  if (o.practice) return { awake: true, why: "practice", ...base };
+  if (o.lastActivity !== null && o.now - o.lastActivity < KIOSK_ACTIVE_MS) return { awake: true, why: "activity", ...base };
+  if (!o.data) return { awake: true, why: "no calendar", ...base };
+  if (h && o.now >= h.from && o.now < h.to) return { awake: true, why: "calendar", ...base };
+  return { awake: false, why: h ? "calendar" : "nothing on", ...base };
+}
 var ScreenFeed = class {
   data = null;
   lastError = "";
@@ -410,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1734" : "dev";
+var VERSION = true ? "2026.11.17-1936" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -425,6 +453,7 @@ var DEFAULT_CONFIG = {
   autoStart: true,
   nightStop: true,
   nightStopAt: 20 * 60 + 30,
+  kioskSleep: true,
   clubQuads: [
     { name: "Club 1", channel: "R1", broken: false },
     { name: "Club 2", channel: "R2", broken: false },
@@ -2378,6 +2407,7 @@ var Engine = class {
     if (patch.freeFlight !== void 0) next.freeFlight = Boolean(patch.freeFlight);
     if (patch.autoStart !== void 0) next.autoStart = Boolean(patch.autoStart);
     if (patch.nightStop !== void 0) next.nightStop = Boolean(patch.nightStop);
+    if (patch.kioskSleep !== void 0) next.kioskSleep = Boolean(patch.kioskSleep);
     if (patch.nightStopAt !== void 0 && Number.isInteger(Number(patch.nightStopAt)) && Number(patch.nightStopAt) >= 0 && Number(patch.nightStopAt) < 1440) next.nightStopAt = Number(patch.nightStopAt);
     if (patch.timer !== void 0) next.timer = cleanTimer(patch.timer, next.timer);
     if (patch.lights !== void 0) next.lights = cleanLights(patch.lights, next.lights);
@@ -3469,8 +3499,17 @@ var store = saver(DATA_FILE, () => engine.toSaved());
 var pairing = new Install((0, import_node_path7.resolve)(DATA_FILE, ".."));
 outbox = new Outbox((0, import_node_path7.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
 var screenFeed = new ScreenFeed((0, import_node_path7.resolve)(DATA_FILE, ".."));
+var kioskAskedAt = null;
+var kioskNow = (now) => kioskScreen({
+  sleep: engine.config.kioskSleep !== false,
+  data: screenFeed.data,
+  now,
+  practice: engine.clock.phase !== "stopped" && engine.clock.phase !== "waiting",
+  lastActivity: engine.lastActivity
+});
 var snapshot = (now) => ({
   ...engine.snapshot(now),
+  kioskScreen: { ...kioskNow(now), askedAt: kioskAskedAt },
   trackdayUrl: pairing.state.trackdayUrl,
   trackdayScreen: screenFeed.data,
   trackdayScreenError: screenFeed.lastError,
@@ -3554,7 +3593,8 @@ var TYPES = {
   ".webmanifest": "application/manifest+json",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
-  ".txt": "text/plain; charset=utf-8"
+  ".txt": "text/plain; charset=utf-8",
+  ".sh": "text/plain; charset=utf-8"
 };
 async function readBody(req, limit = 1e5) {
   let raw = "";
@@ -3714,6 +3754,13 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   if (path === "/api/known" && req.method === "GET") {
     const name = url.searchParams.get("name") ?? "";
     return json(res, 200, known[knownKey(name)] ?? {});
+  }
+  if (path === "/api/kiosk-screen" && req.method === "GET") {
+    kioskAskedAt = Date.now();
+    const k = kioskNow(kioskAskedAt);
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+    return res.end(`${k.awake ? "on" : "dark"}
+`);
   }
   if (path === "/api/info" && req.method === "GET") return json(res, 200, { hostname: (0, import_node_os2.hostname)(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall: firewallNow() });
   if (path === "/api/firewall/allow" && req.method === "POST") {
