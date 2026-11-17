@@ -777,7 +777,11 @@ img.avatar { filter: brightness(0.55) saturate(0.8); }
 .td-board .td-name .logo { font-size: calc(5.4 * var(--u)); }
 .pb.car-day .meta, .pb.car-day .pb-qr, .pb.car-day .pb-signin { visibility: hidden; }
 /* TrackDay has its own big clock: no second one in the header. */
-.pb.car-day .pb-head .wallclock { visibility: hidden; }
+.pb.car-day .pb-head .wallclock, .pb.td-on .pb-head .wallclock { visibility: hidden; }
+/* How long the calendar / thank-you pane still shows: a bar along the bottom edge. */
+.td-bar { position: fixed; left: 0; right: 0; bottom: 0; height: calc(.6 * var(--u)); background: #1a1a1a; z-index: 5; pointer-events: none; }
+.td-bar[hidden] { display: none; }
+.td-bar i { display: block; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); transition: transform .5s linear; }
 .td-board .td-name .label { font-family: var(--display); font-weight: 800; text-transform: uppercase; letter-spacing: 0.14em; }
 
 /* End of the day: "Still flying?" */
@@ -1053,7 +1057,7 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 /* The week as a calendar (screen.html calendarHtml): days across, hours down, the website's looks. */
 .td-cal .cal-grid { display: grid; grid-template-columns: calc(4.4 * var(--u)) repeat(7, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr); column-gap: calc(.35 * var(--uw)); min-height: 0; }
 .td-cal .cal-grid.with-bands { grid-template-rows: auto auto minmax(0, 1fr); }
-.td-cal .cg-day { display: flex; align-items: baseline; justify-content: space-between; gap: calc(.4 * var(--uw)); padding: calc(.6 * var(--u)) calc(.6 * var(--uw)); border-bottom: calc(.4 * var(--u)) solid #2a2a2a; }
+.td-cal .cg-day { display: flex; flex-direction: column; align-items: flex-start; gap: calc(.4 * var(--u)); padding: calc(.6 * var(--u)) calc(.6 * var(--uw)); border-bottom: calc(.4 * var(--u)) solid #2a2a2a; }
 .td-cal .cg-day span { font: 800 calc(2 * var(--u))/1 var(--display); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
 .td-cal .cg-day b { font: 900 calc(3.4 * var(--u))/1 var(--stencil); }
 .td-cal .cg-day.today { border-bottom-color: var(--accent); }
