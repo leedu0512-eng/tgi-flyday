@@ -40,6 +40,7 @@
 
 <script type="module">
 import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt, tr, langSwitch, LANG } from '/assets/common.js';
+import { startLightMeter } from '/assets/light.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
@@ -580,7 +581,13 @@ function closeSignin() {
   signin.classList.remove('open');
   closing = setTimeout(() => { frame.src = 'about:blank'; }, 400); // also switches the webcam off
 }
-$('signinBtn').addEventListener('click', (e) => { e.stopPropagation(); signin.classList.contains('open') ? closeSignin() : openSignin(); });
+// The webcam as light meter when this big screen runs on a PC of its own (the Linux kiosk PC
+// with PAGE=screen): the kiosk in the flyout is embedded and leaves the light to this page.
+// On the RD PC itself (localhost) the real kiosk does it. While the flyout is open its photo
+// step may need the webcam, so the meter lets go of it. No webcam here: it says nothing.
+const LOCAL = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const screenLight = LOCAL ? null : startLightMeter({ busy: () => signin.classList.contains('open'), quietWithoutCamera: true, where: 'the big screen' });
+$('signinBtn').addEventListener('click', (e) => { e.stopPropagation(); signin.classList.contains('open') ? closeSignin() : (screenLight?.stop(), openSignin()); });
 $('signinClose').addEventListener('click', closeSignin);
 // A tap on the board beside the flyout closes it too.
 document.addEventListener('click', (e) => { if (!signin.contains(e.target)) closeSignin(); });

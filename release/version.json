@@ -1,9 +1,9 @@
 {
- "version": "2026.11.17-1948",
+ "version": "2026.11.17-2002",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "0dd02eaad78a0d552c6ce4424f3910c4be0093b14d1f7f283132e465fcf5dd91"
+   "sha256": "d7073b7bdc73715734a893bb3b615f9f40812f6726f7b16b4ac1ca70cb31aecd"
   },
   {
    "path": "web/assets/avatars.js",
@@ -122,6 +122,10 @@
    "sha256": "c063f693fb7a05a5338b5ed7ce9456e55eccdd2d1acb806e49152d8213470faa"
   },
   {
+   "path": "web/assets/light.js",
+   "sha256": "9f83a1cff01860630bb194ce7225e12bb48ef583cedaf0edcdba14ccf7618749"
+  },
+  {
    "path": "web/assets/mark-car-small.svg",
    "sha256": "8cc2b8c405865d3677493ee242df389d35fe691c1e703905914f9dc731910976"
   },
@@ -167,7 +171,7 @@
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "994a9f2c245d95d2bae62fe1e6f565d89efe1c495d3eb977e8f98099e7465cf3"
+   "sha256": "8a2a66d8090329894aaea84abfbaa283a431f4db40575ef53e8328981c882c61"
   },
   {
    "path": "web/kiosk.sh",
@@ -183,7 +187,7 @@
   },
   {
    "path": "web/screen.html",
-   "sha256": "79e563eb9af9d69317da409e033883a20d91472e11629f6e6745d7c4a30aed4e"
+   "sha256": "7bb6cbb8600cff2703cae348169ef0cc5d2aa72af453c85e619c0cb5016d30d4"
   }
  ]
 }
