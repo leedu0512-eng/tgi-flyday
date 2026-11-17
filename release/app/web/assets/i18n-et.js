@@ -79,6 +79,7 @@ export const ET = {
   'Use this photo': 'Kasuta seda pilti',
   'Not right now': 'Praegu mitte',
   'Kiosk screen': 'Kioski ekraan',
+  'Flyday asked for an update: it happens as soon as practice stops.': 'Flyday küsis uuendust: see tehakse kohe, kui trenn lõpeb.',
   'Set up this PC (Linux)': 'Seadista see arvuti (Linux)',
   'Copy the command.': 'Kopeeri käsk.',
   'Open a terminal: Ctrl+Alt+T (or Alt+Tab to one that is open).': 'Ava terminal: Ctrl+Alt+T (või Alt+Tab juba avatud terminali).',

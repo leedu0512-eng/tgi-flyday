@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-2146" : "dev";
+var VERSION = true ? "2026.11.17-2152" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2953,7 +2953,7 @@ function cleanTrackdayUrl(v) {
   }
 }
 function publicInstall(s) {
-  return { id: s.id, pairingCode: s.pairingCode, status: s.status, send: s.send, lastHello: s.lastHello, helloError: s.helloError };
+  return { id: s.id, pairingCode: s.pairingCode, status: s.status, send: s.send, lastHello: s.lastHello, helloError: s.helloError, updateRequested: !!s.updateRequested };
 }
 var Install = class {
   state;
@@ -3940,7 +3940,7 @@ Updating tgiFlyDay ${VERSION} -> ${release.version} ...`);
 }
 var lastNightlyUpdate = "";
 setInterval(() => {
-  if (!IN_EXE || updating || engine.clock.phase !== "stopped" || engine.pilots.size > 0) return;
+  if (!IN_EXE || updating || engine.clock.phase !== "stopped") return;
   const d = /* @__PURE__ */ new Date();
   const night = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   if (pairing.state.updateRequested) {

@@ -83,7 +83,7 @@ export function cleanTrackdayUrl(v: unknown): string | null {
 
 /** What the screens may see: no secret, no token. */
 export function publicInstall(s: InstallState) {
-  return { id: s.id, pairingCode: s.pairingCode, status: s.status, send: s.send, lastHello: s.lastHello, helloError: s.helloError };
+  return { id: s.id, pairingCode: s.pairingCode, status: s.status, send: s.send, lastHello: s.lastHello, helloError: s.helloError, updateRequested: !!s.updateRequested };
 }
 
 export class Install {

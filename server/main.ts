@@ -647,12 +647,13 @@ async function updateNow(): Promise<{ status: string; version: string; error?: s
 
 /**
  * Updates with nobody at the PC: every night between 03:00 and 05:00 (once a night), and
- * whenever Flyday's hello asks for one. Only while practice is stopped and nobody is signed
- * in, so nobody's flying is ever cut short; a Flyday request waits until then.
+ * whenever Flyday's hello asks for one. Only while practice is stopped, so nobody's flying is
+ * ever cut short; a Flyday request waits until then. Pilots still signed in after Stop session
+ * don't hold it back (Janno 17.11.2026): they are saved and are all still there after the restart.
  */
 let lastNightlyUpdate = '';
 setInterval(() => {
-  if (!IN_EXE || updating || engine.clock.phase !== 'stopped' || engine.pilots.size > 0) return;
+  if (!IN_EXE || updating || engine.clock.phase !== 'stopped') return;
   const d = new Date();
   const night = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   if (pairing.state.updateRequested) {

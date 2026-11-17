@@ -1,9 +1,9 @@
 {
- "version": "2026.11.17-2146",
+ "version": "2026.11.17-2152",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "2755d6d7c06290cccbbfe2f3286f2d60504259208440b6e55ac05fa2baf71b71"
+   "sha256": "78aadd5756ff957c94188bd8fc5e8fc450401799fcf28ecfd1118bb4594f8781"
   },
   {
    "path": "web/assets/avatars.js",
@@ -59,7 +59,7 @@
   },
   {
    "path": "web/assets/i18n-et.js",
-   "sha256": "be4eb9b37b052795a2c29862c6b8f570441b9aac1a88a539899204f790fe3483"
+   "sha256": "581e951b4376831b5fbd9e60ad8e60c885f2c2b48bcb6063339ab0507180c4d9"
   },
   {
    "path": "web/assets/i18n.js",
@@ -155,7 +155,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "9a5af5ab72704a77359f666d647156196abcc05020b9ac7e7ea31e3cd6fbbe83"
+   "sha256": "4b0df18cfda37d509f03ab2a5b55d87f402b8b8b2e92b08df49fdaa88b73d855"
   },
   {
    "path": "web/favicon.ico",
