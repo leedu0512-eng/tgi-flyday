@@ -1082,7 +1082,7 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .td-cal .cg-corner { min-width: 0; }
 
 /* Birthdays and club milestones in the all-day row */
-.td-cal .cg-ev.cg-birthday { background: #2a1a0c; border: calc(.25 * var(--u)) solid var(--accent); color: #fff; }
-.td-cal .cg-ev.cg-milestone { background: #2a250c; border: calc(.25 * var(--u)) solid #FACC15; color: #fff; }
+.td-cal .cg-ev.cg-birthday { background: #2a1a0c; border: 0; border-left: calc(.12 * var(--u)) solid var(--accent); color: #fff; }
+.td-cal .cg-ev.cg-milestone { background: #2a250c; border: 0; border-left: calc(.12 * var(--u)) solid #FACC15; color: #fff; }
 .td-cal .cg-mark { font-style: normal; margin-right: .3em; }
 .td-cal .cg-milestone .cg-mark { color: #FACC15; }
