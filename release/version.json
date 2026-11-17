@@ -1,9 +1,9 @@
 {
- "version": "2026.11.17-1632",
+ "version": "2026.11.17-1637",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "c992297679957363756c530b86ef2fd17f36500e54ad9116b2a1726dc4b938be"
+   "sha256": "f2049dee8ce984b626757821c1dfeda29dec53ea1ccbee5a6f74b6ae06252dae"
   },
   {
    "path": "web/assets/avatars.js",
@@ -59,7 +59,7 @@
   },
   {
    "path": "web/assets/i18n-et.js",
-   "sha256": "3bae8e46e50a322621e6322ac1514b27e12595408b4c3ff05a25d3e73e86bde6"
+   "sha256": "1677d9e2b3bc15c42c5d07d20a5a1df8f19b10ba41cab72dd8529a2548de86bc"
   },
   {
    "path": "web/assets/i18n.js",
@@ -143,7 +143,7 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "e5aa318c84b6189e85baa09f3f05208c7a33b684f62271389e84adf32b9fba3e"
+   "sha256": "9b6e3537b28e4d4bf3822b9f7513885f2723d805ed8f69a03645cda929e0980c"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
@@ -163,7 +163,7 @@
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "fc34c2249423f099b32e21835848fecdc1390f52a0be67dc7fe647d2a76549a0"
+   "sha256": "d7709cf6b2e800727966be79461377c7746e405548af604f3ee26c70d5feeef5"
   },
   {
    "path": "web/me.html",

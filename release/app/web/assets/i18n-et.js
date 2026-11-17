@@ -77,6 +77,7 @@ export const ET = {
   'Photo for the big screen': 'Pilt suurele ekraanile',
   'Take it again': 'Tee uuesti',
   'Use this photo': 'Kasuta seda pilti',
+  'Not right now': 'Praegu mitte',
   'Keep the old one': 'Jäta vana',
   'Take photo': 'Tee pilt',
   'No webcam was found on this PC.': 'Selles arvutis pole veebikaamerat.',

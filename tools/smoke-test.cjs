@@ -127,7 +127,11 @@ async function typeKeys(scope, text) {
     await k.click('[data-next]');
     // The camera screen is a .done too: wait for the snap button or the real done screen.
     await k.waitForSelector('[data-snap], .done:not(.photo-step)', { timeout: 5000 });
-    if (await k.$('[data-snap]')) { await k.click('[data-snap]'); await k.waitForSelector('[data-use]', { timeout: 6000 }); await k.click('[data-use]'); }
+    if (await k.$('[data-snap]')) {
+      // No photo today: the small "Not right now" goes straight to the welcome.
+      check(/not right now/i.test(await k.textContent('.not-now')), 'camera has a small "Not right now"');
+      await k.click('.not-now');
+    }
     await k.waitForSelector('.done:not(.photo-step) .big-msg', { timeout: 5000 });
     check(/club quad/i.test(await k.textContent('.done:not(.photo-step)')), 'done screen names the club quad');
     s = await state();

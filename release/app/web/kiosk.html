@@ -298,7 +298,8 @@ function cameraView() {
     <div class="confirm-row">${shot
       ? '<button class="big" data-again>Take it again</button><button class="big primary" data-use>Use this photo</button>'
       : `${me?.photo ? '<button class="big" data-go="isyou">Keep the old one</button>' : ''}<button class="big primary" data-snap ${counting ? 'disabled' : ''}>Take photo</button>`}
-    </div></div>`;
+    </div>
+    <button class="not-now" data-skip>Not right now</button></div>`;
 }
 
 async function startCamera() {
@@ -351,7 +352,7 @@ function signedIn(pilot, msg) {
   name = '';
   me = pilot;
   shot = null;
-  // Every pilot either confirms last time's photo or takes one, no skipping.
+  // Every pilot sees last time's photo or the camera; a small "Not right now" lets them skip it (Janno 17.11.2026).
   // Only when the camera doesn't work does the photo step quietly drop out.
   if (pilot.photo) return go('isyou');
   if (camOK) return go('camera');

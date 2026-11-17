@@ -47,7 +47,7 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 ## Pilot photos
 
 - `data/photos/<pilot id>.jpg` is the live photo; `data/photos/known/<base64url of lowercased callsign>.jpg` remembers it by name (main.ts: rememberPhoto / restorePhotos). After every API call, pilots without a photo whose name is remembered get it back, so `/api/join` and `/api/pilot/add` already answer with `photo` set. Deleting a pilot keeps the remembered copy; removing a photo deletes both.
-- Kiosk photo step (kiosk.html): after joining or signing in, "Is this you?" for a remembered photo, else the webcam (getUserMedia, whole landscape frame, zoomed fully out where the camera allows, 1280 px). No camera or no permission: skipped silently.
+- Kiosk photo step (kiosk.html): after joining or signing in, "Is this you?" for a remembered photo, else the webcam (getUserMedia, whole landscape frame, zoomed fully out where the camera allows, 1280 px). A small **Not right now** link under the camera's buttons skips the photo (`.not-now`, `data-skip`; Janno 17.11.2026). No camera or no permission: skipped silently.
 - getUserMedia needs a secure context, and the kiosk is plain http on the LAN: kiosk.sh (Linux) and kiosk.bat / tgiFlyDay Kiosk.exe (Windows) start the browser with `--unsafely-treat-insecure-origin-as-secure=<RD URL>` and `--use-fake-ui-for-media-stream` (Firefox: insecure media prefs in user.js).
 
 ## Updates (GitHub)
