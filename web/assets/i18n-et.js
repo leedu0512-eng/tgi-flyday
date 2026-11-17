@@ -135,6 +135,7 @@ export const ET = {
   'Scan to join HOBIzone': "Skanni ja liitu HOBIzone'iga",
 
   'All day': 'Terve päev',
+  'cancelled': 'jääb ära',
   'TRACK DAY': 'RAJAPÄEV',
   'Previous week': 'Eelmine nädal',
   'Next week': 'Järgmine nädal',

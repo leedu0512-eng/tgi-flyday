@@ -26,19 +26,134 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server/main.ts
 var import_node_http = require("node:http");
 var import_promises2 = require("node:fs/promises");
-var import_node_fs6 = require("node:fs");
+var import_node_fs7 = require("node:fs");
 var import_node_os2 = require("node:os");
-var import_node_path6 = require("node:path");
+var import_node_path7 = require("node:path");
 var import_node_url = require("node:url");
 var sea = __toESM(require("node:sea"), 1);
 
+// server/screenfeed.ts
+var import_node_fs = require("node:fs");
+var import_node_path = require("node:path");
+var SCREEN_TAILNET = "https://flyday.tail543cf5.ts.net:8443/api/hz/tgiflyday/screen";
+var str = (v, max = 200) => typeof v === "string" ? v.trim().slice(0, max) : "";
+function text(v, max = 200) {
+  if (v && typeof v === "object") {
+    const o = v;
+    const out = {};
+    if (str(o.et, max)) out.et = str(o.et, max);
+    if (str(o.en, max)) out.en = str(o.en, max);
+    return out;
+  }
+  return str(v, max);
+}
+var isDate = (v) => typeof v === "string" && !Number.isNaN(Date.parse(v));
+var KIND = { trackday: "track", drone_practice: "drone", class: "class" };
+function hobizoneUrl(v) {
+  try {
+    const u = new URL(str(v, 300));
+    return u.protocol === "https:" && /^(www\.)?hobizone\.org$/.test(u.hostname) ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+function cleanScreen(body, now = Date.now()) {
+  if (!body || typeof body !== "object" || !Array.isArray(body.events)) return null;
+  const events = [];
+  for (const e of body.events.slice(0, 500)) {
+    if (!e || !isDate(e.start)) continue;
+    events.push({
+      id: str(e.id, 80) || String(events.length),
+      start: e.start,
+      end: isDate(e.end) ? e.end : null,
+      all_day: !!e.all_day,
+      kind: KIND[e.kind] ?? "other",
+      title: text(e.title, 80),
+      cancelled: !!e.cancelled
+    });
+  }
+  let join_url = null;
+  if (body.join_url && typeof body.join_url === "object") {
+    const et = hobizoneUrl(body.join_url.et), en = hobizoneUrl(body.join_url.en);
+    if (et || en) join_url = { ...et ? { et } : {}, ...en ? { en } : {} };
+  } else if (hobizoneUrl(body.join_url)) join_url = hobizoneUrl(body.join_url);
+  let thanks = null;
+  if (body.thanks && Array.isArray(body.thanks.names)) {
+    const names = body.thanks.names.slice(0, 400).map((n) => typeof n === "string" ? { name: str(n, 60), new: false } : { name: str(n?.name, 60), new: n?.new === true }).filter((n) => n.name);
+    thanks = { title: text(body.thanks.title, 120), names, updated: isDate(body.thanks.updated) ? body.thanks.updated : null };
+  }
+  const every = Number(body.refresh_after_s);
+  return {
+    events,
+    join_url,
+    thanks,
+    updated: new Date(now).toISOString(),
+    refresh_after_s: Number.isFinite(every) ? Math.min(3600, Math.max(60, every)) : 600
+  };
+}
+var ScreenFeed = class {
+  data = null;
+  lastError = "";
+  lastTry = 0;
+  file;
+  constructor(dataDir) {
+    this.file = (0, import_node_path.join)(dataDir, "trackday-screen.json");
+    try {
+      const saved2 = (0, import_node_fs.existsSync)(this.file) ? JSON.parse((0, import_node_fs.readFileSync)(this.file, "utf8")) : null;
+      if (Array.isArray(saved2?.events)) this.data = saved2;
+    } catch {
+    }
+  }
+  /** Due again? Every refresh_after_s (10 minutes by default), or a minute after a failure. */
+  due(now = Date.now()) {
+    const every = this.lastError ? 6e4 : (this.data?.refresh_after_s ?? 600) * 1e3;
+    return now - this.lastTry >= every;
+  }
+  /** Ask the portal (its address on this PC, then the tailnet one). Keeps the last good answer on failure. */
+  async refresh(base, token, now = Date.now()) {
+    this.lastTry = now;
+    const urls = [.../* @__PURE__ */ new Set([base.replace(/\/?$/, "/") + "screen", SCREEN_TAILNET])];
+    const errors = [];
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, { headers: { authorization: `Bearer ${token}`, accept: "application/json" }, signal: AbortSignal.timeout(15e3) });
+        const body = await res.json().catch(() => null);
+        const data = res.ok ? cleanScreen(body, now) : null;
+        if (!data) {
+          errors.push(`${new URL(url).host}: ${res.status}${body?.error ? ` ${body.error}` : ""}`);
+          continue;
+        }
+        this.data = data;
+        this.lastError = "";
+        try {
+          (0, import_node_fs.mkdirSync)((0, import_node_path.join)(this.file, ".."), { recursive: true });
+          (0, import_node_fs.writeFileSync)(this.file + ".tmp", JSON.stringify(data));
+          (0, import_node_fs.renameSync)(this.file + ".tmp", this.file);
+        } catch {
+        }
+        return true;
+      } catch (err) {
+        errors.push(`${(() => {
+          try {
+            return new URL(url).host;
+          } catch {
+            return url;
+          }
+        })()}: ${err?.name === "TimeoutError" ? "no answer" : err?.cause?.code ?? err?.message ?? err}`);
+      }
+    }
+    this.lastError = errors.join("; ");
+    return false;
+  }
+};
+
 // server/launch.ts
 var import_node_child_process = require("node:child_process");
-var import_node_fs = require("node:fs");
+var import_node_fs2 = require("node:fs");
 var import_node_os = require("node:os");
 var import_promises = require("node:readline/promises");
-var import_node_path = require("node:path");
-var PROFILES = (0, import_node_path.join)(process.env.LOCALAPPDATA ?? ".", "TGI-FlyDay");
+var import_node_path2 = require("node:path");
+var PROFILES = (0, import_node_path2.join)(process.env.LOCALAPPDATA ?? ".", "TGI-FlyDay");
 var EDGE_FLAGS = ["--no-first-run", "--hide-crash-restore-bubble", "--disable-session-crashed-bubble"];
 function ps(script, inherit = false) {
   const encoded = Buffer.from(script, "utf16le").toString("base64");
@@ -54,8 +169,8 @@ function ps(script, inherit = false) {
 }
 function edgePath() {
   for (const base of [process.env["ProgramFiles(x86)"], process.env.ProgramFiles, process.env.LOCALAPPDATA]) {
-    const p = base && (0, import_node_path.join)(base, "Microsoft", "Edge", "Application", "msedge.exe");
-    if (p && (0, import_node_fs.existsSync)(p)) return p;
+    const p = base && (0, import_node_path2.join)(base, "Microsoft", "Edge", "Application", "msedge.exe");
+    if (p && (0, import_node_fs2.existsSync)(p)) return p;
   }
   return "msedge";
 }
@@ -148,9 +263,9 @@ $block = @($rules | Where-Object { [string]$_.Action -eq 'Block' -and (& $hit $_
 async function firewallAllow(port = 8080) {
   if (process.platform !== "win32") return { accepted: false, error: "" };
   const q = (x) => `'${x.replace(/'/g, "''")}'`;
-  const log = (0, import_node_path.join)((0, import_node_os.tmpdir)(), `tgiflyday-firewall-${process.pid}.txt`);
+  const log = (0, import_node_path2.join)((0, import_node_os.tmpdir)(), `tgiflyday-firewall-${process.pid}.txt`);
   try {
-    (0, import_node_fs.rmSync)(log, { force: true });
+    (0, import_node_fs2.rmSync)(log, { force: true });
   } catch {
   }
   const inner = `$ErrorActionPreference = 'Stop'
@@ -170,8 +285,8 @@ try {
   const accepted = out.endsWith("yes");
   let said = "";
   try {
-    said = (0, import_node_fs.readFileSync)(log, "utf8").replace(/^﻿/, "").trim();
-    (0, import_node_fs.rmSync)(log, { force: true });
+    said = (0, import_node_fs2.readFileSync)(log, "utf8").replace(/^﻿/, "").trim();
+    (0, import_node_fs2.rmSync)(log, { force: true });
   } catch {
   }
   const error = !accepted ? "" : said.startsWith("error: ") ? said.slice(7).replace(/\s+/g, " ").slice(0, 300) : said === "ok" ? "" : "the change ran but did not report back";
@@ -180,7 +295,7 @@ try {
 function relaunch(args) {
   if (process.platform === "win32") {
     const q = (x) => `'${x.replace(/'/g, "''")}'`;
-    ps(`Start-Process -FilePath ${q(process.execPath)} -ArgumentList ${args.map(q).join(",")} -WorkingDirectory ${q((0, import_node_path.join)(process.execPath, ".."))} -WindowStyle Minimized`);
+    ps(`Start-Process -FilePath ${q(process.execPath)} -ArgumentList ${args.map(q).join(",")} -WorkingDirectory ${q((0, import_node_path2.join)(process.execPath, ".."))} -WindowStyle Minimized`);
   } else {
     (0, import_node_child_process.spawn)(process.execPath, args, { detached: true, stdio: "ignore" }).unref();
   }
@@ -192,21 +307,21 @@ if ($o.Count) { [string]$o[0].Bounds.X + ',' + $o[0].Bounds.Y } else { 'none' }`
   return /^-?\d+,-?\d+$/.test(out) ? out : null;
 }
 function openRdWindows(port) {
-  edge([`--app=http://localhost:${port}/console`, "--autoplay-policy=no-user-gesture-required", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "console-2")}`]);
+  edge([`--app=http://localhost:${port}/console`, "--autoplay-policy=no-user-gesture-required", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path2.join)(PROFILES, "console-2")}`]);
 }
 function openBigScreen(port) {
   ps(`Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*TGI-FlyDay*screen-2*' } | ForEach-Object { $p = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($p -and $p.MainWindowHandle -ne 0) { [void]$p.CloseMainWindow() } }`);
   const base = `http://localhost:${port}`;
   const second = secondMonitor();
-  if (second) edge(["--kiosk", `${base}/screen`, "--edge-kiosk-type=fullscreen", `--window-position=${second}`, "--use-fake-ui-for-media-stream", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
-  else edge([`--app=${base}/screen`, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
+  if (second) edge(["--kiosk", `${base}/screen`, "--edge-kiosk-type=fullscreen", `--window-position=${second}`, "--use-fake-ui-for-media-stream", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path2.join)(PROFILES, "screen-2")}`]);
+  else edge([`--app=${base}/screen`, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path2.join)(PROFILES, "screen-2")}`]);
   return { second: !!second };
 }
 
 // server/update.ts
 var import_node_crypto = require("node:crypto");
-var import_node_fs2 = require("node:fs");
-var import_node_path2 = require("node:path");
+var import_node_fs3 = require("node:fs");
+var import_node_path3 = require("node:path");
 var tls = __toESM(require("node:tls"), 1);
 var REPO = process.env.TGIFLYDAY_REPO ?? "leedu0512-eng/tgi-flyday";
 var API = process.env.TGIFLYDAY_UPDATE_API ?? `https://api.github.com/repos/${REPO}`;
@@ -251,48 +366,48 @@ async function latest() {
 var safe = (p) => /^[A-Za-z0-9._/-]+$/.test(p) && !p.split("/").includes("..");
 async function install(dir, release, commit, onFile) {
   if (!/^[0-9A-Za-z.-]+$/.test(release.version)) throw new Error(`Odd version: ${release.version}`);
-  const versions = (0, import_node_path2.join)(dir, "versions");
-  const target = (0, import_node_path2.join)(versions, release.version);
+  const versions = (0, import_node_path3.join)(dir, "versions");
+  const target = (0, import_node_path3.join)(versions, release.version);
   const fresh = `${target}.new-${Date.now()}`;
   for (const f of release.files) {
     if (!safe(f.path)) throw new Error(`Odd file name in the release: ${f.path}`);
     const data = await get(`${RAW}/${commit}/release/app/${f.path}`, "*/*");
     if ((0, import_node_crypto.createHash)("sha256").update(data).digest("hex") !== f.sha256) throw new Error(`${f.path} didn't download correctly.`);
-    const out = (0, import_node_path2.join)(fresh, ...f.path.split("/"));
-    (0, import_node_fs2.mkdirSync)((0, import_node_path2.dirname)(out), { recursive: true });
-    (0, import_node_fs2.writeFileSync)(out, data);
+    const out = (0, import_node_path3.join)(fresh, ...f.path.split("/"));
+    (0, import_node_fs3.mkdirSync)((0, import_node_path3.dirname)(out), { recursive: true });
+    (0, import_node_fs3.writeFileSync)(out, data);
     onFile?.(release.files.indexOf(f) + 1, release.files.length);
   }
-  (0, import_node_fs2.writeFileSync)((0, import_node_path2.join)(fresh, "version.json"), JSON.stringify(release, null, 1));
-  if ((0, import_node_fs2.existsSync)(target)) (0, import_node_fs2.rmSync)(target, { recursive: true, force: true });
-  (0, import_node_fs2.renameSync)(fresh, target);
-  const pointer = (0, import_node_path2.join)(dir, "app.json");
-  (0, import_node_fs2.writeFileSync)(`${pointer}.tmp`, JSON.stringify({ version: release.version, dir: `versions/${release.version}` }, null, 1));
-  (0, import_node_fs2.renameSync)(`${pointer}.tmp`, pointer);
+  (0, import_node_fs3.writeFileSync)((0, import_node_path3.join)(fresh, "version.json"), JSON.stringify(release, null, 1));
+  if ((0, import_node_fs3.existsSync)(target)) (0, import_node_fs3.rmSync)(target, { recursive: true, force: true });
+  (0, import_node_fs3.renameSync)(fresh, target);
+  const pointer = (0, import_node_path3.join)(dir, "app.json");
+  (0, import_node_fs3.writeFileSync)(`${pointer}.tmp`, JSON.stringify({ version: release.version, dir: `versions/${release.version}` }, null, 1));
+  (0, import_node_fs3.renameSync)(`${pointer}.tmp`, pointer);
 }
 function tidy(dir, keep) {
-  const versions = (0, import_node_path2.join)(dir, "versions");
+  const versions = (0, import_node_path3.join)(dir, "versions");
   let names = [];
   try {
-    names = (0, import_node_fs2.readdirSync)(versions);
+    names = (0, import_node_fs3.readdirSync)(versions);
   } catch {
     return;
   }
   for (const n of names) {
     if (keep.includes(n)) continue;
     try {
-      (0, import_node_fs2.rmSync)((0, import_node_path2.join)(versions, n), { recursive: true, force: true });
+      (0, import_node_fs3.rmSync)((0, import_node_path3.join)(versions, n), { recursive: true, force: true });
     } catch {
     }
   }
   for (const old of ["app.new", "app.old"]) try {
-    (0, import_node_fs2.rmSync)((0, import_node_path2.join)(dir, old), { recursive: true, force: true });
+    (0, import_node_fs3.rmSync)((0, import_node_path3.join)(dir, old), { recursive: true, force: true });
   } catch {
   }
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1502" : "dev";
+var VERSION = true ? "2026.11.17-1510" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -757,11 +872,11 @@ var Engine = class {
   }
   fireCallouts(remainingMs, callouts) {
     const phaseMs = this.phaseLengthMs();
-    for (const [seconds, text] of callouts) {
+    for (const [seconds, text2] of callouts) {
       if (phaseMs <= (seconds + 5) * 1e3) continue;
       if (remainingMs <= seconds * 1e3 && !this.calloutsDone.has(seconds)) {
         this.calloutsDone.add(seconds);
-        this.say(text);
+        this.say(text2);
       }
     }
   }
@@ -808,9 +923,9 @@ var Engine = class {
     return `${callouts.texts.arm}|${sound.voice}|${sound.voiceRate}`;
   }
   /** Console: the arm call (with the current wording, voice and speed) took this long to say. */
-  setArmMeasured(text, ms) {
+  setArmMeasured(text2, ms) {
     const n = Math.round(Number(ms));
-    if (String(text) !== this.config.callouts.texts.arm || !(n >= 300 && n <= 2e4)) return;
+    if (String(text2) !== this.config.callouts.texts.arm || !(n >= 300 && n <= 2e4)) return;
     this.armMeasured = { key: this.armKey(), ms: n };
   }
   /**
@@ -919,12 +1034,12 @@ var Engine = class {
     this.onChange();
   }
   /** The end time's done: practice stops and the next session starts clean. */
-  finishSession(text) {
+  finishSession(text2) {
     this.sessionEnded("endTime");
     this.closeTiming(true);
     this.setPhase("stopped", null);
     this.cleanSlate();
-    if (this.config.callouts.sessionEnd) this.say(text);
+    if (this.config.callouts.sessionEnd) this.say(text2);
     this.onChange();
   }
   /** Someone tapped "Still flying": carry on, ask again in an hour. */
@@ -2383,8 +2498,8 @@ var Engine = class {
       clearMhz: CLEAR_MHZ
     };
   }
-  say(text) {
-    this.onAudio({ kind: "say", text });
+  say(text2) {
+    this.onAudio({ kind: "say", text: text2 });
   }
   tone(tone) {
     this.onAudio({ kind: "tone", tone });
@@ -2430,12 +2545,12 @@ function cleanLights(patch, current) {
 }
 var FLYDAY_PATH = "/api/hz/tgiflyday/";
 function cleanServerUrl(raw) {
-  const text = String(raw ?? "").trim();
-  if (!text) return "";
-  if (!/^https:\/\//i.test(text)) throw new EngineError("The address starts with https:// (only secure addresses).");
+  const text2 = String(raw ?? "").trim();
+  if (!text2) return "";
+  if (!/^https:\/\//i.test(text2)) throw new EngineError("The address starts with https:// (only secure addresses).");
   let u;
   try {
-    u = new URL(text);
+    u = new URL(text2);
   } catch {
     throw new EngineError("That address doesn't look right, e.g. https://flyday.tail543cf5.ts.net:8445");
   }
@@ -2500,11 +2615,11 @@ function spokenChannel(ch) {
 }
 
 // server/store.ts
-var import_node_fs3 = require("node:fs");
-var import_node_path3 = require("node:path");
+var import_node_fs4 = require("node:fs");
+var import_node_path4 = require("node:path");
 function load(file) {
   try {
-    return JSON.parse((0, import_node_fs3.readFileSync)(file, "utf8"));
+    return JSON.parse((0, import_node_fs4.readFileSync)(file, "utf8"));
   } catch (err) {
     if (err?.code !== "ENOENT") console.warn(`Could not read ${file}, starting fresh:`, err.message);
     return {};
@@ -2514,10 +2629,10 @@ function saver(file, get2) {
   let timer = null;
   const write = () => {
     timer = null;
-    (0, import_node_fs3.mkdirSync)((0, import_node_path3.dirname)(file), { recursive: true });
+    (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(file), { recursive: true });
     const tmp = `${file}.tmp`;
-    (0, import_node_fs3.writeFileSync)(tmp, JSON.stringify(get2(), null, 2));
-    (0, import_node_fs3.renameSync)(tmp, file);
+    (0, import_node_fs4.writeFileSync)(tmp, JSON.stringify(get2(), null, 2));
+    (0, import_node_fs4.renameSync)(tmp, file);
   };
   return {
     soon() {
@@ -2766,13 +2881,13 @@ var RotorHazardLink = class {
 
 // server/outbox.ts
 var import_node_crypto3 = require("node:crypto");
-var import_node_fs5 = require("node:fs");
-var import_node_path5 = require("node:path");
+var import_node_fs6 = require("node:fs");
+var import_node_path6 = require("node:path");
 
 // server/flyday.ts
 var import_node_crypto2 = require("node:crypto");
-var import_node_fs4 = require("node:fs");
-var import_node_path4 = require("node:path");
+var import_node_fs5 = require("node:fs");
+var import_node_path5 = require("node:path");
 var FLYDAY_BASE = "https://hobizone.org/api/hz/tgiflyday/";
 var ALNUM = "abcdefghijklmnopqrstuvwxyz0123456789";
 function newId() {
@@ -2811,10 +2926,10 @@ var Install = class {
   state;
   file;
   constructor(dataDir) {
-    this.file = (0, import_node_path4.join)(dataDir, "install.json");
+    this.file = (0, import_node_path5.join)(dataDir, "install.json");
     let saved2 = {};
     try {
-      if ((0, import_node_fs4.existsSync)(this.file)) saved2 = JSON.parse((0, import_node_fs4.readFileSync)(this.file, "utf8"));
+      if ((0, import_node_fs5.existsSync)(this.file)) saved2 = JSON.parse((0, import_node_fs5.readFileSync)(this.file, "utf8"));
     } catch {
     }
     const secret = typeof saved2.secret === "string" && saved2.secret.length >= 32 ? saved2.secret : (0, import_node_crypto2.randomBytes)(32).toString("hex");
@@ -2833,10 +2948,10 @@ var Install = class {
   }
   save() {
     try {
-      (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
+      (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(this.file), { recursive: true });
       const { helloError, updateRequested, ...keep } = this.state;
-      (0, import_node_fs4.writeFileSync)(this.file + ".tmp", JSON.stringify(keep, null, 2));
-      (0, import_node_fs4.renameSync)(this.file + ".tmp", this.file);
+      (0, import_node_fs5.writeFileSync)(this.file + ".tmp", JSON.stringify(keep, null, 2));
+      (0, import_node_fs5.renameSync)(this.file + ".tmp", this.file);
     } catch {
     }
   }
@@ -2860,11 +2975,11 @@ var Install = class {
         body: JSON.stringify({ install: s.id, install_secret: s.secret, pairing_code: s.pairingCode, venue, pc, version }),
         signal: AbortSignal.timeout(2e4)
       });
-      const text = await res.text().catch(() => "");
-      if (!res.ok) throw new Error(`Flyday answered ${res.status}${text ? `: ${text.replace(/\s+/g, " ").slice(0, 160)}` : ""}`);
+      const text2 = await res.text().catch(() => "");
+      if (!res.ok) throw new Error(`Flyday answered ${res.status}${text2 ? `: ${text2.replace(/\s+/g, " ").slice(0, 160)}` : ""}`);
       let body = {};
       try {
-        body = JSON.parse(text);
+        body = JSON.parse(text2);
       } catch {
         throw new Error("Flyday gave an answer that is not JSON");
       }
@@ -3040,10 +3155,10 @@ function partsOf(b, max = SAFE_SIZE) {
   const s = splitBody(b);
   return s ? [...partsOf(s[0], max), ...partsOf(s[1], max)] : [b];
 }
-function verdictOf(status, text) {
+function verdictOf(status, text2) {
   let portalError = null;
   try {
-    const j = JSON.parse(text);
+    const j = JSON.parse(text2);
     if (j && typeof j.error === "string") portalError = j.error;
   } catch {
   }
@@ -3080,11 +3195,11 @@ var Outbox = class {
     this.config = config;
     this.venueFallback = venueFallback;
     this.log = log;
-    this.file = (0, import_node_path5.join)(dataDir, "outbox.jsonl");
-    this.sentFile = (0, import_node_path5.join)(dataDir, "outbox-sent.jsonl");
+    this.file = (0, import_node_path6.join)(dataDir, "outbox.jsonl");
+    this.sentFile = (0, import_node_path6.join)(dataDir, "outbox-sent.jsonl");
     try {
-      if ((0, import_node_fs5.existsSync)(this.file)) {
-        for (const line of (0, import_node_fs5.readFileSync)(this.file, "utf8").split("\n")) {
+      if ((0, import_node_fs6.existsSync)(this.file)) {
+        for (const line of (0, import_node_fs6.readFileSync)(this.file, "utf8").split("\n")) {
           if (!line.trim()) continue;
           try {
             this.pending.push(JSON.parse(line));
@@ -3092,9 +3207,9 @@ var Outbox = class {
           }
         }
       }
-      if ((0, import_node_fs5.existsSync)(this.sentFile)) {
+      if ((0, import_node_fs6.existsSync)(this.sentFile)) {
         const sent = [];
-        for (const line of (0, import_node_fs5.readFileSync)(this.sentFile, "utf8").split("\n")) {
+        for (const line of (0, import_node_fs6.readFileSync)(this.sentFile, "utf8").split("\n")) {
           if (!line.trim()) continue;
           try {
             sent.push(JSON.parse(line));
@@ -3120,11 +3235,11 @@ var Outbox = class {
     const ev = { id: (0, import_node_crypto3.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
     this.pending.push(ev);
     try {
-      (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(this.file), { recursive: true });
+      (0, import_node_fs6.mkdirSync)((0, import_node_path6.dirname)(this.file), { recursive: true });
       if (this.pending.length > MAX_PENDING) {
         this.pending.splice(0, this.pending.length - MAX_PENDING);
         this.rewrite();
-      } else (0, import_node_fs5.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
+      } else (0, import_node_fs6.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
     } catch (err) {
       this.log(`Outbox: could not save an event (${err.message}).`);
     }
@@ -3160,10 +3275,10 @@ var Outbox = class {
               body: JSON.stringify(body),
               signal: AbortSignal.timeout(2e4)
             });
-            const text = await res.text().catch(() => "");
-            const { verdict, portalError } = verdictOf(res.status, text);
+            const text2 = await res.text().catch(() => "");
+            const { verdict, portalError } = verdictOf(res.status, text2);
             if (verdict === "stored") continue;
-            const msg = `Flyday answered ${res.status}${portalError ? `: ${portalError}` : text ? ` (${text.replace(/\s+/g, " ").slice(0, 120)})` : ""}`;
+            const msg = `Flyday answered ${res.status}${portalError ? `: ${portalError}` : text2 ? ` (${text2.replace(/\s+/g, " ").slice(0, 120)})` : ""}`;
             if (verdict === "split") {
               const halves = splitBody(body);
               if (halves) {
@@ -3193,7 +3308,7 @@ var Outbox = class {
         }
         for (const [k, v] of notes) this.notes.set(k, v);
         const done = this.pending.splice(0, up.rows);
-        (0, import_node_fs5.appendFileSync)(this.sentFile, done.map((e) => JSON.stringify(e)).join("\n") + "\n");
+        (0, import_node_fs6.appendFileSync)(this.sentFile, done.map((e) => JSON.stringify(e)).join("\n") + "\n");
         this.rewrite();
         this.st.sent += done.length;
         this.st.pending = this.pending.length;
@@ -3211,43 +3326,43 @@ var Outbox = class {
   }
   rewrite() {
     const tmp = `${this.file}.tmp`;
-    (0, import_node_fs5.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
-    (0, import_node_fs5.renameSync)(tmp, this.file);
+    (0, import_node_fs6.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
+    (0, import_node_fs6.renameSync)(tmp, this.file);
   }
 };
 
 // server/main.ts
 var IN_EXE = sea.isSea();
-var ROOT = IN_EXE ? (0, import_node_path6.dirname)(process.execPath) : (0, import_node_path6.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
+var ROOT = IN_EXE ? (0, import_node_path7.dirname)(process.execPath) : (0, import_node_path7.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
 var APP_DIR = process.env.TGIFLYDAY_APP_DIR ?? process.env.FLYDAY_APP_DIR;
-var WEB = APP_DIR ? (0, import_node_path6.join)(APP_DIR, "web") : (0, import_node_path6.join)(ROOT, "web");
-var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs6.existsSync)((0, import_node_path6.join)(WEB, "console.html"));
+var WEB = APP_DIR ? (0, import_node_path7.join)(APP_DIR, "web") : (0, import_node_path7.join)(ROOT, "web");
+var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs7.existsSync)((0, import_node_path7.join)(WEB, "console.html"));
 async function webFile(full) {
   if (WEB_FROM_DISK) return (0, import_promises2.readFile)(full);
-  return Buffer.from(sea.getAsset("web/" + (0, import_node_path6.relative)(WEB, full).split(import_node_path6.sep).join("/")));
+  return Buffer.from(sea.getAsset("web/" + (0, import_node_path7.relative)(WEB, full).split(import_node_path7.sep).join("/")));
 }
-var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path6.join)(ROOT, "data", "flyday.json");
+var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path7.join)(ROOT, "data", "flyday.json");
 var PORT = Number(process.env.PORT ?? 8080);
-var PHOTOS = (0, import_node_path6.join)((0, import_node_path6.resolve)(DATA_FILE, ".."), "photos");
+var PHOTOS = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "photos");
 var photoFile = (id) => {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw new EngineError("No such pilot.");
-  return (0, import_node_path6.join)(PHOTOS, `${id}.jpg`);
+  return (0, import_node_path7.join)(PHOTOS, `${id}.jpg`);
 };
-var KNOWN = (0, import_node_path6.join)(PHOTOS, "known");
-var knownFile = (callsign) => (0, import_node_path6.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
+var KNOWN = (0, import_node_path7.join)(PHOTOS, "known");
+var knownFile = (callsign) => (0, import_node_path7.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
 function rememberPhoto(id) {
   const p = engine.pilots.get(id);
   if (!p?.photo) return;
   try {
-    (0, import_node_fs6.mkdirSync)(KNOWN, { recursive: true });
-    (0, import_node_fs6.copyFileSync)(photoFile(id), knownFile(p.callsign));
+    (0, import_node_fs7.mkdirSync)(KNOWN, { recursive: true });
+    (0, import_node_fs7.copyFileSync)(photoFile(id), knownFile(p.callsign));
   } catch {
   }
 }
-var KNOWN_FILE = (0, import_node_path6.join)((0, import_node_path6.resolve)(DATA_FILE, ".."), "known.json");
+var KNOWN_FILE = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "known.json");
 var known = (() => {
   try {
-    return JSON.parse((0, import_node_fs6.readFileSync)(KNOWN_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs7.readFileSync)(KNOWN_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -3265,17 +3380,17 @@ function rememberChannel(pilotId) {
     if (known[k]?.channel === channel && !!known[k]?.club === club) return;
     known[k] = { ...channel ? { channel } : {}, ...club ? { club } : {} };
     try {
-      (0, import_node_fs6.mkdirSync)((0, import_node_path6.resolve)(KNOWN_FILE, ".."), { recursive: true });
-      (0, import_node_fs6.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
+      (0, import_node_fs7.mkdirSync)((0, import_node_path7.resolve)(KNOWN_FILE, ".."), { recursive: true });
+      (0, import_node_fs7.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
     } catch {
     }
     return;
   }
 }
-var CARDS_FILE = (0, import_node_path6.join)((0, import_node_path6.resolve)(DATA_FILE, ".."), "cards.json");
+var CARDS_FILE = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "cards.json");
 var cards = (() => {
   try {
-    return JSON.parse((0, import_node_fs6.readFileSync)(CARDS_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs7.readFileSync)(CARDS_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -3287,8 +3402,8 @@ function cardId(v) {
 }
 function saveCards() {
   try {
-    (0, import_node_fs6.mkdirSync)((0, import_node_path6.resolve)(CARDS_FILE, ".."), { recursive: true });
-    (0, import_node_fs6.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
+    (0, import_node_fs7.mkdirSync)((0, import_node_path7.resolve)(CARDS_FILE, ".."), { recursive: true });
+    (0, import_node_fs7.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
   } catch {
   }
 }
@@ -3305,17 +3420,17 @@ function restorePhotos() {
   for (const p of engine.pilots.values()) {
     if (p.photo) continue;
     const known2 = knownFile(p.callsign);
-    if (!(0, import_node_fs6.existsSync)(known2)) continue;
+    if (!(0, import_node_fs7.existsSync)(known2)) continue;
     try {
-      (0, import_node_fs6.mkdirSync)(PHOTOS, { recursive: true });
-      (0, import_node_fs6.copyFileSync)(known2, photoFile(p.id));
+      (0, import_node_fs7.mkdirSync)(PHOTOS, { recursive: true });
+      (0, import_node_fs7.copyFileSync)(known2, photoFile(p.id));
       engine.setPilotPhoto(p.id, Date.now().toString(36));
     } catch {
     }
   }
 }
-var OLD_DATA = (0, import_node_path6.join)(ROOT, "data", "eztimer.json");
-if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs6.existsSync)(DATA_FILE) && (0, import_node_fs6.existsSync)(OLD_DATA)) (0, import_node_fs6.renameSync)(OLD_DATA, DATA_FILE);
+var OLD_DATA = (0, import_node_path7.join)(ROOT, "data", "eztimer.json");
+if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs7.existsSync)(DATA_FILE) && (0, import_node_fs7.existsSync)(OLD_DATA)) (0, import_node_fs7.renameSync)(OLD_DATA, DATA_FILE);
 var clients = /* @__PURE__ */ new Set();
 function broadcast(type, payload) {
   const msg = `event: ${type}
@@ -3348,9 +3463,16 @@ var engine = new Engine(saved, {
   }
 });
 var store = saver(DATA_FILE, () => engine.toSaved());
-var pairing = new Install((0, import_node_path6.resolve)(DATA_FILE, ".."));
-outbox = new Outbox((0, import_node_path6.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
-var snapshot = (now) => ({ ...engine.snapshot(now), trackdayUrl: pairing.state.trackdayUrl, outbox: { ...outbox.status(), venue: outbox.venue(), base: outbox.base(), flyday: publicInstall(pairing.state) } });
+var pairing = new Install((0, import_node_path7.resolve)(DATA_FILE, ".."));
+outbox = new Outbox((0, import_node_path7.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
+var screenFeed = new ScreenFeed((0, import_node_path7.resolve)(DATA_FILE, ".."));
+var snapshot = (now) => ({
+  ...engine.snapshot(now),
+  trackdayUrl: pairing.state.trackdayUrl,
+  trackdayScreen: screenFeed.data,
+  trackdayScreenError: screenFeed.lastError,
+  outbox: { ...outbox.status(), venue: outbox.venue(), base: outbox.base(), flyday: publicInstall(pairing.state) }
+});
 async function helloFlyday() {
   await pairing.hello(outbox.base(), outbox.venue(), (0, import_node_os2.hostname)(), VERSION);
   stateDirty = true;
@@ -3365,19 +3487,26 @@ setInterval(() => {
     void helloFlyday();
   }
 }, 6e4);
+async function refreshScreen() {
+  if (pairing.state.status !== "approved" || !pairing.state.token || !screenFeed.due()) return;
+  if (await screenFeed.refresh(outbox.base(), pairing.state.token)) stateDirty = true;
+  else console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Screen data from Flyday: ${screenFeed.lastError}`);
+}
+setTimeout(() => void refreshScreen(), 5e3);
+setInterval(() => void refreshScreen(), 3e4);
 setInterval(() => {
   void outbox.flush().then(() => {
     stateDirty = true;
   });
 }, 3e4);
 engine.resume(saved.clock, Date.now());
-for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs6.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
+for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs7.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
 restorePhotos();
 timerLink = new RotorHazardLink(engine, (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
 var webVersion = String(Date.now());
 var reloadTimer = null;
 try {
-  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs6.watch)(WEB, { recursive: true }, () => {
+  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs7.watch)(WEB, { recursive: true }, () => {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       webVersion = String(Date.now());
@@ -3599,7 +3728,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
         await (0, import_promises2.unlink)(file2).catch(() => {
         });
         try {
-          (0, import_node_fs6.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
+          (0, import_node_fs7.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
         } catch {
         }
         engine.setPilotPhoto(id, null);
@@ -3653,12 +3782,12 @@ data: ${JSON.stringify(snapshot(Date.now()))}
       return json(res, known2 ? 400 : 500, { error: known2 ? err.message : "Something went wrong on the server." });
     }
   }
-  const file = PAGES[path] ?? (0, import_node_path6.normalize)(path).replace(/^([/\\])+/, "");
-  const full = (0, import_node_path6.join)(WEB, file);
+  const file = PAGES[path] ?? (0, import_node_path7.normalize)(path).replace(/^([/\\])+/, "");
+  const full = (0, import_node_path7.join)(WEB, file);
   if (!full.startsWith(WEB)) return json(res, 404, { error: "Not found." });
   try {
     const body = await webFile(full);
-    res.writeHead(200, { "content-type": TYPES[(0, import_node_path6.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": TYPES[(0, import_node_path7.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
     res.end(body);
   } catch {
     json(res, 404, { error: "Not found." });

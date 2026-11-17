@@ -1038,8 +1038,14 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .td-thanks { display: grid; grid-template-rows: auto 1fr; gap: calc(2.4 * var(--u)); min-height: 0; background: #111; border-left: calc(1.4 * var(--u)) solid var(--accent); padding: calc(3 * var(--u)) calc(3 * var(--uw)); }
 .td-thanks h1 { margin: 0; font: 900 calc(7.4 * var(--u))/1 var(--stencil); text-transform: uppercase; color: var(--accent); letter-spacing: .01em; }
 .td-thanks .names { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: .18em .5em; min-height: 0; overflow: hidden; font-family: var(--display); font-weight: 900; text-transform: uppercase; line-height: 1.05; }
-.td-thanks .names span { white-space: nowrap; }
-.td-thanks .names span:nth-child(3n+2) { color: #9A9A9A; }
+.td-thanks .names { gap: .22em .55em; }
+.td-thanks .names span { white-space: nowrap; display: inline-block; }
+.td-thanks .names span.t1 { color: #FFFFFF; }
+.td-thanks .names span.t2 { color: #C8C8C8; }
+.td-thanks .names span.t3 { color: #8A8A8A; }
+.td-thanks .names span.new { color: var(--accent); }
+.td-cal .ev.off { opacity: .45; }
+.td-cal .ev.off b { text-decoration: line-through; }
 
 /* Settings page (gear icon): the big screen's QR code opens it on the second monitor */
 .screens-head { margin: 10px 0 0; font-family: var(--display); font-weight: 800; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
@@ -1048,3 +1054,27 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .screen-link .qr-open:hover { outline-color: #fff; }
 .screen-link .qr-open:disabled { opacity: .5; cursor: wait; }
 #settingsView .kiosk-info { gap: 14px; }
+
+/* Upright screens (Janno 17.11.2026): TrackDay stacks, the QR cards lie flat under the calendar,
+   and the header drops what it can't fit. */
+@media (max-aspect-ratio: 4/3) {
+  .pb-head { gap: calc(1.4 * var(--uw)); padding: 0 calc(2 * var(--uw)); }
+  .pb-head .meta { display: none; }
+  .pb.car-day .pb-qr, .pb.car-day .pb-signin { display: none; }
+  .pb-head .pb-qr span { display: none; }
+  .pb-main.td2, .pb-main.td2:has(.td-thanks) { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .td-left { grid-template-rows: calc(17 * var(--u)) minmax(0, 1fr); }
+  .td-clock .bigclock { font-size: calc(15 * var(--u)); }
+  .td-clock .date { font-size: calc(3.2 * var(--u)); }
+  .td-right { grid-template-rows: auto; }
+  .td-qr { grid-template-columns: auto 1fr; grid-template-rows: auto; justify-items: start; text-align: left; gap: calc(3 * var(--uw)); padding: calc(2.4 * var(--u)) calc(3 * var(--uw)); }
+  .td-qr .pay-qr { width: calc(30 * var(--u)); }
+  .td-qr .txt { align-items: flex-start; }
+  .td-cal .dh b { font-size: calc(3 * var(--u)); }
+  .td-cal .ev b { font-size: calc(1.9 * var(--u)); }
+  .td-cal .ev .t { font-size: calc(1.9 * var(--u)); }
+  .td-thanks h1 { font-size: calc(6.4 * var(--u)); }
+  .td-join-only .td-qr { width: 100%; height: auto; grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .td-join-only .td-qr .txt { align-items: center; }
+  .td-join-only .td-qr .pay-qr { width: calc(56 * var(--u)); }
+}

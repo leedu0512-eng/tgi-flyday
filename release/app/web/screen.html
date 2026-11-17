@@ -87,7 +87,7 @@ function plates(heat, pm) {
 const CARDS = [
   // The pay address comes from Flyday (state.trackdayUrl, contracts/trackday-pay.md); this is the fallback.
   { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', builtIn: 'https://pay.montonio.com/3di-bmx-ofqo', secs: 30 },
-  { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', secs: 15, cls: 'join' },
+  { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', builtIn: 'https://www.hobizone.org/liitu', secs: 15, cls: 'join' },
 ];
 let view = (() => { try { return localStorage.getItem('tgiflyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
 const cardQr = new Map();
@@ -134,7 +134,7 @@ setInterval(trackDaySchedule, 30_000);
 // the portal through the RD PC (state.trackdayScreen); `?demo` shows made-up data until then.
 const DEMO = new URLSearchParams(location.search).has('demo');
 const TD_MAIN_MS = 45_000, TD_THANKS_MS = 20_000, TD_HOLD_MS = 60_000;
-let tdPane = 'main', tdSince = Date.now(), tdHoldUntil = 0, tdWeek = 0;
+let tdPane = 'main', tdSince = Date.now(), tdHoldUntil = 0, tdWeek = 0, tdShown = 0;
 const pick = (v) => (v && typeof v === 'object' ? v[LANG] ?? v.en ?? v.et ?? '' : v ?? '');
 const two = (n) => String(n).padStart(2, '0');
 const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
@@ -162,10 +162,13 @@ function demoData() {
     e(6, 10, 0, 16, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
   }
   const names = ['Karl', 'Sven', 'Mari', 'Liis', 'Kristjan', 'Mia', 'Leo', 'Rasmus', 'Hanna', 'Oskar', 'Laura', 'Markus', 'Eliise', 'Robin', 'Kaspar', 'Grete', 'Martin', 'Sofia', 'Andres', 'Kertu', 'Joonas', 'Emma', 'Tanel', 'Maria', 'Siim', 'Anna', 'Rein', 'Helen', 'Marko', 'Kadri', 'Funrent', 'Velvet', 'Priit', 'Triin', 'Aivar', 'Elisabeth', 'Henri', 'Johanna', 'Kevin', 'Merilin', 'Tõnu', 'Ülle', 'Jüri', 'Katrin', 'Taavi', 'Pille', 'Erik', 'Hobipood', 'Janek', 'Signe', 'Mihkel', 'Lisette', 'Toomas', 'Getter', 'Artur', 'Liisa'];
+  const mixed = names.map((name) => ({ name, new: false })).sort(() => Math.random() - 0.5);
+  mixed.splice(7, 0, { name: 'Karl', new: true });
+  mixed.splice(30, 0, { name: 'Laura', new: true });
   return {
     events,
     updated: new Date(Date.now() - 12 * 60_000).toISOString(),
-    thanks: { title: { et: 'Aitäh, et hoiate selle koha lahti', en: 'Thank you for keeping this place open' }, names },
+    thanks: { title: { et: 'Aitäh, et hoiate seda paika lahti!', en: 'Thank you for keeping this place open!' }, names: mixed },
   };
 }
 const tdData = () => state?.trackdayScreen ?? (DEMO ? demoData() : null);
@@ -185,7 +188,7 @@ function calendarHtml(data) {
     const items = evs.map((e) => {
       const st = new Date(e.start), en = e.end ? new Date(e.end) : null;
       const when = e.all_day ? tr('All day') : `${hhmm(st)}${en ? `–${hhmm(en)}` : ''}`;
-      return `<div class="ev ${esc(e.kind ?? 'other')}"><span class="t num">${when}</span><b>${esc(pick(e.title))}</b></div>`;
+      return `<div class="ev ${esc(e.kind ?? 'other')}${e.cancelled ? ' off' : ''}"><span class="t num">${when}${e.cancelled ? ` · ${tr('cancelled')}` : ''}</span><b>${esc(pick(e.title))}</b></div>`;
     }).join('');
     return `<div class="day ${d.toDateString() === today ? 'today' : ''}">
       <div class="dh"><span>${d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '')}</span><b class="num">${d.getDate()}</b></div>
@@ -212,12 +215,38 @@ function qrCardHtml(card, i, cls) {
     <div class="txt"><h2>${esc(tr(card.title))}</h2><p class="price">${esc(tr(card.price))}</p><p class="cta">${esc(tr(card.cta))}</p></div></div>`;
 }
 
+/**
+ * The thank-you names, scattered like a word cloud (Janno 17.11.2026): mixed order (the portal
+ * shuffles, and we shuffle again every time the pane comes up), a few sizes and a little tilt and
+ * offset each, so they never read as rows. People and companies alike; paid today = orange.
+ */
+function cloud(names) {
+  const list = names.map((n) => (typeof n === 'string' ? { name: n, new: false } : n));
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
+  const SIZES = [0.72, 0.86, 1, 1, 1.16, 1.34];
+  return list.map((n) => {
+    const size = SIZES[Math.floor(Math.random() * SIZES.length)];
+    const shift = (Math.random() * 0.24 - 0.12).toFixed(2);
+    const tilt = (Math.random() * 6 - 3).toFixed(1);
+    const tone = n.new ? 'new' : ['t1', 't2', 't3'][Math.floor(Math.random() * 3)];
+    return `<span class="${tone}" style="font-size:${size}em;transform:translateY(${shift}em) rotate(${tilt}deg)">${esc(n.name)}</span>`;
+  }).join('');
+}
+
+/** The same scatter for as long as the pane is up; a new one each time it comes back or the names change. */
+let cloudKey = '', cloudHtml = '';
+function cloudFor(t) {
+  const key = `${tdShown}|${t.updated ?? ''}|${t.names.length}|${LANG}`;
+  if (key !== cloudKey) { cloudKey = key; cloudHtml = cloud(t.names); }
+  return cloudHtml;
+}
+
 function thanksHtml(data) {
   const t = data?.thanks;
   // No names from the portal yet: Join the club on its own.
   if (!t?.names?.length) return `<div class="td-join-only">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
   return `<div class="td-thanks"><h1>${esc(pick(t.title))}</h1>
-    <div class="names" id="tdNames">${t.names.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>
+    <div class="names" id="tdNames">${cloudFor(t)}</div></div>
     <div class="td-right">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
 }
 /** The biggest text at which every name fits in its box: no scrolling, no empty half-screen. */
@@ -236,8 +265,8 @@ function fitNames() {
 function renderTrackDay() {
   const data = tdData();
 
-  const pay = state?.trackdayUrl || CARDS[0].builtIn;
-  CARDS[0].url = pay;
+  CARDS[0].url = state?.trackdayUrl || CARDS[0].builtIn;
+  CARDS[1].url = pick(data?.join_url) || CARDS[1].builtIn;
   const now = new Date();
   $('main').className = 'pb-main td2';
   $('main').innerHTML = tdPane === 'thanks' ? thanksHtml(data) : `
@@ -270,7 +299,7 @@ setInterval(() => {
   tdSince = Date.now();
   if (next === tdPane) return;
   $('main').classList.add('td-fade');
-  setTimeout(() => { tdPane = next; tdWeek = 0; renderTrackDay(); requestAnimationFrame(() => $('main').classList.remove('td-fade')); }, 420);
+  setTimeout(() => { tdPane = next; tdWeek = 0; tdShown++; renderTrackDay(); requestAnimationFrame(() => $('main').classList.remove('td-fade')); }, 420);
 }, 500);
 // For screenshots and checking: ?pane=thanks opens on the thank-you screen.
 if (new URLSearchParams(location.search).get('pane') === 'thanks') tdPane = 'thanks';
