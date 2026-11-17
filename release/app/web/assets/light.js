@@ -1,11 +1,15 @@
-// The webcam as a light meter: every 20 s the RD PC gets the picture's average brightness
-// (0-255), nothing else. No picture is kept or sent. The server decides from that whether the
+// The webcam as a light meter: once a minute it opens the webcam for a moment (about two
+// seconds: the picture needs a moment to settle its exposure), and the RD PC gets the picture's
+// average brightness (0-255), nothing else. Then the webcam closes again, so its light only
+// blinks once a minute (Janno 17.11.2026: not on all the time). No picture is kept or sent. The server decides from that whether the
 // lights are on. Used by the kiosk page, and by the big screen when it runs on a PC of its own
 // (the Linux kiosk PC can show the big screen with the Sign in flyout: then it has the webcam).
 import { post } from './common.js';
 
 /** A webcam that doesn't answer (Linux, right after the photo step) must not stall the light check. */
 const LIGHT_OPEN_MS = 10_000;
+/** How often, and how long the picture gets to settle before it is measured. */
+const EVERY_MS = 60_000, SETTLE_MS = 1500;
 const inTime = (promise, ms) => Promise.race([promise, new Promise((_, no) => setTimeout(() => no(Object.assign(new Error('no answer'), { name: 'TimeoutError' })), ms))]);
 
 const WHY = {
@@ -45,7 +49,7 @@ export function startLightMeter({ busy = () => false, quietWithoutCamera = false
       // Too late is no use: if the webcam answers after all, let it go again.
       if (err?.name === 'TimeoutError') asking.then((late) => { if (late !== lightStream) late.getTracks().forEach((t) => t.stop()); }).catch(() => {});
       stop();
-      retryAt = Date.now() + 60_000; // no camera, or busy: try again in a minute
+      retryAt = Date.now() + EVERY_MS - 5000; // no camera, or busy: try again next time
       noCamera = err?.name === 'NotFoundError' || err?.name === 'OverconstrainedError';
       problem = WHY[err?.name] ?? `the webcam would not open (${err?.name ?? ''} ${err?.message ?? err})`.trim();
     } finally {
@@ -74,11 +78,14 @@ export function startLightMeter({ busy = () => false, quietWithoutCamera = false
     }
     if (busy()) { stop(); return; }
     await open();
-    const l = level();
+    if (lightStream) await new Promise((r) => setTimeout(r, SETTLE_MS));
+    const l = busy() ? null : level();
+    stop(); // closed until the next look: the webcam's light is only on for a moment
+    if (busy()) return;
     if (l !== null) post('/api/light', { level: Math.round(l) }).catch(() => {});
     else if (!(quietWithoutCamera && noCamera)) post('/api/light', { problem: problem || (opening ? 'the webcam is still opening' : 'the webcam opened but gives no picture yet') }).catch(() => {});
   }
   setTimeout(check, 3000);
-  setInterval(check, 20_000);
+  setInterval(check, EVERY_MS);
   return { stop };
 }

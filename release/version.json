@@ -1,9 +1,9 @@
 {
- "version": "2026.11.17-2002",
+ "version": "2026.11.17-2027",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "d7073b7bdc73715734a893bb3b615f9f40812f6726f7b16b4ac1ca70cb31aecd"
+   "sha256": "1ea1b3adc035b5e270a480e134c897a6cb00ee6b7fa954894b4a1eba23b31f90"
   },
   {
    "path": "web/assets/avatars.js",
@@ -123,7 +123,7 @@
   },
   {
    "path": "web/assets/light.js",
-   "sha256": "9f83a1cff01860630bb194ce7225e12bb48ef583cedaf0edcdba14ccf7618749"
+   "sha256": "ae8290ed91deff49a794746efafb4745ec3dc07653c7c5cee4d215b008c660ed"
   },
   {
    "path": "web/assets/mark-car-small.svg",
