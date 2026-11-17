@@ -439,6 +439,7 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
   box.innerHTML = `<div class="vp-menu">${views.map(([href, label]) =>
     `<a href="${href}" class="${href === here ? 'on' : ''}">${label}</a>`).join('')}
       <button class="vp-restart">↻ Restart · check for updates</button>
+      ${rd ? '' : `<button class="vp-setup">${tr('Set up this PC (Linux)')}</button>`}
       <span class="vp-version"></span></div>
     <span class="vp-ver"></span>
     <button class="vp-btn" aria-label="Change view" title="Change view">
@@ -454,11 +455,47 @@ const VIEWS = [['/screen', 'Big screen'], ['/kiosk', 'Kiosk']];
     } else clearTimeout(timer);
   });
   box.querySelector('.vp-restart').addEventListener('click', (e) => { e.stopPropagation(); close(); restart(); });
+  box.querySelector('.vp-setup')?.addEventListener('click', (e) => { e.stopPropagation(); close(); kioskSetup(here === '/screen' ? 'screen' : 'kiosk'); });
   document.addEventListener('click', (e) => { if (!box.contains(e.target)) close(); });
   document.body.appendChild(box);
   // The running version, small and faint next to the picker.
   fetch('/api/info').then((r) => r.json()).then((i) => { if (i.version) box.querySelector('.vp-ver').textContent = /^\d/.test(i.version) ? `v${i.version}` : i.version; }).catch(() => {});
 })();
+
+/**
+ * "Set up this PC" (Janno 17.11.2026): the one command for a Linux kiosk PC, to copy and paste
+ * into a terminal, so nobody types it there. It downloads kiosk.sh from the RD PC with its
+ * address filled in and runs it; from then on kiosk.sh starts at login, keeps itself up to date
+ * and puts a "Restart tgiFlyDay kiosk" icon on the desktop.
+ */
+function kioskSetup(page) {
+  const url = `http://${location.host}/kiosk.sh?page=${page}`;
+  const cmd = `(wget -qO- "${url}" || curl -s "${url}") > ~/kiosk.sh && bash ~/kiosk.sh`;
+  const box = document.createElement('div');
+  box.className = 'setup-cover';
+  box.innerHTML = `<div class="setup-card">
+      <h2>${tr('Set up this PC (Linux)')}</h2>
+      <ol>
+        <li>${tr('Copy the command.')}</li>
+        <li>${tr('Open a terminal: Ctrl+Alt+T (or Alt+Tab to one that is open).')}</li>
+        <li>${tr('Paste it with Ctrl+Shift+V and press Enter.')}</li>
+      </ol>
+      <textarea readonly rows="3" spellcheck="false" data-no-i18n>${esc(cmd)}</textarea>
+      <p class="hint">${tr('The kiosk closes and opens again. From then on it starts by itself at login, keeps itself up to date, and the desktop has a Restart tgiFlyDay kiosk icon.')}</p>
+      <div class="row"><button class="primary" data-copy>${tr('Copy the command')}</button><button data-close>${tr('Close')}</button></div>
+    </div>`;
+  document.body.appendChild(box);
+  const ta = box.querySelector('textarea');
+  box.addEventListener('click', async (e) => {
+    if (e.target === box || e.target.closest('[data-close]')) return box.remove();
+    const b = e.target.closest('[data-copy]');
+    if (!b) return;
+    ta.focus(); ta.select();
+    let ok = false;
+    try { await navigator.clipboard.writeText(cmd); ok = true; } catch { try { ok = document.execCommand('copy'); } catch {} }
+    b.textContent = ok ? tr('Copied') : tr('Select it and press Ctrl+C');
+  });
+}
 
 /**
  * Restart: tgiFlyDay on the RD PC looks for a newer version on GitHub. If there is one it

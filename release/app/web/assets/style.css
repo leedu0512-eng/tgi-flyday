@@ -593,6 +593,15 @@ body.embedded .kiosk .view { padding-top: 24px; }
 .view-picker .vp-menu .vp-restart:hover { background: #1c1c1c; color: #fff; }
 .view-picker .vp-menu .vp-version { padding: 0 16px 10px; color: #555; font-size: 11px; }
 .view-picker .vp-menu .vp-version:empty { display: none; }
+.setup-cover { position: fixed; inset: 0; z-index: 210; background: rgba(0, 0, 0, .88); display: grid; place-items: center; padding: 24px; font-family: var(--font); }
+.setup-card { width: min(720px, 100%); background: #111; border: 1px solid #333; border-top: 4px solid var(--accent); border-radius: 10px; padding: 24px 28px; color: #fff; }
+.setup-card h2 { margin: 0 0 12px; font: 900 30px/1.1 var(--display); text-transform: uppercase; }
+.setup-card ol { margin: 0 0 14px; padding-left: 22px; font-size: 18px; line-height: 1.5; }
+.setup-card textarea { width: 100%; box-sizing: border-box; background: #000; color: #ffb27a; border: 1px solid #444; border-radius: 6px; padding: 12px; font: 15px/1.4 ui-monospace, monospace; resize: none; }
+.setup-card .hint { color: var(--muted); font-size: 15px; margin: 10px 0 16px; }
+.setup-card .row { display: flex; gap: 12px; justify-content: flex-end; }
+.setup-card button { font: 800 18px/1 var(--display); text-transform: uppercase; padding: 14px 22px; border-radius: 8px; border: 1px solid #444; background: #1a1a1a; color: #fff; cursor: pointer; }
+.setup-card button.primary { background: var(--accent); border-color: var(--accent); color: #000; }
 .restart-cover { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.88); display: grid; place-items: center; color: #fff; text-align: center; font-family: var(--font); }
 .restart-cover b { display: block; font-family: var(--display); font-size: 48px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.03em; }
 .restart-cover span { display: block; margin-top: 10px; font-size: 20px; color: #aaa; }

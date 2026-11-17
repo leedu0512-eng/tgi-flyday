@@ -1,9 +1,14 @@
 #!/bin/bash
 # tgiFlyDay pilot kiosk on a Linux PC (with a webcam for pilot photos).
 #
-# Set the RD PC's address below: the RD console shows it under "Kiosk on another PC".
-# Use the number (e.g. 192.168.1.10); Windows PC names often don't work from Linux.
-# Then run:  bash kiosk.sh      (close the kiosk with Alt+F4; running it again restarts it)
+# Easiest: on the kiosk PC, open the kiosk page's corner menu (bottom right) → "Set up this PC"
+# and paste the command it copies into a terminal. That downloads this file with the RD PC's
+# address already in it and runs it.
+# By hand: set the RD PC's address below (the number, e.g. 192.168.1.10; Windows PC names
+# often don't work from Linux), then run:  bash kiosk.sh
+# Close the kiosk with Alt+F4; running it again restarts it. It also starts by itself at login,
+# there is a "Restart tgiFlyDay kiosk" icon on the desktop and in the apps, and the RD console
+# can restart it (Settings → Kiosk screen). It keeps itself up to date from the RD PC.
 #
 # Browsers only let a page use the camera over https or when told it's fine, so this starts
 # Chromium/Chrome (or Firefox) with its own profile that trusts tgiFlyDay's page and allows
@@ -50,16 +55,65 @@ fi
 echo "Waiting for tgiFlyDay on $RDPC ..."
 until (exec 3<>"/dev/tcp/$RDPC/$PORT") 2>/dev/null; do sleep 3; done
 
+# A file from the RD PC, without curl or wget (plain bash). get <path> <file>
+get() {
+  { exec 3<>"/dev/tcp/$RDPC/$PORT" && printf 'GET %s HTTP/1.0\r\nHost: %s\r\n\r\n' "$1" "$RDPC" >&3 \
+    && timeout 15 cat <&3 > "$2.raw"; exec 3>&-; } 2>/dev/null
+  # Drop the HTTP header (everything up to the first empty line).
+  local n; n=$(grep -abn -m1 $'^\r\{0,1\}$' "$2.raw" 2>/dev/null | cut -d: -f1)
+  [ -n "$n" ] && tail -n +"$((n + 1))" "$2.raw" > "$2"; rm -f "$2.raw"
+  [ -s "$2" ]
+}
+
+# Up to date with the RD PC: its copy of this file has this PC's settings filled in. When it
+# differs, take it and start again with it (once).
+SELF="$(readlink -f "$0")"
+if [ -z "$TGIFLYDAY_KIOSK_UPDATED" ] && get "/kiosk.sh?rdpc=$RDPC&port=$PORT&page=$PAGE" "$SELF.new" \
+  && head -1 "$SELF.new" | grep -q '^#!/bin/bash' && ! cmp -s "$SELF.new" "$SELF"; then
+  mv "$SELF.new" "$SELF" && chmod +x "$SELF"
+  echo "Updated kiosk.sh from the RD PC."
+  TGIFLYDAY_KIOSK_UPDATED=1 exec bash "$SELF" "$@"
+fi
+rm -f "$SELF.new"
+
+# Start with the desktop, and a "Restart tgiFlyDay kiosk" icon on the desktop and in the apps.
+mkdir -p "$HOME/.config/autostart" "$HOME/.local/share/applications" "$HOME/.local/share/icons"
+get /assets/icons/app-icon-192.png "$HOME/.local/share/icons/tgiflyday-kiosk.png.new" && head -c 4 "$HOME/.local/share/icons/tgiflyday-kiosk.png.new" | grep -q PNG \
+  && mv "$HOME/.local/share/icons/tgiflyday-kiosk.png.new" "$HOME/.local/share/icons/tgiflyday-kiosk.png"
+rm -f "$HOME/.local/share/icons/tgiflyday-kiosk.png.new"
+launcher() {
+  cat > "$1" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=$2
+Comment=Opens the tgiFlyDay kiosk again (closes the one that is open)
+Exec=bash "$SELF"
+Icon=$HOME/.local/share/icons/tgiflyday-kiosk.png
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+DESKTOP
+  chmod +x "$1"
+}
+launcher "$HOME/.config/autostart/tgiflyday-kiosk.desktop" "tgiFlyDay kiosk"
+launcher "$HOME/.local/share/applications/tgiflyday-kiosk.desktop" "Restart tgiFlyDay kiosk"
+DESK=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
+if [ -d "$DESK" ]; then
+  launcher "$DESK/tgiflyday-kiosk.desktop" "Restart tgiFlyDay kiosk"
+  gio set "$DESK/tgiflyday-kiosk.desktop" metadata::trusted true 2>/dev/null
+fi
+
 # The screen on or dark as tgiFlyDay says (calendar hours, practice, somebody here): the helper
 # comes from the RD PC each time, so it updates with tgiFlyDay. Off in the RD console:
 # Settings -> Kiosk screen.
 pkill -f "tgi-flyday-screen" 2>/dev/null
 HELPER="$HOME/.config/tgi-flyday-screen.sh"
-mkdir -p "$HOME/.config"
-{ exec 3<>"/dev/tcp/$RDPC/$PORT" && printf 'GET /kiosk-screen.sh HTTP/1.0\r\nHost: %s\r\n\r\n' "$RDPC" >&3 \
-  && timeout 10 cat <&3 | sed '1,/^\r\{0,1\}$/d' > "$HELPER.new"; exec 3>&-; } 2>/dev/null
-if head -1 "$HELPER.new" 2>/dev/null | grep -q '^#!/bin/bash'; then mv "$HELPER.new" "$HELPER"; fi
-[ -f "$HELPER" ] && nohup $INHIBIT bash "$HELPER" "$RDPC" "$PORT" >"$HOME/.config/tgi-flyday-screen.log" 2>&1 &
+if get /kiosk-screen.sh "$HELPER.new" && head -1 "$HELPER.new" | grep -q '^#!/bin/bash'; then mv "$HELPER.new" "$HELPER"; fi
+rm -f "$HELPER.new"
+LOG="$HOME/.config/tgi-flyday-screen.log"
+[ -f "$LOG" ] && [ "$(stat -c %s "$LOG" 2>/dev/null || echo 0)" -gt 200000 ] && tail -n 200 "$LOG" > "$LOG.old" && mv "$LOG.old" "$LOG"
+echo "$(date '+%d.%m %H:%M') kiosk.sh started" >> "$LOG"
+[ -f "$HELPER" ] && setsid nohup $INHIBIT bash "$HELPER" "$RDPC" "$PORT" "$SELF" >>"$LOG" 2>&1 &
 
 if [ -n "$BROWSER" ]; then
   DIR=$(profile "$BROWSER")

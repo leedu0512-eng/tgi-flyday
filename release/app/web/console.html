@@ -210,6 +210,7 @@
           <h3>Kiosk screen</h3>
           <label class="toggle wide"><input type="checkbox" id="kioskSleep"><span><b>Dark when nothing is on</b>: the kiosk PC's screen is on from an hour before the day's first event in the calendar until an hour after the last, and while practice runs or somebody uses tgiFlyDay. Otherwise it switches off (the PC keeps running), and comes back on by itself. A touch wakes it for 10 minutes. Off: always on, never the screensaver.</span></label>
           <p class="hint" id="kioskScreenNow"></p>
+          <p><button class="btn" id="kioskRestart">Restart the kiosk</button> <span class="hint" id="kioskRestartNote">Closes and opens the kiosk browser on the Linux kiosk PC, within a minute. Setting up a new kiosk PC: on it, the kiosk page's corner menu → Set up this PC.</span></p>
         </section>
         <section class="drawer-sec">
           <h3>Online history <span id="outboxSum" class="muted"></span></h3>
@@ -879,6 +880,9 @@ $('freeFlight').onchange = (e) => act('/api/config', { freeFlight: e.target.chec
 $('autoStart').onchange = (e) => act('/api/config', { autoStart: e.target.checked });
 $('nightStop').onchange = (e) => act('/api/config', { nightStop: e.target.checked });
 $('kioskSleep').onchange = (e) => act('/api/config', { kioskSleep: e.target.checked });
+$('kioskRestart').onclick = async () => {
+  try { await post('/api/kiosk/restart'); toast(tr('The kiosk restarts within a minute.'), true); } catch (err) { toast(err.message); }
+};
 /** What the kiosk PC's screen does now, and whether the kiosk PC is following it. */
 function renderKioskScreen() {
   const k = state?.kioskScreen;
@@ -892,6 +896,9 @@ function renderKioskScreen() {
     ? tr('The kiosk PC is following it.')
     : tr('The kiosk PC isn\'t asking: start it with the new kiosk.sh (Linux).');
   $('kioskScreenNow').textContent = `${now} ${k.why === 'off' ? '' : hours + ' '}${asked}`;
+  $('kioskRestart').disabled = !!k.restartAt;
+  if (k.restartAt) $('kioskRestart').textContent = tr('Restart asked…');
+  else $('kioskRestart').textContent = tr('Restart the kiosk');
 }
 // 18:00 to 23:30, every half hour.
 $('nightStopAt').innerHTML = Array.from({ length: 12 }, (_, i) => 18 * 60 + i * 30)

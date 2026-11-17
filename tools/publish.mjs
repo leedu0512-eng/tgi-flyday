@@ -38,6 +38,8 @@ esbuild.buildSync({
   logLevel: 'warning',
 });
 cpSync(join(ROOT, 'web'), join(OUT, 'app', 'web'), { recursive: true });
+// The Linux kiosk's kiosk.sh, served by the RD PC at /kiosk.sh with its address filled in.
+cpSync(join(ROOT, 'kiosk.sh'), join(OUT, 'app', 'web', 'kiosk.sh'));
 
 const files = [];
 (function walk(dir) {

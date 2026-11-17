@@ -2,19 +2,21 @@
 # tgiFlyDay: the kiosk PC's screen on or dark, as tgiFlyDay says (Janno 17.11.2026).
 #
 # kiosk.sh downloads this from the RD PC every time it starts and runs it in the background:
-#   bash kiosk-screen.sh <RD PC address> <port>
-# Every minute it asks http://<RD PC>:<port>/api/kiosk-screen: "on" or "dark".
+#   bash kiosk-screen.sh <RD PC address> <port> <kiosk.sh>
+# Every minute it asks http://<RD PC>:<port>/api/kiosk-screen: "on", "dark" or "restart".
 #   on   = the calendar has something on (from an hour before the day's first event until an
 #          hour after the last), practice is running, or somebody used tgiFlyDay in the last
 #          15 minutes: wake the screen and keep it on (no screensaver, no blanking).
 #   dark = switch the screen off. The PC keeps running (the webcam still sees the lights).
 #          A touch wakes it; it goes dark again after 10 minutes unless somebody signs in.
+#   restart = the RD console's Restart button: run kiosk.sh again (browser and this helper).
 # No answer from the RD PC: leave the screen as it is.
 # Works on GNOME (Ubuntu, X11 or Wayland) and other X11 desktops; what a desktop doesn't
 # understand is skipped quietly.
 
 RDPC="$1"
 PORT="${2:-8080}"
+KIOSK_SH="$3"
 [ -z "$RDPC" ] && { echo "usage: kiosk-screen.sh <RD PC address> [port]"; exit 1; }
 DARK_AGAIN_S=600
 
@@ -42,6 +44,7 @@ ask() {
   case "$reply" in
     *$'\r\n\r\n'on*) echo on ;;
     *$'\r\n\r\n'dark*) echo dark ;;
+    *$'\r\n\r\n'restart*) echo restart ;;
     *) return 1 ;;
   esac
 }
@@ -70,6 +73,12 @@ dark_at=0
 while true; do
   if word=$(ask); then
     now=$(date +%s)
+    if [ "$word" = restart ]; then
+      echo "$(date +%H:%M) restart from the RD console"
+      screen_on
+      [ -n "$KIOSK_SH" ] && [ -f "$KIOSK_SH" ] && setsid nohup bash "$KIOSK_SH" >/dev/null 2>&1 &
+      sleep 60; continue
+    fi
     if [ "$word" = on ]; then
       screen_on
     elif [ "$last" != dark ] || [ $((now - dark_at)) -ge $DARK_AGAIN_S ]; then

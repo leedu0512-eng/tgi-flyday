@@ -174,9 +174,11 @@ outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostnam
 const screenFeed = new ScreenFeed(resolve(DATA_FILE, '..'));
 /** The kiosk PC's screen on or dark (Janno 17.11.2026), and when the kiosk PC last asked. */
 let kioskAskedAt: number | null = null;
+/** The RD console's "Restart the kiosk": the kiosk PC's helper gets "restart" once, within a minute. */
+let kioskRestartAt: number | null = null;
 const kioskNow = (now: number) => kioskScreen({ sleep: engine.config.kioskSleep !== false, data: screenFeed.data, now,
   practice: engine.clock.phase !== 'stopped' && engine.clock.phase !== 'waiting', lastActivity: engine.lastActivity });
-const snapshot = (now: number) => ({ ...engine.snapshot(now), kioskScreen: { ...kioskNow(now), askedAt: kioskAskedAt }, trackdayUrl: pairing.state.trackdayUrl, trackdayScreen: screenFeed.data,
+const snapshot = (now: number) => ({ ...engine.snapshot(now), kioskScreen: { ...kioskNow(now), askedAt: kioskAskedAt, restartAt: kioskRestartAt }, trackdayUrl: pairing.state.trackdayUrl, trackdayScreen: screenFeed.data,
   trackdayScreenError: screenFeed.lastError, trackdayScreenTry: screenFeed.lastTry, outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
 /** Hello to Flyday: approval, token, send on or off, all decided there. Then send what's waiting. */
 async function helloFlyday() {
@@ -439,8 +441,33 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   if (path === '/api/kiosk-screen' && req.method === 'GET') {
     kioskAskedAt = Date.now();
     const k = kioskNow(kioskAskedAt);
+    const restartNow = kioskRestartAt !== null && kioskAskedAt - kioskRestartAt < 5 * 60_000;
+    if (kioskRestartAt !== null) { kioskRestartAt = null; stateDirty = true; }
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
-    return res.end(`${k.awake ? 'on' : 'dark'}\n`);
+    return res.end(`${restartNow ? 'restart' : k.awake ? 'on' : 'dark'}\n`);
+  }
+  if (path === '/api/kiosk/restart' && req.method === 'POST') {
+    kioskRestartAt = Date.now();
+    stateDirty = true;
+    return json(res, 200, { ok: true });
+  }
+  // kiosk.sh with this PC's address (the one the kiosk PC reached) filled in: the kiosk page's
+  // "Set up this PC" command downloads it, and kiosk.sh keeps itself up to date from it.
+  if (path === '/kiosk.sh' && req.method === 'GET') {
+    let text = '';
+    try { text = (await webFile(join(WEB, 'kiosk.sh'))).toString('utf8'); } catch {
+      try { text = await readFile(join(ROOT, 'kiosk.sh'), 'utf8'); } catch {}
+    }
+    if (!text) return json(res, 404, { error: 'kiosk.sh is not in this version' });
+    const q = url.searchParams;
+    const host = (req.headers.host ?? '').replace(/:\d+$/, '');
+    const rdpc = /^[\w.-]{1,100}$/.test(q.get('rdpc') ?? '') ? q.get('rdpc')! : /^[\w.-]{1,100}$/.test(host) ? host : '';
+    const port = /^\d{2,5}$/.test(q.get('port') ?? '') ? q.get('port')! : String(PORT);
+    const page = q.get('page') === 'screen' ? 'screen' : 'kiosk';
+    if (rdpc) text = text.replace(/^RDPC=.*$/m, `RDPC=${rdpc}`);
+    text = text.replace(/^PORT=.*$/m, `PORT=${port}`).replace(/^PAGE=.*$/m, `PAGE=${page}`);
+    res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    return res.end(text);
   }
   if (path === '/api/info' && req.method === 'GET') return json(res, 200, { hostname: hostname(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall: firewallNow() });
   // Console: "Let them in" (Windows Firewall), one permission prompt on this PC.

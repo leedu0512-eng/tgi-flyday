@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1937" : "dev";
+var VERSION = true ? "2026.11.17-1948" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -3500,6 +3500,7 @@ var pairing = new Install((0, import_node_path7.resolve)(DATA_FILE, ".."));
 outbox = new Outbox((0, import_node_path7.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
 var screenFeed = new ScreenFeed((0, import_node_path7.resolve)(DATA_FILE, ".."));
 var kioskAskedAt = null;
+var kioskRestartAt = null;
 var kioskNow = (now) => kioskScreen({
   sleep: engine.config.kioskSleep !== false,
   data: screenFeed.data,
@@ -3509,7 +3510,7 @@ var kioskNow = (now) => kioskScreen({
 });
 var snapshot = (now) => ({
   ...engine.snapshot(now),
-  kioskScreen: { ...kioskNow(now), askedAt: kioskAskedAt },
+  kioskScreen: { ...kioskNow(now), askedAt: kioskAskedAt, restartAt: kioskRestartAt },
   trackdayUrl: pairing.state.trackdayUrl,
   trackdayScreen: screenFeed.data,
   trackdayScreenError: screenFeed.lastError,
@@ -3758,9 +3759,40 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   if (path === "/api/kiosk-screen" && req.method === "GET") {
     kioskAskedAt = Date.now();
     const k = kioskNow(kioskAskedAt);
+    const restartNow = kioskRestartAt !== null && kioskAskedAt - kioskRestartAt < 5 * 6e4;
+    if (kioskRestartAt !== null) {
+      kioskRestartAt = null;
+      stateDirty = true;
+    }
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
-    return res.end(`${k.awake ? "on" : "dark"}
+    return res.end(`${restartNow ? "restart" : k.awake ? "on" : "dark"}
 `);
+  }
+  if (path === "/api/kiosk/restart" && req.method === "POST") {
+    kioskRestartAt = Date.now();
+    stateDirty = true;
+    return json(res, 200, { ok: true });
+  }
+  if (path === "/kiosk.sh" && req.method === "GET") {
+    let text2 = "";
+    try {
+      text2 = (await webFile((0, import_node_path7.join)(WEB, "kiosk.sh"))).toString("utf8");
+    } catch {
+      try {
+        text2 = await (0, import_promises2.readFile)((0, import_node_path7.join)(ROOT, "kiosk.sh"), "utf8");
+      } catch {
+      }
+    }
+    if (!text2) return json(res, 404, { error: "kiosk.sh is not in this version" });
+    const q = url.searchParams;
+    const host = (req.headers.host ?? "").replace(/:\d+$/, "");
+    const rdpc = /^[\w.-]{1,100}$/.test(q.get("rdpc") ?? "") ? q.get("rdpc") : /^[\w.-]{1,100}$/.test(host) ? host : "";
+    const port = /^\d{2,5}$/.test(q.get("port") ?? "") ? q.get("port") : String(PORT);
+    const page = q.get("page") === "screen" ? "screen" : "kiosk";
+    if (rdpc) text2 = text2.replace(/^RDPC=.*$/m, `RDPC=${rdpc}`);
+    text2 = text2.replace(/^PORT=.*$/m, `PORT=${port}`).replace(/^PAGE=.*$/m, `PAGE=${page}`);
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+    return res.end(text2);
   }
   if (path === "/api/info" && req.method === "GET") return json(res, 200, { hostname: (0, import_node_os2.hostname)(), port: PORT, addresses: lanAddresses(), version: VERSION, firewall: firewallNow() });
   if (path === "/api/firewall/allow" && req.method === "POST") {
