@@ -152,14 +152,20 @@ function demoData() {
   const events = [];
   for (const w of [-7, 0, 7, 14]) {
     const e = (day, h1, m1, h2, m2, kind, title, color = null, look = null) => events.push({ id: `${w}-${day}-${h1}`, start: at(day + w, h1, m1), end: at(day + w, h2, m2), kind, title, color, look });
-    e(0, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' }, '#22C55E', 'ring');
-    e(1, 16, 0, 17, 30, 'class', { et: 'Varblane', en: 'Sparrow' }, '#3B82F6', 'ring');
+    e(0, 17, 30, 20, 0, 'drone', { et: 'Drooniring', en: 'Drone club' }, '#FF6F00', 'ring');
+    e(1, 16, 0, 17, 30, 'class', { et: 'Varblane', en: 'Sparrow' }, '#00A04A', 'ring');
     e(2, 9, 0, 21, 0, 'track', { et: 'Vaba rada', en: 'Open track' }, '#FF6B00', 'open');
-    e(3, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' }, '#22C55E', 'ring');
+    e(3, 17, 30, 20, 0, 'drone', { et: 'Drooniring', en: 'Drone club' }, '#FF6F00', 'ring');
     e(4, 13, 30, 15, 30, 'other', { et: 'Suletud', en: 'Closed' }, null, 'closed');
     e(5, 10, 0, 18, 0, 'track', { et: 'Vaba rada', en: 'Open track' }, '#FF6B00', 'open');
     if (w === 0) e(5, 12, 0, 15, 0, 'other', { et: 'Klubipäev', en: 'Club day' }, null, 'club');
     e(6, 10, 0, 16, 0, 'track', { et: 'Vaba rada', en: 'Open track' }, '#E879F9', 'open');
+    e(2, 17, 30, 19, 0, 'class', { et: 'Mudeliring', en: 'Model club' }, '#1A47FF', 'ring');
+    if (w === 0) {
+      e(6, 12, 0, 14, 0, 'other', { et: 'Drooniralli', en: 'Drone rally' }, '#FF6F00', 'race');
+      e(3, 16, 0, 17, 0, 'class', { et: 'Varblane', en: 'Sparrow' }, '#00A04A', 'off');
+      events.push({ id: 'band', start: at(4, 0, 0), end: at(6, 0, 0), all_day: true, kind: 'other', title: { et: 'Koolivaheaeg', en: 'School break' }, color: null, look: 'period' });
+    }
   }
   const names = ['Karl', 'Sven', 'Mari', 'Liis', 'Kristjan', 'Mia', 'Leo', 'Rasmus', 'Hanna', 'Oskar', 'Laura', 'Markus', 'Eliise', 'Robin', 'Kaspar', 'Grete', 'Martin', 'Sofia', 'Andres', 'Kertu', 'Joonas', 'Emma', 'Tanel', 'Maria', 'Siim', 'Anna', 'Rein', 'Helen', 'Marko', 'Kadri', 'Funrent', 'Velvet', 'Priit', 'Triin', 'Aivar', 'Elisabeth', 'Henri', 'Johanna', 'Kevin', 'Merilin', 'Tõnu', 'Ülle', 'Jüri', 'Katrin', 'Taavi', 'Pille', 'Erik', 'Hobipood', 'Janek', 'Signe', 'Mihkel', 'Lisette', 'Toomas', 'Getter', 'Artur', 'Liisa'];
   const mixed = names.map((name) => ({ name, new: false })).sort(() => Math.random() - 0.5);
@@ -173,30 +179,78 @@ function demoData() {
 }
 const tdData = () => state?.trackdayScreen ?? (DEMO ? demoData() : null);
 
+/** A colour from the portal (#RRGGBB), else one for the kind of event. */
+const KIND_COLOR = { track: '#FF6B00', drone: '#22C55E', class: '#3B82F6', other: '#9A9A9A' };
+const colorOf = (e) => (e.color && /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : KIND_COLOR[e.kind] ?? KIND_COLOR.other);
+const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+/**
+ * The week as a calendar (Janno 17.11.2026): days across, hours down, each session a block in the
+ * website calendar's look (website code, 17.11.2026): regular = group-colour border with thin
+ * diagonal lines, race = solid, Vaba rada = dashed, whole club = solid (light here: black would
+ * vanish), closed = hatched, cancelled = grey and struck through, past = faded, today outlined.
+ */
 function calendarHtml(data) {
   const mon = mondayOf(new Date());
   mon.setDate(mon.getDate() + tdWeek * 7);
   const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
-  const today = new Date().toDateString();
+  const now = new Date();
   const loc = LANG === 'et' ? 'et-EE' : 'en-GB';
   const range = `${mon.getDate()}.${mon.getMonth() + 1}–${sun.getDate()}.${sun.getMonth() + 1}`;
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); return d; });
-  const cols = days.map((d) => {
-    const evs = (data?.events ?? [])
-      .filter((e) => new Date(e.start).toDateString() === d.toDateString())
-      .sort((a, b) => new Date(a.start) - new Date(b.start));
-    const items = evs.map((e) => {
-      const st = new Date(e.start), en = e.end ? new Date(e.end) : null;
-      const when = e.all_day ? tr('All day') : `${hhmm(st)}${en ? `–${hhmm(en)}` : ''}`;
-      // The website's calendar colours (website-integration.md): group colour, open dashed, club solid, closed hatched.
-      const look = e.look ? ` look-${esc(e.look)}` : '';
-      const col = e.color && /^#[0-9a-f]{6}$/i.test(e.color) ? ` style="--ev:${e.color}"` : '';
-      return `<div class="ev ${esc(e.kind ?? 'other')}${look}${col ? ' has-color' : ''}${e.cancelled ? ' off' : ''}"${col}><span class="t num">${when}${e.cancelled ? ` · ${tr('cancelled')}` : ''}</span><b>${esc(pick(e.title))}</b></div>`;
-    }).join('');
-    return `<div class="day ${d.toDateString() === today ? 'today' : ''}">
-      <div class="dh"><span>${d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '')}</span><b class="num">${d.getDate()}</b></div>
-      <div class="evs">${items || '<i class="none">–</i>'}</div></div>`;
+  const weekEnd = new Date(mon); weekEnd.setDate(weekEnd.getDate() + 7);
+  const evs = (data?.events ?? []).filter((e) => {
+    const st = new Date(e.start), en = e.end ? new Date(e.end) : st;
+    return st < weekEnd && en >= mon;
+  });
+  const isBand = (e) => e.all_day || e.look === 'period';
+  const timed = evs.filter((e) => !isBand(e));
+  // The hours to draw: what this week needs, at least 9:00–21:00.
+  let h0 = 9, h1 = 21;
+  for (const e of timed) {
+    const st = new Date(e.start), en = e.end ? new Date(e.end) : new Date(st.getTime() + 3600_000);
+    h0 = Math.min(h0, st.getHours());
+    h1 = Math.max(h1, en.getDate() !== st.getDate() ? 24 : Math.ceil(en.getHours() + en.getMinutes() / 60));
+  }
+  const span = (h1 - h0) * 60;
+  const head = days.map((d) => `<div class="cg-day ${dayKey(d) === dayKey(now) ? 'today' : ''}"><span>${d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '')}</span><b class="num">${d.getDate()}</b></div>`).join('');
+  const block = (e, extra = '', style = '') => {
+    const st = new Date(e.start), en = e.end ? new Date(e.end) : null;
+    const look = e.cancelled ? 'off' : (e.look ?? 'ring');
+    const past = (en ?? st) < now ? ' past' : '';
+    const when = isBand(e) ? '' : `<span class="t num">${hhmm(st)}${en ? `–${hhmm(en)}` : ''}</span>`;
+    return `<div class="cg-ev look-${esc(look)}${past}${extra}" style="--ev:${colorOf(e)};${style}">${when}<b>${esc(pick(e.title))}</b></div>`;
+  };
+  // All-day events and multi-day periods: a row above the hours, on every day they cover.
+  const bands = days.map((d) => {
+    const next = new Date(d); next.setDate(next.getDate() + 1);
+    const here = evs.filter((e) => isBand(e) && new Date(e.start) < next && (e.end ? new Date(e.end) : new Date(e.start)) >= d);
+    return `<div class="cg-band">${here.map((e) => block(e)).join('')}</div>`;
   }).join('');
+  const hasBands = evs.some(isBand);
+  // Timed sessions: placed by the clock; ones that overlap share the column side by side.
+  const cols = days.map((d) => {
+    const list = timed.filter((e) => dayKey(new Date(e.start)) === dayKey(d)).sort((a, b) => new Date(a.start) - new Date(b.start));
+    const lanes = [];
+    const placed = list.map((e) => {
+      const st = new Date(e.start), en = e.end && dayKey(new Date(e.end)) === dayKey(st) ? new Date(e.end) : new Date(Math.min(st.getTime() + 3600_000, new Date(d).setHours(24, 0, 0, 0)));
+      let lane = lanes.findIndex((end) => end <= st);
+      if (lane < 0) { lane = lanes.length; lanes.push(en); } else lanes[lane] = en;
+      return { e, st, en, lane };
+    });
+    const n = Math.max(1, lanes.length);
+    const items = placed.map(({ e, st, en, lane }) => {
+      const top = ((st.getHours() * 60 + st.getMinutes()) - h0 * 60) / span * 100;
+      const end = en.getDate() !== st.getDate() ? h1 * 60 : en.getHours() * 60 + en.getMinutes();
+      const height = Math.max(3, (end - (st.getHours() * 60 + st.getMinutes())) / span * 100);
+      return block(e, height < 9 ? ' short' : '', `top:${top}%;height:${height}%;left:${lane / n * 100}%;width:${100 / n}%`);
+    }).join('');
+    const isToday = dayKey(d) === dayKey(now);
+    const nowAt = ((now.getHours() * 60 + now.getMinutes()) - h0 * 60) / span * 100;
+    const line = isToday && nowAt >= 0 && nowAt <= 100 ? `<i class="cg-now" style="top:${nowAt}%"></i>` : '';
+    return `<div class="cg-col ${isToday ? 'today' : ''}">${items}${line}</div>`;
+  }).join('');
+  const hours = Array.from({ length: h1 - h0 }, (_, i) => `<span style="top:${i / (h1 - h0) * 100}%">${two(h0 + i)}</span>`).join('');
   const upd = data?.updated ? tr('updated {time}', { time: hhmm(new Date(data.updated)) }) : '';
   return `<div class="td-cal">
     <div class="cal-head">
@@ -205,7 +259,11 @@ function calendarHtml(data) {
       <button class="wk" data-week="1" aria-label="${tr('Next week')}">›</button>
       <span class="upd">${upd}</span>
     </div>
-    ${data ? `<div class="cal-days">${cols}</div>` : `<p class="cal-none">${tr('The calendar comes from hobizone.org once the timing PC has heard from it.')}</p>`}
+    ${data ? `<div class="cal-grid ${hasBands ? 'with-bands' : ''}" style="--hours:${h1 - h0}">
+      <div class="cg-corner"></div>${head}
+      ${hasBands ? `<div class="cg-corner"></div>${bands}` : ''}
+      <div class="cg-times">${hours}</div>${cols}
+    </div>` : `<p class="cal-none">${tr('The calendar comes from hobizone.org once the timing PC has heard from it.')}</p>`}
   </div>`;
 }
 
