@@ -49,7 +49,7 @@ function text(v, max = 200) {
 }
 var isDate = (v) => typeof v === "string" && !Number.isNaN(Date.parse(v));
 var LOOKS = /* @__PURE__ */ new Set(["ring", "race", "club", "open", "closed", "off", "period"]);
-var KIND = { trackday: "track", drone_practice: "drone", class: "class" };
+var KIND = { trackday: "track", drone_practice: "drone", class: "class", birthday: "birthday", milestone: "milestone" };
 function hobizoneUrl(v) {
   try {
     const u = new URL(str(v, 300));
@@ -410,7 +410,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1612" : "dev";
+var VERSION = true ? "2026.11.17-1619" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {

@@ -165,6 +165,8 @@ function demoData() {
       e(6, 12, 0, 14, 0, 'other', { et: 'Drooniralli', en: 'Drone rally' }, '#FF6F00', 'race');
       e(3, 16, 0, 17, 0, 'class', { et: 'Varblane', en: 'Sparrow' }, '#00A04A', 'off');
       events.push({ id: 'band', start: at(4, 0, 0), end: at(6, 0, 0), all_day: true, kind: 'other', title: { et: 'Koolivaheaeg', en: 'School break' }, color: null, look: 'period' });
+      events.push({ id: 'bd1', start: at(1, 0, 0), end: null, all_day: true, kind: 'birthday', title: 'Chirp' });
+      events.push({ id: 'ms1', start: at(3, 0, 0), end: null, all_day: true, kind: 'milestone', title: { et: 'HOBIzone 5 aastat', en: 'HOBIzone turns 5' } });
     }
   }
   const names = ['Karl', 'Sven', 'Mari', 'Liis', 'Kristjan', 'Mia', 'Leo', 'Rasmus', 'Hanna', 'Oskar', 'Laura', 'Markus', 'Eliise', 'Robin', 'Kaspar', 'Grete', 'Martin', 'Sofia', 'Andres', 'Kertu', 'Joonas', 'Emma', 'Tanel', 'Maria', 'Siim', 'Anna', 'Rein', 'Helen', 'Marko', 'Kadri', 'Funrent', 'Velvet', 'Priit', 'Triin', 'Aivar', 'Elisabeth', 'Henri', 'Johanna', 'Kevin', 'Merilin', 'Tõnu', 'Ülle', 'Jüri', 'Katrin', 'Taavi', 'Pille', 'Erik', 'Hobipood', 'Janek', 'Signe', 'Mihkel', 'Lisette', 'Toomas', 'Getter', 'Artur', 'Liisa'];
@@ -180,7 +182,7 @@ function demoData() {
 const tdData = () => state?.trackdayScreen ?? (DEMO ? demoData() : null);
 
 /** A colour from the portal (#RRGGBB), else one for the kind of event. */
-const KIND_COLOR = { track: '#FF6B00', drone: '#22C55E', class: '#3B82F6', other: '#9A9A9A' };
+const KIND_COLOR = { track: '#FF6B00', drone: '#22C55E', class: '#3B82F6', other: '#9A9A9A', birthday: '#FF6B00', milestone: '#FACC15' };
 const colorOf = (e) => (e.color && /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : KIND_COLOR[e.kind] ?? KIND_COLOR.other);
 const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
@@ -203,7 +205,7 @@ function calendarHtml(data) {
     const st = new Date(e.start), en = e.end ? new Date(e.end) : st;
     return st < weekEnd && en >= mon;
   });
-  const isBand = (e) => e.all_day || e.look === 'period';
+  const isBand = (e) => e.all_day || e.look === 'period' || e.kind === 'birthday' || e.kind === 'milestone';
   const timed = evs.filter((e) => !isBand(e));
   // The hours to draw: what this week needs, at least 9:00–21:00.
   let h0 = 9, h1 = 21;
@@ -217,9 +219,14 @@ function calendarHtml(data) {
   const block = (e, extra = '', style = '') => {
     const st = new Date(e.start), en = e.end ? new Date(e.end) : null;
     const look = e.cancelled ? 'off' : (e.look ?? 'ring');
-    const past = (en ?? st) < now ? ' past' : '';
+    // An all-day event without an end lasts the whole day (a birthday today isn't over at 00:01).
+    const ends = en ?? (isBand(e) ? new Date(st.getFullYear(), st.getMonth(), st.getDate() + 1) : st);
+    const past = ends < now ? ' past' : '';
     const when = isBand(e) ? '' : `<span class="t num">${hhmm(st)}${en ? `–${hhmm(en)}` : ''}</span>`;
-    return `<div class="cg-ev look-${esc(look)}${past}${extra}" style="--ev:${colorOf(e)};${style}">${when}<b>${esc(pick(e.title))}</b></div>`;
+    // Birthdays and club milestones (Janno 17.11.2026): their own mark, no group colour.
+    const mark = e.kind === 'birthday' ? '<i class="cg-mark">🎂</i>' : e.kind === 'milestone' ? '<i class="cg-mark">★</i>' : '';
+    const kind = e.kind === 'birthday' || e.kind === 'milestone' ? ` cg-${e.kind}` : ` look-${esc(look)}`;
+    return `<div class="cg-ev${kind}${past}${extra}" style="--ev:${colorOf(e)};${style}">${when}<b>${mark}${esc(pick(e.title))}</b></div>`;
   };
   // All-day events and multi-day periods: a row above the hours, on every day they cover.
   const bands = days.map((d) => {

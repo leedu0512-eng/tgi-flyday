@@ -15,6 +15,7 @@ const EXAMPLE = {
     { id: 'b', start: '2026-11-17T17:30:00+02:00', end: '2026-11-17T20:00:00+02:00', all_day: false, title: { et: 'Vaba rada', en: 'Open track' }, kind: 'trackday', cancelled: true },
     { id: 'c', start: '2026-11-18T17:30:00+02:00', end: null, title: 'Drone', kind: 'drone_practice', color: '#3B82F6', look: 'open' },
     { id: 'd', start: '2026-11-19T10:00:00+02:00', title: 'X', color: 'red', look: 'weird' },
+    { id: 'bd', start: '2026-11-20T00:00:00+02:00', all_day: true, kind: 'birthday', title: 'Chirp' },
     { id: 'bad', start: 'not a date' },
   ],
   pay_url: 'https://hobizone.org/api/hz/rajapaev?k=x',
@@ -24,8 +25,9 @@ const EXAMPLE = {
 
 test('screen door: events, kinds, cancelled, join link only on hobizone.org, names as objects', () => {
   const d = cleanScreen(EXAMPLE, 0)!;
-  assert.equal(d.events.length, 4);
-  assert.deepEqual(d.events.map((e) => e.kind), ['other', 'track', 'drone', 'other']);
+  assert.equal(d.events.length, 5);
+  assert.equal(d.events[4].kind, 'birthday');
+  assert.deepEqual(d.events.map((e) => e.kind), ['other', 'track', 'drone', 'other', 'birthday']);
   assert.equal(d.events[2].color, '#3B82F6');
   assert.equal(d.events[2].look, 'open');
   assert.equal(d.events[3].color, null, 'only #RRGGBB');
