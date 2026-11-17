@@ -984,3 +984,55 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .kiosk .lang-sw.lg button { padding: 12px 20px; font-size: 22px; }
 .kiosk-lang { display: flex; justify-content: center; margin-top: 4vh; }
 .pb-head .lang-sw button { font-size: calc(1.9 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); }
+
+/* ---- TrackDay screen: clock + week calendar, both QR codes; thank-you screen (screen.html) ---- */
+.pb-main.td2 { grid-template-columns: 1fr calc(54 * var(--u)); padding-bottom: calc(3.2 * var(--u)); transition: opacity .42s ease, filter .42s ease; }
+.pb-main.td2.td-fade { opacity: 0; filter: blur(6px); }
+.td-left { display: grid; grid-template-rows: calc(20 * var(--u)) 1fr; gap: calc(1.4 * var(--u)); min-height: 0; min-width: 0; }
+.td-clock { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: calc(2 * var(--uw)); background: #161616; border-left: calc(1.4 * var(--u)) solid var(--accent); padding: 0 calc(2.2 * var(--uw)); min-height: 0; }
+.td-clock .cl { display: flex; align-items: center; height: 100%; min-width: 0; overflow: hidden; }
+.td-clock .bigclock { font-size: calc(18 * var(--u)); line-height: .82; }
+.td-clock .date { font-family: var(--display); font-weight: 800; font-size: calc(3.6 * var(--u)); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); text-align: right; line-height: 1.15; max-width: calc(30 * var(--u)); }
+
+.td-cal { display: grid; grid-template-rows: auto 1fr; gap: calc(1.2 * var(--u)); background: #111; border-left: calc(1.4 * var(--u)) solid #fff; padding: calc(1.6 * var(--u)) calc(1 * var(--uw)); min-height: 0; }
+.td-cal .cal-head { display: flex; align-items: center; gap: calc(1.2 * var(--uw)); }
+.td-cal .wk { all: unset; cursor: pointer; display: grid; place-items: center; width: calc(6.4 * var(--u)); height: calc(6.4 * var(--u)); border: calc(.3 * var(--u)) solid #333; border-radius: calc(1 * var(--u)); font: 900 calc(4.6 * var(--u))/1 var(--display); color: #fff; }
+.td-cal .wk:active { background: var(--accent); color: #000; }
+.td-cal .cal-title { display: flex; align-items: baseline; gap: calc(1.4 * var(--uw)); }
+.td-cal .cal-title b { font: 900 calc(4.4 * var(--u))/1 var(--display); text-transform: uppercase; letter-spacing: .04em; }
+.td-cal .cal-title span { font: 800 calc(3 * var(--u))/1 var(--display); color: var(--muted); letter-spacing: .08em; }
+.td-cal .upd { margin-left: auto; font: 700 calc(1.9 * var(--u))/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: #555; }
+.td-cal .cal-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: calc(.4 * var(--uw)); min-height: 0; }
+.td-cal .day { display: grid; grid-template-rows: auto 1fr; gap: calc(.8 * var(--u)); background: #181818; padding: calc(1 * var(--u)) calc(.6 * var(--uw)); min-height: 0; overflow: hidden; border-top: calc(.5 * var(--u)) solid #262626; }
+.td-cal .day.today { background: #1f1a14; border-top-color: var(--accent); }
+.td-cal .dh { display: flex; align-items: baseline; justify-content: space-between; }
+.td-cal .dh span { font: 800 calc(2.1 * var(--u))/1 var(--display); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+.td-cal .day.today .dh span { color: var(--accent); }
+.td-cal .dh b { font: 900 calc(3.4 * var(--u))/1 var(--stencil); }
+.td-cal .evs { display: flex; flex-direction: column; gap: calc(.7 * var(--u)); min-height: 0; }
+.td-cal .ev { display: flex; flex-direction: column; gap: calc(.3 * var(--u)); padding: calc(.7 * var(--u)) calc(.5 * var(--uw)); background: #222; border-left: calc(.6 * var(--u)) solid #555; }
+.td-cal .ev .t { font: 700 calc(1.7 * var(--u))/1 var(--display); letter-spacing: .06em; color: var(--muted); }
+.td-cal .ev b { font: 800 calc(2.1 * var(--u))/1.1 var(--display); text-transform: uppercase; overflow-wrap: break-word; }
+.td-cal .ev.track { border-left-color: var(--accent); background: #2a1d10; }
+.td-cal .ev.drone { border-left-color: var(--running); }
+.td-cal .ev.class { border-left-color: #3b82f6; }
+.td-cal .none { color: #444; font-style: normal; font-size: calc(2.4 * var(--u)); }
+.td-cal .cal-none { margin: auto; font: 800 calc(2.8 * var(--u))/1.3 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: center; }
+
+.td-right { display: grid; grid-template-rows: 1fr 1fr; gap: calc(1.4 * var(--u)); min-height: 0; }
+.td-qr { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: calc(1.6 * var(--uw)); background: #fff; color: #000; padding: calc(2 * var(--u)) calc(1.6 * var(--uw)); border-top: calc(1 * var(--u)) solid var(--accent); min-height: 0; }
+.td-qr.join { border-top-color: var(--running); }
+.td-qr .pay-qr { height: calc(21 * var(--u)); aspect-ratio: 1; }
+.td-qr .pay-qr svg { width: 100%; height: 100%; display: block; }
+.td-qr .txt { display: flex; flex-direction: column; gap: calc(1 * var(--u)); min-width: 0; }
+.td-qr h2 { margin: 0; font: 900 calc(3.2 * var(--u))/1.04 var(--display); text-transform: uppercase; overflow-wrap: anywhere; }
+.td-qr .price { margin: 0; font: 900 calc(3 * var(--u))/1.05 var(--stencil); color: var(--accent); text-transform: uppercase; }
+.td-qr.join .price { color: #16a34a; }
+.td-qr .cta { margin: 0; font: 800 calc(1.8 * var(--u))/1.2 var(--display); letter-spacing: .14em; text-transform: uppercase; color: #666; }
+
+.pb-main.td2:has(.td-thanks) { grid-template-columns: 1fr; }
+.td-thanks { display: grid; grid-template-rows: auto 1fr; gap: calc(2.4 * var(--u)); min-height: 0; background: #111; border-left: calc(1.4 * var(--u)) solid var(--accent); padding: calc(3 * var(--u)) calc(3 * var(--uw)); }
+.td-thanks h1 { margin: 0; font: 900 calc(7.4 * var(--u))/1 var(--stencil); text-transform: uppercase; color: var(--accent); letter-spacing: .01em; }
+.td-thanks .names { display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: .18em .5em; min-height: 0; overflow: hidden; font-family: var(--display); font-weight: 900; text-transform: uppercase; line-height: 1.05; }
+.td-thanks .names span { white-space: nowrap; }
+.td-thanks .names span:nth-child(3n+2) { color: #9A9A9A; }

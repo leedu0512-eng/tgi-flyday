@@ -134,6 +134,14 @@ export const ET = {
   'Track days for free ;)': 'Rajapäevad tasuta ;)',
   'Scan to join HOBIzone': "Skanni ja liitu HOBIzone'iga",
 
+  'All day': 'Terve päev',
+  'Previous week': 'Eelmine nädal',
+  'Next week': 'Järgmine nädal',
+  'This week': 'See nädal',
+  'Week {n}': '{n}. nädal',
+  'updated {time}': 'uuendatud {time}',
+  'The calendar comes from hobizone.org once the timing PC has heard from it.': 'Kalender tuleb hobizone.org-ist, kui ajavõtuarvuti on sellega ühendust saanud.',
+
   // ---- phone page ----
   'You have to be at HOBIzone to use tgiFlyDay': "tgiFlyDay töötab ainult HOBIzone'is",
   'This page works on the club Wi-Fi at the venue. Connect to it, then come back here.': 'See leht töötab klubi võrgus. Ühenda end sellega ja tule siia tagasi.',
