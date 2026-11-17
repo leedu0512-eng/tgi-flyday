@@ -81,13 +81,13 @@ function plates(heat, pm) {
 // so tapping back to tgiFlyDay that day sticks).
 
 /**
- * QR cards for the second view, taking turns on one panel that flips in 3D: paying for the
- * track day first (shown for `secs`), then joining the club, and back.
+ * The two QR codes of the TrackDay view: paying for the track day (main pane) and joining the
+ * club (thank-you pane).
  */
 const CARDS = [
   // The pay address comes from Flyday (state.trackdayUrl, contracts/trackday-pay.md); this is the fallback.
-  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', builtIn: 'https://pay.montonio.com/3di-bmx-ofqo', secs: 30 },
-  { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', builtIn: 'https://www.hobizone.org/liitu', secs: 15, cls: 'join' },
+  { title: 'Did you pay for this track day?', price: 'Track day 15 EUR', cta: 'Scan to pay', url: 'https://pay.montonio.com/3di-bmx-ofqo', builtIn: 'https://pay.montonio.com/3di-bmx-ofqo' },
+  { title: 'Join the club', price: 'Track days for free ;)', cta: 'Scan to join HOBIzone', url: 'https://www.hobizone.org/liitu', builtIn: 'https://www.hobizone.org/liitu', cls: 'join' },
 ];
 let view = (() => { try { return localStorage.getItem('tgiflyday.screen.view') || 'plates'; } catch { return 'plates'; } })();
 const cardQr = new Map();
@@ -262,8 +262,13 @@ function fitNames() {
   box.style.fontSize = `${lo}px`;
 }
 
-function renderTrackDay() {
+let tdKey = '';
+function renderTrackDay(force = false) {
   const data = tdData();
+  // States come several times a second during a session: redraw only when something shown changed.
+  const key = [tdPane, tdWeek, tdShown, data?.updated, data?.thanks?.updated, state?.trackdayUrl, LANG, new Date().toDateString(), $('main').className].join('|');
+  if (!force && key === tdKey && $('main').querySelector('.td-left, .td-thanks, .td-join-only')) return;
+  tdKey = key;
 
   CARDS[0].url = state?.trackdayUrl || CARDS[0].builtIn;
   CARDS[1].url = pick(data?.join_url) || CARDS[1].builtIn;
@@ -284,22 +289,21 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   tdWeek = Math.max(-1, Math.min(2, tdWeek + Number(b.dataset.week)));
   tdHoldUntil = Date.now() + TD_HOLD_MS;
-  renderTrackDay();
+  renderTrackDay(true);
 });
 addEventListener('resize', () => requestAnimationFrame(fitNames));
 setInterval(() => {
   const c = state?.clock;
-  const idle = view === 'pay' && c && (c.phase === 'stopped' || c.phase === 'waiting');
-  if (!idle) { tdPane = 'main'; tdSince = Date.now(); return; }
+  if (view !== 'pay' || !c) { tdPane = 'main'; tdSince = Date.now(); return; }
   if (Date.now() < tdHoldUntil) { tdSince = Date.now(); return; }
-  if (tdWeek !== 0 && tdPane === 'main' && Date.now() - tdSince > TD_HOLD_MS) { tdWeek = 0; renderTrackDay(); }
+  if (tdWeek !== 0 && tdPane === 'main' && Date.now() - tdSince > TD_HOLD_MS) { tdWeek = 0; renderTrackDay(true); }
   const due = tdPane === 'main' ? TD_MAIN_MS : TD_THANKS_MS;
   if (Date.now() - tdSince < due) return;
   const next = tdPane === 'main' ? 'thanks' : 'main';
   tdSince = Date.now();
   if (next === tdPane) return;
   $('main').classList.add('td-fade');
-  setTimeout(() => { tdPane = next; tdWeek = 0; tdShown++; renderTrackDay(); requestAnimationFrame(() => $('main').classList.remove('td-fade')); }, 420);
+  setTimeout(() => { tdPane = next; tdWeek = 0; tdShown++; renderTrackDay(true); requestAnimationFrame(() => $('main').classList.remove('td-fade')); }, 420);
 }, 500);
 // For screenshots and checking: ?pane=thanks opens on the thank-you screen.
 if (new URLSearchParams(location.search).get('pane') === 'thanks') tdPane = 'thanks';
@@ -315,48 +319,6 @@ setInterval(() => {
   if (el.textContent !== dayClock()) el.textContent = dayClock();
   fitClock(el);
 }, 1000);
-
-/** One card face. Its QR code is drawn once and kept. */
-function cardFace(card, i) {
-  if (!cardQr.has(card.url)) {
-    cardQr.set(card.url, '');
-    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); for (const el of document.querySelectorAll(`[data-qr="${i}"]`)) el.innerHTML = svg; });
-  }
-  return `<div class="pay-card face ${card.cls ?? ''}">
-    <h2>${esc(card.title)}</h2>
-    <div class="pay-qr" data-qr="${i}">${cardQr.get(card.url)}</div>
-    <p class="pay-price">${esc(card.price)}</p>
-    <p class="pay-cta">${esc(card.cta)}</p>
-  </div>`;
-}
-
-/**
- * The flipping panel. It is one element kept across renders (the board is redrawn on every
- * state change), so a flip is never cut short; render() puts it where #cardSlot is.
- */
-let cardSide = 0, cardSince = Date.now(), cardEl = null;
-function payCard() { return '<div id="cardSlot"></div>'; }
-function placeCard() {
-  const slot = document.getElementById('cardSlot');
-  if (!slot) return;
-  // Flyday gave a new pay address: draw the panel again with its QR.
-  const pay = state?.trackdayUrl || CARDS[0].builtIn;
-  if (pay !== CARDS[0].url) { CARDS[0].url = pay; cardEl = null; }
-  if (!cardEl) {
-    cardEl = document.createElement('div');
-    cardEl.className = 'card-flip';
-    cardEl.innerHTML = `<div class="card-inner">${cardFace(CARDS[0], 0)}${cardFace(CARDS[1], 1).replace('face ', 'face back ')}</div>`;
-  }
-  cardEl.classList.toggle('flipped', cardSide === 1);
-  slot.replaceWith(cardEl);
-}
-setInterval(() => {
-  if (view !== 'pay') { cardSide = 0; cardSince = Date.now(); cardEl?.classList.remove('flipped'); return; }
-  if (Date.now() - cardSince < CARDS[cardSide].secs * 1000) return;
-  cardSide = (cardSide + 1) % CARDS.length;
-  cardSince = Date.now();
-  cardEl?.classList.toggle('flipped', cardSide === 1);
-}, 500);
 
 /**
  * Back to work: while a session runs, every new phase (changeover, arm, heat on, heat over)
@@ -390,12 +352,17 @@ function render() {
   const ends = c.lastRound ? ' · Last round' : c.finishAt ? ` · until ${hm(c.finishAt)}` : '';
   $('meta').textContent = c.phase === 'stopped' || c.phase === 'waiting' ? 'Practice' : `Practice · Round ${c.round}${ends}`;
 
+  // TrackDay: the pay / thank-you cycle, with or without a drone session (Janno 17.11.2026).
+  if (view === 'pay') {
+    screen.classList.add('no-next');
+    $('next').innerHTML = '';
+    return renderTrackDay();
+  }
   if (c.phase === 'stopped' || c.phase === 'waiting') {
     screen.classList.add('no-next');
     $('next').innerHTML = '';
     const msg = c.phase === 'waiting' ? 'Waiting for pilots · join a heat at the kiosk' : 'Practice is not running';
     const idle = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
-    if (view === 'pay') return renderTrackDay();
     $('main').className = 'pb-idle';
     $('main').innerHTML = idle;
     return;
@@ -409,8 +376,7 @@ function render() {
       <div class="plank clock-plank"><span id="bigclock" class="bigclock num"></span></div>
       <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
     </div>
-    ${view === 'pay' ? payCard() : plates(state.heats[c.heat], pm)}`;
-  placeCard();
+    ${plates(state.heats[c.heat], pm)}`;
   renderNext(pm);
   tick();
 }
