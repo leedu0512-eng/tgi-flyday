@@ -216,7 +216,8 @@ function thanksHtml(data) {
   const t = data?.thanks;
   if (!t?.names?.length) return '';
   return `<div class="td-thanks"><h1>${esc(pick(t.title))}</h1>
-    <div class="names" id="tdNames">${t.names.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>`;
+    <div class="names" id="tdNames">${t.names.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>
+    <div class="td-right">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
 }
 /** The biggest text at which every name fits in its box: no scrolling, no empty half-screen. */
 function fitNames() {
@@ -244,7 +245,7 @@ function renderTrackDay() {
         <span class="date">${now.toLocaleDateString(LANG === 'et' ? 'et-EE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
       ${calendarHtml(data)}
     </div>
-    <div class="td-right">${qrCardHtml(CARDS[0], 0, 'pay')}${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
+    <div class="td-right">${qrCardHtml(CARDS[0], 0, 'pay')}</div>`;
   if (tdPane === 'thanks') requestAnimationFrame(fitNames);
 }
 document.addEventListener('click', (e) => {
