@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-2027" : "dev";
+var VERSION = true ? "2026.11.17-2146" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -3906,6 +3906,7 @@ function lanAddresses() {
   return Object.entries((0, import_node_os2.networkInterfaces)()).flatMap(([name, list]) => (list ?? []).filter((i) => i.family === "IPv4" && !i.internal).map((i) => ({ a: i.address, s: score(name, i.address) }))).sort((x, y) => y.s - x.s).map((x) => x.a);
 }
 var AFTER_UPDATE = process.argv.includes("--after-update");
+if (AFTER_UPDATE) kioskRestartAt = Date.now();
 var OPEN_WINDOWS = process.platform === "win32" && (IN_EXE || process.argv.includes("--open")) && !AFTER_UPDATE;
 var updating = false;
 var updateProgress = { stage: "idle", done: 0, total: 0 };

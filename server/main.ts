@@ -608,6 +608,9 @@ function lanAddresses(): string[] {
 // The exe on Windows does what start.bat does for the folder version: open the screens.
 /** Started by an update: the windows are already open and reload by themselves. */
 const AFTER_UPDATE = process.argv.includes('--after-update');
+// Just updated: the Linux kiosk restarts too (its helper's next ask, within a minute), so
+// kiosk.sh and the helper take the new version from this PC. Nobody has to go to it.
+if (AFTER_UPDATE) kioskRestartAt = Date.now();
 const OPEN_WINDOWS = process.platform === 'win32' && (IN_EXE || process.argv.includes('--open')) && !AFTER_UPDATE;
 let updating = false;
 let updateProgress: { stage: 'idle' | 'check' | 'download' | 'restart'; done: number; total: number; to?: string } = { stage: 'idle', done: 0, total: 0 };

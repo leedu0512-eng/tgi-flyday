@@ -74,8 +74,7 @@ while true; do
   if word=$(ask); then
     now=$(date +%s)
     if [ "$word" = restart ]; then
-      echo "$(date +%H:%M) restart from the RD console"
-      screen_on
+      echo "$(date +%H:%M) restart (RD console, or tgiFlyDay just updated)"
       [ -n "$KIOSK_SH" ] && [ -f "$KIOSK_SH" ] && setsid nohup bash "$KIOSK_SH" >/dev/null 2>&1 &
       sleep 60; continue
     fi
