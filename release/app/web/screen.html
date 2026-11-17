@@ -22,6 +22,7 @@
     <span id="wallclock" class="wallclock num"></span>
     <div class="pb-qr" title="Your heat on your phone"><span>Your heat<br>on your phone</span><i id="meQr"></i></div>
     <button id="signinBtn" class="pb-signin">Sign in</button>
+    <span id="langSw"></span>
   </header>
   <div id="main" class="pb-main"></div>
   <div id="next" class="pb-next"></div>
@@ -36,11 +37,12 @@
 </div>
 
 <script type="module">
-import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt } from '/assets/common.js';
+import { connect, clockMs, fmt, SLOT_COLORS, esc, pilotMap, wallClock, NAME, photoUrl, meUrl, qrSvg, timerMark, faceOf, nightPrompt, tr, langSwitch, LANG } from '/assets/common.js';
 
 // Spectator view: a pit board. Big planks for the heat and the clock, race plates for the
 // line-up, and the next heat on the orange board while a heat flies.
 const $ = (id) => document.getElementById(id);
+$('langSw').innerHTML = langSwitch('head');
 let state = null;
 
 const WORD = {
@@ -126,6 +128,162 @@ function trackDaySchedule() {
   if (view !== 'pay') setView('pay');
 }
 setInterval(trackDaySchedule, 30_000);
+
+// ---------- TrackDay screen (Janno 17.11.2026): clock, this week's calendar, both QR codes;
+// taking turns with the thank-you screen (45 s / 20 s). The calendar and the names come from
+// the portal through the RD PC (state.trackdayScreen); `?demo` shows made-up data until then.
+const DEMO = new URLSearchParams(location.search).has('demo');
+const TD_MAIN_MS = 45_000, TD_THANKS_MS = 20_000, TD_HOLD_MS = 60_000;
+let tdPane = 'main', tdSince = Date.now(), tdHoldUntil = 0, tdWeek = 0;
+const pick = (v) => (v && typeof v === 'object' ? v[LANG] ?? v.en ?? v.et ?? '' : v ?? '');
+const two = (n) => String(n).padStart(2, '0');
+const hhmm = (d) => `${two(d.getHours())}:${two(d.getMinutes())}`;
+function mondayOf(d) { const m = new Date(d); m.setHours(0, 0, 0, 0); m.setDate(m.getDate() - ((m.getDay() + 6) % 7)); return m; }
+function isoWeek(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
+}
+
+/** Made-up week, the same shape the portal will send. */
+function demoData() {
+  const mon = mondayOf(new Date());
+  const at = (day, h, m = 0) => { const d = new Date(mon); d.setDate(d.getDate() + day); d.setHours(h, m); return d.toISOString(); };
+  const events = [];
+  for (const w of [-7, 0, 7, 14]) {
+    const e = (day, h1, m1, h2, m2, kind, title) => events.push({ id: `${w}-${day}-${h1}`, start: at(day + w, h1, m1), end: at(day + w, h2, m2), kind, title });
+    e(0, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' });
+    e(1, 16, 0, 17, 30, 'class', { et: 'Droonide huviring', en: "Kids' drone class" });
+    e(2, 9, 0, 21, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
+    e(3, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' });
+    e(4, 18, 0, 21, 0, 'other', { et: 'Ehitusõhtu', en: 'Build night' });
+    e(5, 10, 0, 18, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
+    if (w === 0) e(5, 12, 0, 15, 0, 'other', { et: 'RC-autode võistlus', en: 'RC car race' });
+    e(6, 10, 0, 16, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
+  }
+  const names = ['Karl', 'Sven', 'Mari', 'Liis', 'Kristjan', 'Mia', 'Leo', 'Rasmus', 'Hanna', 'Oskar', 'Laura', 'Markus', 'Eliise', 'Robin', 'Kaspar', 'Grete', 'Martin', 'Sofia', 'Andres', 'Kertu', 'Joonas', 'Emma', 'Tanel', 'Maria', 'Siim', 'Anna', 'Rein', 'Helen', 'Marko', 'Kadri', 'Funrent', 'Velvet', 'Priit', 'Triin', 'Aivar', 'Elisabeth', 'Henri', 'Johanna', 'Kevin', 'Merilin', 'Tõnu', 'Ülle', 'Jüri', 'Katrin', 'Taavi', 'Pille', 'Erik', 'Hobipood', 'Janek', 'Signe', 'Mihkel', 'Lisette', 'Toomas', 'Getter', 'Artur', 'Liisa'];
+  return {
+    events,
+    updated: new Date(Date.now() - 12 * 60_000).toISOString(),
+    thanks: { title: { et: 'Aitäh, et hoiate selle koha lahti', en: 'Thank you for keeping this place open' }, names },
+  };
+}
+const tdData = () => state?.trackdayScreen ?? (DEMO ? demoData() : null);
+
+function calendarHtml(data) {
+  const mon = mondayOf(new Date());
+  mon.setDate(mon.getDate() + tdWeek * 7);
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  const today = new Date().toDateString();
+  const loc = LANG === 'et' ? 'et-EE' : 'en-GB';
+  const range = `${mon.getDate()}.${mon.getMonth() + 1}–${sun.getDate()}.${sun.getMonth() + 1}`;
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); return d; });
+  const cols = days.map((d) => {
+    const evs = (data?.events ?? [])
+      .filter((e) => new Date(e.start).toDateString() === d.toDateString())
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    const items = evs.map((e) => {
+      const st = new Date(e.start), en = e.end ? new Date(e.end) : null;
+      const when = e.all_day ? tr('All day') : `${hhmm(st)}${en ? `–${hhmm(en)}` : ''}`;
+      return `<div class="ev ${esc(e.kind ?? 'other')}"><span class="t num">${when}</span><b>${esc(pick(e.title))}</b></div>`;
+    }).join('');
+    return `<div class="day ${d.toDateString() === today ? 'today' : ''}">
+      <div class="dh"><span>${d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '')}</span><b class="num">${d.getDate()}</b></div>
+      <div class="evs">${items || '<i class="none">–</i>'}</div></div>`;
+  }).join('');
+  const upd = data?.updated ? tr('updated {time}', { time: hhmm(new Date(data.updated)) }) : '';
+  return `<div class="td-cal">
+    <div class="cal-head">
+      <button class="wk" data-week="-1" aria-label="${tr('Previous week')}">‹</button>
+      <div class="cal-title"><b>${tdWeek === 0 ? tr('This week') : tr('Week {n}', { n: isoWeek(mon) })}</b><span class="num">${range}</span></div>
+      <button class="wk" data-week="1" aria-label="${tr('Next week')}">›</button>
+      <span class="upd">${upd}</span>
+    </div>
+    ${data ? `<div class="cal-days">${cols}</div>` : `<p class="cal-none">${tr('The calendar comes from hobizone.org once the timing PC has heard from it.')}</p>`}
+  </div>`;
+}
+
+function qrCardHtml(card, i, cls) {
+  if (!cardQr.has(card.url)) {
+    cardQr.set(card.url, '');
+    qrSvg(card.url).then((svg) => { cardQr.set(card.url, svg); for (const el of document.querySelectorAll(`[data-qr="${i}"]`)) el.innerHTML = svg; });
+  }
+  return `<div class="td-qr ${cls}"><div class="pay-qr" data-qr="${i}">${cardQr.get(card.url)}</div>
+    <div class="txt"><h2>${esc(tr(card.title))}</h2><p class="price">${esc(tr(card.price))}</p><p class="cta">${esc(tr(card.cta))}</p></div></div>`;
+}
+
+function thanksHtml(data) {
+  const t = data?.thanks;
+  if (!t?.names?.length) return '';
+  return `<div class="td-thanks"><h1>${esc(pick(t.title))}</h1>
+    <div class="names" id="tdNames">${t.names.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>
+    <div class="td-right">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
+}
+/** The biggest text at which every name fits in its box: no scrolling, no empty half-screen. */
+function fitNames() {
+  const box = document.getElementById('tdNames');
+  if (!box) return;
+  let lo = 8, hi = 400;
+  for (let k = 0; k < 18; k++) {
+    const mid = (lo + hi) / 2;
+    box.style.fontSize = `${mid}px`;
+    if (box.scrollHeight <= box.clientHeight && box.scrollWidth <= box.clientWidth) lo = mid; else hi = mid;
+  }
+  box.style.fontSize = `${lo}px`;
+}
+
+function renderTrackDay() {
+  const data = tdData();
+  // Nothing from the portal yet: the flipping pay / join card, as before.
+  if (!data) {
+    $('main').className = 'pb-main';
+    $('main').innerHTML = `<div class="pb-board td-board">
+        <div class="plank top"><span class="heat">${tr('TRACK DAY')}</span></div>
+        <div class="plank clock-plank"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
+        <div class="plank bar td-name"><span class="label">${new Date().toLocaleDateString(LANG === 'et' ? 'et-EE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+      </div>${payCard()}`;
+    placeCard();
+    fitClock($('dayClock'));
+    return;
+  }
+  if (tdPane === 'thanks' && !data?.thanks?.names?.length) tdPane = 'main';
+  const pay = state?.trackdayUrl || CARDS[0].builtIn;
+  CARDS[0].url = pay;
+  const now = new Date();
+  $('main').className = 'pb-main td2';
+  $('main').innerHTML = tdPane === 'thanks' ? thanksHtml(data) : `
+    <div class="td-left">
+      <div class="td-clock"><div class="cl"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
+        <span class="date">${now.toLocaleDateString(LANG === 'et' ? 'et-EE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
+      ${calendarHtml(data)}
+    </div>
+    <div class="td-right">${qrCardHtml(CARDS[0], 0, 'pay')}</div>`;
+  if (tdPane === 'thanks') requestAnimationFrame(fitNames);
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-week]');
+  if (!b) return;
+  tdWeek = Math.max(-1, Math.min(2, tdWeek + Number(b.dataset.week)));
+  tdHoldUntil = Date.now() + TD_HOLD_MS;
+  renderTrackDay();
+});
+addEventListener('resize', () => requestAnimationFrame(fitNames));
+setInterval(() => {
+  const c = state?.clock;
+  const idle = view === 'pay' && c && (c.phase === 'stopped' || c.phase === 'waiting');
+  if (!idle) { tdPane = 'main'; tdSince = Date.now(); return; }
+  if (Date.now() < tdHoldUntil) { tdSince = Date.now(); return; }
+  if (tdWeek !== 0 && tdPane === 'main' && Date.now() - tdSince > TD_HOLD_MS) { tdWeek = 0; renderTrackDay(); }
+  const due = tdPane === 'main' ? TD_MAIN_MS : TD_THANKS_MS;
+  if (Date.now() - tdSince < due) return;
+  const next = tdPane === 'main' && tdData()?.thanks?.names?.length ? 'thanks' : 'main';
+  tdSince = Date.now();
+  if (next === tdPane) return;
+  $('main').classList.add('td-fade');
+  setTimeout(() => { tdPane = next; tdWeek = 0; renderTrackDay(); requestAnimationFrame(() => $('main').classList.remove('td-fade')); }, 420);
+}, 500);
+// For screenshots and checking: ?pane=thanks opens on the thank-you screen.
+if (new URLSearchParams(location.search).get('pane') === 'thanks') tdPane = 'thanks';
 
 /** The big time of day, for the TrackDay view when no drone practice runs. */
 function dayClock() {
@@ -218,18 +376,7 @@ function render() {
     $('next').innerHTML = '';
     const msg = c.phase === 'waiting' ? 'Waiting for pilots · join a heat at the kiosk' : 'Practice is not running';
     const idle = `<div class="logo"><img src="/assets/mark.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div><p>${msg}</p>`;
-    if (view === 'pay') {
-      // No drone practice: TrackDay and a big clock with the time of day.
-      $('main').className = 'pb-main';
-      $('main').innerHTML = `<div class="pb-board td-board">
-          <div class="plank top"><span class="heat">TRACK DAY</span></div>
-          <div class="plank clock-plank"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
-          <div class="plank bar td-name"><span class="label">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
-        </div>${payCard()}`;
-      placeCard();
-      fitClock($('dayClock'));
-      return;
-    }
+    if (view === 'pay') return renderTrackDay();
     $('main').className = 'pb-idle';
     $('main').innerHTML = idle;
     return;
@@ -239,7 +386,7 @@ function render() {
   $('main').className = 'pb-main';
   $('main').innerHTML = `
     <div class="pb-board">
-      <div class="plank top"><span class="heat">HEAT ${c.heat + 1}</span><span class="word ${key}">${WORD[key].toUpperCase()}</span></div>
+      <div class="plank top"><span class="heat">HEAT ${c.heat + 1}</span><span class="word ${key}">${tr(WORD[key]).toUpperCase()}</span></div>
       <div class="plank clock-plank"><span id="bigclock" class="bigclock num"></span></div>
       <div class="plank bar"><span id="barLabel" class="label"></span><div class="track"><div id="barFill" class="fill"></div></div></div>
     </div>

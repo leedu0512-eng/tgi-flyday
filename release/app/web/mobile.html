@@ -21,6 +21,7 @@
 
 <header class="m-top">
   <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span id="langSw"></span>
   <span id="wallclock" class="wallclock num"></span>
 </header>
 
@@ -70,11 +71,12 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME, timerMark, faceOf } from '/assets/common.js';
+import { channelOptions, photoUrl, uploadPhoto, connect, now, remaining, clockMs, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, NAME, timerMark, faceOf, tr, langSwitch } from '/assets/common.js';
 
 // RD remote for a phone. Controls the same session as the console, but makes no sound:
 // callouts always come from the RD PC.
 const $ = (id) => document.getElementById(id);
+$('langSw').innerHTML = langSwitch('head');
 let state = null;
 let openPilot = null;
 
@@ -181,7 +183,7 @@ function renderHeats() {
   const c = state.clock;
   const pm = pilotMap(state);
   const inUse = state.heats.filter((h) => h.slots.some((s) => s.pilotId)).length;
-  $('heatsInfo').textContent = `${inUse} of ${state.heats.length} heats have pilots`;
+  $('heatsInfo').textContent = tr('{n} of {m} heats have pilots', { n: inUse, m: state.heats.length });
   const options = (sel) => `<option value="">— empty —</option>` +
     state.pilots.map((p) => `<option value="${p.id}" ${p.id === sel ? 'selected' : ''}>${esc(NAME(p.callsign))}</option>`).join('');
   board.innerHTML = state.heats.map((h) => {

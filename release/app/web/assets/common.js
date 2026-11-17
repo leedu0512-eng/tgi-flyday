@@ -1,5 +1,8 @@
 // Shared by every tgiFlyDay screen: live connection, clock, formatting, sound.
 
+import { tr, LANG, langSwitch } from './i18n.js';
+export { tr, LANG, langSwitch };
+
 let offset = 0; // server clock minus this device's clock
 
 /** Server time in ms, corrected for this device's clock. */

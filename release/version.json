@@ -1,9 +1,9 @@
 {
- "version": "2026.11.15-0041",
+ "version": "2026.11.17-1442",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "62b704cf72c43bf7ad3ba94834419df14e123ad9416cdde96e97dd0b4a22c0de"
+   "sha256": "e948b91110d8c099f5fca8dcdac559c22833deea2cb886287596d8fb9c06aca4"
   },
   {
    "path": "web/assets/avatars.js",
@@ -11,7 +11,7 @@
   },
   {
    "path": "web/assets/common.js",
-   "sha256": "d0cc72250d49c27ae3c36c60704e20732d7ff6f9fce8a4ef9e7a447963e7184b"
+   "sha256": "f451abdf8f8e47466068ac0c3c746dc52d87133b975cdffdff4b9a0692a9c8bc"
   },
   {
    "path": "web/assets/favicon.svg",
@@ -56,6 +56,14 @@
   {
    "path": "web/assets/fonts/big-shoulders-stencil-display-latin-ext-900-normal.woff2",
    "sha256": "2a832664d136037daeb00e01fda9e84354a32aa6bd6568c90202137a92ec61e8"
+  },
+  {
+   "path": "web/assets/i18n-et.js",
+   "sha256": "2d448dd1f0763135067dc4180ece3e368bab9ed199868fbec4979ed2bd9bbefd"
+  },
+  {
+   "path": "web/assets/i18n.js",
+   "sha256": "3a59156223a8e941e214ccde70e2303c2d9495285285bf750ac53ede90a3e9b5"
   },
   {
    "path": "web/assets/icons/app-icon-1024.png",
@@ -135,7 +143,7 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "83857138773b7f810ca797d1912835be429252e0a3abc0f3745afbf475730ca8"
+   "sha256": "9de61168675bb03bdd3cd5ef47c8c16dca51e883771e150b310ecd58dff9bcf6"
   },
   {
    "path": "web/assets/vendor/qrcode.js",
@@ -143,7 +151,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "7d1dac8b552d4b232e6e9e884250bdf422005d33ba556a762d97dbbab696cb4a"
+   "sha256": "0df24293f85baf0dc6001017a836e50809ec9757cf56bb3f9a0fd4edb82cba22"
   },
   {
    "path": "web/favicon.ico",
@@ -155,19 +163,19 @@
   },
   {
    "path": "web/kiosk.html",
-   "sha256": "f91a6da4fd9e622015e7d12a37bccd0c19626f6481dd0a2860db22196c674816"
+   "sha256": "fc34c2249423f099b32e21835848fecdc1390f52a0be67dc7fe647d2a76549a0"
   },
   {
    "path": "web/me.html",
-   "sha256": "e81b1e9a6cf6f39e94c6034524371a847518548350d227867e72318356ab2783"
+   "sha256": "0f7d6b48b66e6728f99b7369c0ab8bc85625272543e57d1c21f27db33ce1f337"
   },
   {
    "path": "web/mobile.html",
-   "sha256": "74c98930e26b3388501fc31216339b398355d47797f7d75f3781a4ad9f65493c"
+   "sha256": "cda183c4ec70aa4e665cc52478750a6542f93ed7ce44d5b2d1a823c6bb14e255"
   },
   {
    "path": "web/screen.html",
-   "sha256": "a8fe8d88dabb8491cdeb1d18df0763882f9f834a3a8f707bc7ad15e43043129b"
+   "sha256": "f50db41ce59519c0a9e83abd793bef87f4c71b15592aec2814b28bbafa6d3e1a"
   }
  ]
 }
