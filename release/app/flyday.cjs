@@ -193,11 +193,10 @@ if ($o.Count) { [string]$o[0].Bounds.X + ',' + $o[0].Bounds.Y } else { 'none' }`
 }
 function openRdWindows(port) {
   const base = `http://localhost:${port}`;
-  const cam = "--use-fake-ui-for-media-stream";
-  edge([`--app=${base}/console`, "--autoplay-policy=no-user-gesture-required", cam, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "console-2")}`]);
+  edge([`--app=${base}/console`, "--autoplay-policy=no-user-gesture-required", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "console-2")}`]);
   const second = secondMonitor();
-  if (second) edge(["--kiosk", `${base}/screen`, "--edge-kiosk-type=fullscreen", `--window-position=${second}`, cam, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
-  else edge([`--app=${base}/screen`, cam, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
+  if (second) edge(["--kiosk", `${base}/screen`, "--edge-kiosk-type=fullscreen", `--window-position=${second}`, "--use-fake-ui-for-media-stream", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
+  else edge([`--app=${base}/screen`, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
 }
 
 // server/update.ts
@@ -289,7 +288,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1442" : "dev";
+var VERSION = true ? "2026.11.17-1444" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {

@@ -27,11 +27,12 @@ start "tgiFlyDay server" /min cmd /k node --disable-warning=ExperimentalWarning 
 timeout /t 2 /nobreak >nul
 
 rem Edge: never reopen last time's windows, never ask to restore them.
-rem The webcam is allowed without asking (the big screen's Sign in takes pilot photos).
+rem The full-screen big screen allows the webcam without asking (its Sign in takes pilot photos);
+rem windows with a title bar don't get that flag: Edge warns about it there and asks normally.
 set EDGEFLAGS=--no-first-run --hide-crash-restore-bubble --disable-session-crashed-bubble
 
 rem RD console: autoplay allowed, so callouts work without clicking first.
-start "" msedge --app=http://localhost:8080/console --autoplay-policy=no-user-gesture-required --use-fake-ui-for-media-stream %EDGEFLAGS% --user-data-dir="%PROFILES%\console-2"
+start "" msedge --app=http://localhost:8080/console --autoplay-policy=no-user-gesture-required %EDGEFLAGS% --user-data-dir="%PROFILES%\console-2"
 
 rem Find a second monitor. Prints its top-left corner as X,Y, or "none".
 set SECOND=none
@@ -45,6 +46,6 @@ goto end
 
 :onescreen
 rem Only one monitor: open the spectator view as a normal window instead of taking over the screen.
-start "" msedge --app=http://localhost:8080/screen --use-fake-ui-for-media-stream %EDGEFLAGS% --user-data-dir="%PROFILES%\screen-2"
+start "" msedge --app=http://localhost:8080/screen %EDGEFLAGS% --user-data-dir="%PROFILES%\screen-2"
 
 :end
