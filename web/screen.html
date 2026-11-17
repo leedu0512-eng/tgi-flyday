@@ -214,7 +214,8 @@ function qrCardHtml(card, i, cls) {
 
 function thanksHtml(data) {
   const t = data?.thanks;
-  if (!t?.names?.length) return '';
+  // No names from the portal yet: Join the club on its own.
+  if (!t?.names?.length) return `<div class="td-join-only">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
   return `<div class="td-thanks"><h1>${esc(pick(t.title))}</h1>
     <div class="names" id="tdNames">${t.names.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>
     <div class="td-right">${qrCardHtml(CARDS[1], 1, 'join')}</div>`;
@@ -234,19 +235,7 @@ function fitNames() {
 
 function renderTrackDay() {
   const data = tdData();
-  // Nothing from the portal yet: the flipping pay / join card, as before.
-  if (!data) {
-    $('main').className = 'pb-main';
-    $('main').innerHTML = `<div class="pb-board td-board">
-        <div class="plank top"><span class="heat">${tr('TRACK DAY')}</span></div>
-        <div class="plank clock-plank"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
-        <div class="plank bar td-name"><span class="label">${new Date().toLocaleDateString(LANG === 'et' ? 'et-EE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
-      </div>${payCard()}`;
-    placeCard();
-    fitClock($('dayClock'));
-    return;
-  }
-  if (tdPane === 'thanks' && !data?.thanks?.names?.length) tdPane = 'main';
+
   const pay = state?.trackdayUrl || CARDS[0].builtIn;
   CARDS[0].url = pay;
   const now = new Date();
@@ -258,6 +247,7 @@ function renderTrackDay() {
       ${calendarHtml(data)}
     </div>
     <div class="td-right">${qrCardHtml(CARDS[0], 0, 'pay')}</div>`;
+  $('main').classList.toggle('td-thanks-pane', tdPane === 'thanks');
   if (tdPane === 'thanks') requestAnimationFrame(fitNames);
 }
 document.addEventListener('click', (e) => {
@@ -276,7 +266,7 @@ setInterval(() => {
   if (tdWeek !== 0 && tdPane === 'main' && Date.now() - tdSince > TD_HOLD_MS) { tdWeek = 0; renderTrackDay(); }
   const due = tdPane === 'main' ? TD_MAIN_MS : TD_THANKS_MS;
   if (Date.now() - tdSince < due) return;
-  const next = tdPane === 'main' && tdData()?.thanks?.names?.length ? 'thanks' : 'main';
+  const next = tdPane === 'main' ? 'thanks' : 'main';
   tdSince = Date.now();
   if (next === tdPane) return;
   $('main').classList.add('td-fade');

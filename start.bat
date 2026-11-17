@@ -27,25 +27,11 @@ start "tgiFlyDay server" /min cmd /k node --disable-warning=ExperimentalWarning 
 timeout /t 2 /nobreak >nul
 
 rem Edge: never reopen last time's windows, never ask to restore them.
-rem The full-screen big screen allows the webcam without asking (its Sign in takes pilot photos);
-rem windows with a title bar don't get that flag: Edge warns about it there and asks normally.
 set EDGEFLAGS=--no-first-run --hide-crash-restore-bubble --disable-session-crashed-bubble
 
 rem RD console: autoplay allowed, so callouts work without clicking first.
 start "" msedge --app=http://localhost:8080/console --autoplay-policy=no-user-gesture-required %EDGEFLAGS% --user-data-dir="%PROFILES%\console-2"
 
-rem Find a second monitor. Prints its top-left corner as X,Y, or "none".
-set SECOND=none
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Add-Type -AssemblyName System.Windows.Forms; $o = @([System.Windows.Forms.Screen]::AllScreens.Where({ -not $_.Primary })); if ($o.Count) { [string]$o[0].Bounds.X + ',' + $o[0].Bounds.Y } else { 'none' }"`) do set SECOND=%%i
+rem The big screen opens from the RD console: click its QR code (gear icon page).
 
-if "%SECOND%"=="none" goto onescreen
 
-rem Spectator view: full screen on the second monitor (the HDMI splitter feeds both TVs).
-start "" msedge --kiosk http://localhost:8080/screen --edge-kiosk-type=fullscreen --window-position=%SECOND% --use-fake-ui-for-media-stream %EDGEFLAGS% --user-data-dir="%PROFILES%\screen-2"
-goto end
-
-:onescreen
-rem Only one monitor: open the spectator view as a normal window instead of taking over the screen.
-start "" msedge --app=http://localhost:8080/screen %EDGEFLAGS% --user-data-dir="%PROFILES%\screen-2"
-
-:end

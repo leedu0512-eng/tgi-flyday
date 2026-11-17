@@ -10,7 +10,7 @@ import { hostname, networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as sea from 'node:sea';
-import { closeOldWindows, firewallAllow, firewallStatus, keepAwake, openRdWindows, relaunch, tameConsole, type FirewallStatus } from './launch.ts';
+import { closeOldWindows, firewallAllow, firewallStatus, keepAwake, openBigScreen, openRdWindows, relaunch, tameConsole, type FirewallStatus } from './launch.ts';
 import { install, latest, tidy, why } from './update.ts';
 import { VERSION } from './version.ts';
 import { Engine, EngineError } from './engine.ts';
@@ -291,6 +291,11 @@ const API: Record<string, Handler> = {
       engine.noteCardTap(r.pilot.callsign, 'in', Date.now());
     }
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
+  },
+  // The big screen, opened on the RD PC's second monitor from the console (its QR code).
+  '/api/open-screen': () => {
+    if (process.platform !== 'win32') throw new EngineError('The big screen opens by itself only on the Windows RD PC. Open /screen in a browser there.');
+    return openBigScreen(PORT);
   },
   // The kiosk's card reader: a known card signs its pilot in, or out when they're signed in.
   '/api/card': (b) => {

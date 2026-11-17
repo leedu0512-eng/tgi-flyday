@@ -11,7 +11,7 @@ The look (logo, colours, Archivo type) follows the tgiFlyDay identity; the font 
 1. Install **Node.js LTS** from https://nodejs.org (version 22.18 or newer). Nothing else to install.
 2. Double-click **start.bat**. It starts the server and opens:
    - the **RD console** in its own window (it plays the callouts and tones)
-   - the **spectator view**: full screen on the second monitor if there is one, otherwise as a normal window
+   - the **spectator view** opens from the RD console: gear icon → click the big screen's QR code. It goes full screen on the second monitor if there is one, otherwise it opens as a normal window
 3. Open the kiosk on the kiosk touchscreen (see below).
 
 Running **start.bat** again is a clean restart: it first closes tgiFlyDay's windows and the old server, so you never end up with two of each. (The session carries on.)
@@ -26,7 +26,7 @@ To start the server by hand instead: `npm start` (or `node server/main.ts`) in t
 
 **tgiFlyDay.exe** is the whole app in one program: Node.js, the server, every screen, font and icon. Copy it to any Windows PC and double-click.
 
-- **On the RD PC:** it starts the server, closes any tgiFlyDay windows still open, and opens the RD console and the spectator view (full screen on a second monitor). Pilots, heats and settings are kept in a **data** folder next to the exe, so keep the exe in a folder of its own. A small server window stays open, minimised: closing it stops tgiFlyDay. Double-clicking the exe again while it runs just reopens the windows.
+- **On the RD PC:** it starts the server, closes any tgiFlyDay windows still open, and opens the RD console. The spectator view opens from the console (gear icon → the big screen's QR code), full screen on a second monitor. Pilots, heats and settings are kept in a **data** folder next to the exe, so keep the exe in a folder of its own. A small server window stays open, minimised: closing it stops tgiFlyDay. Double-clicking the exe again while it runs just reopens the windows.
 - **On the kiosk PC:** use a copy named **tgiFlyDay Kiosk.exe**. The first time it asks for the RD PC's name (the console shows it under "Kiosk on another PC") and remembers it in kiosk.json. Then it waits until the RD PC answers and opens the kiosk full screen.
 - **Windows SmartScreen** may say it "protected your PC" the first time, because the exe isn't signed. Click **More info**, then **Run anyway**. Windows Firewall may ask about it too: allow **private networks**, or the kiosk can't connect.
 - **Updating:** run **build-exe.bat** in this folder (needs Node.js on this PC only) to make a fresh dist\tgiFlyDay.exe, then replace the old exe. The data folder stays. To try new pages without rebuilding, put a **web** folder next to the exe: it then uses that instead of the pages inside it.

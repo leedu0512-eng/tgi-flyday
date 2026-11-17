@@ -185,19 +185,29 @@ if ($o.Count) { [string]$o[0].Bounds.X + ',' + $o[0].Bounds.Y } else { 'none' }`
 }
 
 /**
- * RD PC: the console (with sound allowed) and the spectator view, full screen on a second
- * monitor. Only the full-screen big screen gets the webcam flag (its Sign in opens the kiosk,
- * and in a full-screen window Edge's camera question never shows; full screen also shows no
- * warning bar). Windows with a title bar don't: Edge shows "unsupported command-line flag"
- * there (Janno 17.11.2026), and its normal camera question works in them.
+ * RD PC: the console, with sound allowed. The big screen no longer opens by itself (Janno
+ * 17.11.2026): the RD opens it from the console (its QR code on the settings page, POST
+ * /api/open-screen → openBigScreen). No webcam flag on windows with a title bar: Edge shows
+ * "unsupported command-line flag" there, and its normal camera question works in them.
  * Fresh profile folders ("-2"), so an earlier "Block" answer doesn't stick.
  */
 export function openRdWindows(port: number) {
+  edge([`--app=http://localhost:${port}/console`, '--autoplay-policy=no-user-gesture-required', ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'console-2')}`]);
+}
+
+/**
+ * The big screen: full screen on the second monitor (the HDMI splitter feeds the TVs), or a
+ * normal window when there is only one. A big screen window already open is closed first, so
+ * clicking twice never makes two. Only the full-screen one gets the webcam flag: its Sign in
+ * opens the kiosk, and in full screen Edge's camera question never shows (nor the warning bar).
+ */
+export function openBigScreen(port: number): { second: boolean } {
+  ps(`Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*TGI-FlyDay*screen-2*' } | ForEach-Object { $p = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($p -and $p.MainWindowHandle -ne 0) { [void]$p.CloseMainWindow() } }`);
   const base = `http://localhost:${port}`;
-  edge([`--app=${base}/console`, '--autoplay-policy=no-user-gesture-required', ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'console-2')}`]);
   const second = secondMonitor();
   if (second) edge(['--kiosk', `${base}/screen`, '--edge-kiosk-type=fullscreen', `--window-position=${second}`, '--use-fake-ui-for-media-stream', ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'screen-2')}`]);
   else edge([`--app=${base}/screen`, ...EDGE_FLAGS, `--user-data-dir=${join(PROFILES, 'screen-2')}`]);
+  return { second: !!second };
 }
 
 function reachable(host: string, port: number): Promise<boolean> {

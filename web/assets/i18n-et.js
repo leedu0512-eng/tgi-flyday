@@ -498,6 +498,15 @@ export const ET = {
   'The orange line is the band as the board sees it, to scale; each bar is a channel, as wide as the band its level is measured over (±8 MHz). Levels are dB above the noise floor (the board isn\'t calibrated); a bar turns red at 6 dB or more. Under each channel used in the current heat: who flies it, so a signal with no pilot, or a pilot with no signal, stands out.':
     'Oranž joon on sagedusala nii, nagu plaat seda näeb, õiges mõõtkavas; iga tulp on kanal ja sama lai kui ala, mille pealt selle taset mõõdetakse (±8 MHz). Tasemed on dB üle mürataseme (plaat pole kalibreeritud); tulp läheb punaseks alates 6 dB-st. Iga käimasolevas grupis kasutatava kanali all on, kes sellel lendab, nii et signaal ilma piloodita või piloot ilma signaalita torkab silma.',
 
+  'Settings': 'Seaded',
+  'Settings: phones and screens, online history': 'Seaded: telefonid ja ekraanid, ajalugu veebis',
+  'Open the big screen on the second monitor': 'Ava suur ekraan teisel monitoril',
+  'Open': 'Ava',
+  'The pit board for the hall. Click its QR code to open it on the second monitor of this PC (full screen; a normal window when there is only one monitor).': 'Saali tulemustabel. Klõpsa selle QR-koodil, et see selle arvuti teisel monitoril avada (täisekraanil; kui monitore on üks, siis tavalises aknas).',
+  'The big screen is opening on the second monitor.': 'Suur ekraan avaneb teisel monitoril.',
+  'No second monitor: the big screen opens in a window.': 'Teist monitori pole: suur ekraan avaneb aknas.',
+  'The big screen opens by itself only on the Windows RD PC. Open /screen in a browser there.': 'Suur ekraan avaneb ise ainult Windowsiga RD arvutis. Ava seal brauseris /screen.',
+
   // ---- messages from the server (shown in toasts) ----
   'Type your pilot name.': 'Kirjuta oma piloodinimi.',
   'Pilot name is too long (max 24 characters).': 'Piloodinimi on liiga pikk (kuni 24 märki).',

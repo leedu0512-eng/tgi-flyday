@@ -31,6 +31,7 @@
       <button class="si" id="spectrumSi" type="button" data-view="spectrum"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20h18"/><path d="M5 17v-3M8 17V9M11 17v-6M14 17V5M17 17v-8M20 17v-4"/></svg></button>
       <button class="si" id="clubSi" type="button" data-view="club"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="5.5" r="3"/><circle cx="18.5" cy="5.5" r="3"/><circle cx="5.5" cy="18.5" r="3"/><circle cx="18.5" cy="18.5" r="3"/><path d="M7.6 7.6l3 3M16.4 7.6l-3 3M7.6 16.4l3-3M16.4 16.4l-3-3"/><rect x="10" y="10" width="4" height="4" rx="1"/></svg><span id="clubCount" class="num"></span></button>
       <button class="si" id="openPilots" type="button" title="Pilots"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M7 7h10"/></svg><span id="pilotCount" class="num">0</span><span id="waitingCount" class="count waiting" title="Signed in, not in a heat"></span></button>
+      <button class="si" id="settingsSi" type="button" data-view="settings" title="Settings: phones and screens, online history"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     </div>
   </div>
 
@@ -84,25 +85,6 @@
         </div>
       </section>
 
-      <section class="card">
-        <details class="more" id="outboxMore">
-          <summary><h2>Online history</h2> <span id="outboxSum" class="muted"></span></summary>
-          <div class="more-body outbox">
-            <p class="hint">Practice start and end, every timed heat with its laps and whether anybody is here are kept on this PC and sent to the Flyday server once Flyday has approved this PC, so pilots can look at their times at home. With no connection, they wait and go later.</p>
-            <div class="pair" id="oPair"></div>
-            <div class="field"><label for="oVenue">This place</label><input id="oVenue" class="input" placeholder="HOBIzone" autocomplete="off"></div>
-            <div class="field"><label for="oUrl">Flyday address (empty: built in)</label><input id="oUrl" class="input" placeholder="https://hobizone.org/api/hz/tgiflyday/" autocomplete="off" spellcheck="false"></div>
-            <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Ask Flyday and send now</button></div>
-            <p class="hint" id="oStatus"></p>
-            <p class="hint" id="oPresence"></p>
-          </div>
-        </details>
-      </section>
-
-      <section class="card">
-        <h2>Phones and screens</h2>
-        <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
-      </section>
     </div>
 
     <div>
@@ -217,7 +199,26 @@
     <p class="hint">Not built yet. It needs the capture hardware first: one USB grabber per receiver, or a quad splitter into one capture card. Once it's here, its settings (which input is which channel, recording on or off, where recordings go) live on this page.</p>
   </section>
 </section>
-<section id="spectrumView" class="card drawer view" hidden aria-label="Spectrum analyser">
+<section id="settingsView" class="card drawer view" hidden aria-label="Settings">
+        <div class="drawer-head"><h2>Settings</h2></div>
+        <section class="drawer-sec">
+          <h3>Phones and screens</h3>
+          <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
+        </section>
+        <section class="drawer-sec">
+          <h3>Online history <span id="outboxSum" class="muted"></span></h3>
+          <div class="outbox" id="outboxBody">
+            <p class="hint">Practice start and end, every timed heat with its laps and whether anybody is here are kept on this PC and sent to the Flyday server once Flyday has approved this PC, so pilots can look at their times at home. With no connection, they wait and go later.</p>
+            <div class="pair" id="oPair"></div>
+            <div class="field"><label for="oVenue">This place</label><input id="oVenue" class="input" placeholder="HOBIzone" autocomplete="off"></div>
+            <div class="field"><label for="oUrl">Flyday address (empty: built in)</label><input id="oUrl" class="input" placeholder="https://hobizone.org/api/hz/tgiflyday/" autocomplete="off" spellcheck="false"></div>
+            <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Ask Flyday and send now</button></div>
+            <p class="hint" id="oStatus"></p>
+            <p class="hint" id="oPresence"></p>
+          </div>
+        </section>
+      </section>
+      <section id="spectrumView" class="card drawer view" hidden aria-label="Spectrum analyser">
   <div class="drawer-head"><h2>Spectrum analyser</h2></div>
   <section class="drawer-sec"><div id="sStatus" class="dev-status"></div></section>
   <section class="drawer-sec spec-wrap">
@@ -395,8 +396,8 @@ function renderCallouts() {
 const drawer = $('drawer');
 const pilotsDrawer = $('pilotsDrawer');
 // Pages in the main area: Heats and Times, or one opened from the status icons (no flyouts).
-const VIEWS = { time: $('timeView'), sound: drawer, pilots: pilotsDrawer, club: $('clubView'), timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView') };
-const ICONS = { time: $('timeSi'), heats: $('sessionSi'), sound: $('openDrawer'), pilots: $('openPilots'), club: $('clubSi'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi') };
+const VIEWS = { time: $('timeView'), sound: drawer, pilots: pilotsDrawer, club: $('clubView'), timer: $('timerView'), video: $('videoView'), spectrum: $('spectrumView'), settings: $('settingsView') };
+const ICONS = { time: $('timeSi'), heats: $('sessionSi'), sound: $('openDrawer'), pilots: $('openPilots'), club: $('clubSi'), timer: $('timerSi'), video: $('videoSi'), spectrum: $('spectrumSi'), settings: $('settingsSi') };
 let view = 'heats';
 function showView(v) {
   view = VIEWS[v] ? v : 'heats';
@@ -414,9 +415,9 @@ const toggleView = (v) => showView(view === v ? 'heats' : v);
 const closeDrawer = () => showView('heats');
 $('openDrawer').onclick = () => toggleView('sound');
 $('openPilots').onclick = () => toggleView('pilots');
-for (const id of ['timeSi', 'clubSi', 'timerSi', 'videoSi', 'spectrumSi']) $(id).onclick = () => toggleView($(id).dataset.view);
+for (const id of ['timeSi', 'clubSi', 'timerSi', 'videoSi', 'spectrumSi', 'settingsSi']) $(id).onclick = () => toggleView($(id).dataset.view);
 // Somebody here? The details are in the Online history card.
-$('hereSi').onclick = () => { $('outboxMore').open = true; $('oPresence').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+$('hereSi').onclick = () => { showView('settings'); setTimeout(() => $('oPresence').scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); };
 $('sessionSi').onclick = closeDrawer; // the session time: back to the heats
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !e.target.matches('input, textarea, select')) closeDrawer(); });
 
@@ -1314,8 +1315,6 @@ async function showInfo(info) {
   const host = info.addresses[0] ?? info.hostname;
   const url = (path) => `http://${host}:${info.port}${path}`;
   const fw = info.firewall;
-  let open = $('screensMore')?.open;
-  if (open == null) { try { open = !!localStorage.getItem('tgiflyday.more.screensMore'); } catch { open = false; } }
   const qrs = await Promise.all(SCREENS.map(([path]) => qrFor(url(path))));
   $('kioskInfo').innerHTML = `
     ${fw && !fw.ok ? `<div class="fw-warn"><b>Phones and the kiosk can't reach this PC.</b>
@@ -1327,17 +1326,27 @@ async function showInfo(info) {
       <div class="qr">${qrs[0]}</div>
       <div><b>${SCREENS[0][1]}</b><code>${esc(url('/me'))}</code><span class="hint">${SCREENS[0][2]} The big screen and the kiosk show this QR code too.</span></div>
     </div>
-    <details class="more" id="screensMore"${open ? ' open' : ''}>
-      <summary>All screens</summary>
-      <div class="more-body">
-        ${SCREENS.slice(1).map(([path, name, text], i) => `<div class="screen-link">
+    <h4 class="screens-head">${tr('All screens')}</h4>
+    ${SCREENS.slice(1).map(([path, name, text], i) => path === '/screen'
+      ? `<div class="screen-link">
+          <button class="qr qr-open" id="openScreen" type="button" title="${tr('Open the big screen on the second monitor')}">${qrs[i + 1]}<span>${tr('Open')}</span></button>
+          <div><b>${name}</b><code>${esc(url(path))}</code><span class="hint">${tr('The pit board for the hall. Click its QR code to open it on the second monitor of this PC (full screen; a normal window when there is only one monitor).')}</span></div>
+        </div>`
+      : `<div class="screen-link">
           <div class="qr">${qrs[i + 1]}</div>
           <div><b>${name}</b><code>${esc(url(path))}</code><span class="hint">${text}</span></div>
         </div>`).join('')}
-        ${info.addresses.length > 1 ? `<p class="hint">This PC also answers on ${info.addresses.slice(1).map((a) => `<code class="plain">${esc(a)}</code>`).join(', ')}.</p>` : ''}
-        <p class="hint">Phones and the kiosk must be on the same network as this PC.</p>
-      </div>
-    </details>`;
+    ${info.addresses.length > 1 ? `<p class="hint">This PC also answers on ${info.addresses.slice(1).map((a) => `<code class="plain">${esc(a)}</code>`).join(', ')}.</p>` : ''}
+    <p class="hint">Phones and the kiosk must be on the same network as this PC.</p>`;
+  $('openScreen')?.addEventListener('click', async (e) => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+      const r = await post('/api/open-screen');
+      toast(tr(r.second ? 'The big screen is opening on the second monitor.' : 'No second monitor: the big screen opens in a window.'), true);
+    } catch (err) { toast(err.message); }
+    setTimeout(() => { b.disabled = false; }, 3000);
+  });
   $('fwFix')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     e.target.textContent = 'Check the Windows prompt…';
@@ -1360,7 +1369,7 @@ document.addEventListener('toggle', (e) => {
   if (!(d instanceof HTMLDetailsElement) || !d.id || !d.classList.contains('more')) return;
   try { localStorage.setItem(`tgiflyday.more.${d.id}`, d.open ? '1' : ''); } catch {}
 }, true);
-try { for (const id of ['setupMore', 'outboxMore']) if (localStorage.getItem(`tgiflyday.more.${id}`)) $(id).open = true; } catch {}
+try { for (const id of ['setupMore']) if (localStorage.getItem(`tgiflyday.more.${id}`)) $(id).open = true; } catch {}
 // The firewall check takes a few seconds after start: look again.
 setTimeout(() => fetch('/api/info').then((r) => r.json()).then(showInfo).catch(() => {}), 8000);
 

@@ -192,11 +192,15 @@ if ($o.Count) { [string]$o[0].Bounds.X + ',' + $o[0].Bounds.Y } else { 'none' }`
   return /^-?\d+,-?\d+$/.test(out) ? out : null;
 }
 function openRdWindows(port) {
+  edge([`--app=http://localhost:${port}/console`, "--autoplay-policy=no-user-gesture-required", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "console-2")}`]);
+}
+function openBigScreen(port) {
+  ps(`Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'msedge.exe' -and $_.CommandLine -like '*TGI-FlyDay*screen-2*' } | ForEach-Object { $p = Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($p -and $p.MainWindowHandle -ne 0) { [void]$p.CloseMainWindow() } }`);
   const base = `http://localhost:${port}`;
-  edge([`--app=${base}/console`, "--autoplay-policy=no-user-gesture-required", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "console-2")}`]);
   const second = secondMonitor();
   if (second) edge(["--kiosk", `${base}/screen`, "--edge-kiosk-type=fullscreen", `--window-position=${second}`, "--use-fake-ui-for-media-stream", ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
   else edge([`--app=${base}/screen`, ...EDGE_FLAGS, `--user-data-dir=${(0, import_node_path.join)(PROFILES, "screen-2")}`]);
+  return { second: !!second };
 }
 
 // server/update.ts
@@ -288,7 +292,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1444" : "dev";
+var VERSION = true ? "2026.11.17-1502" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -3446,6 +3450,11 @@ var API2 = {
       engine.noteCardTap(r.pilot.callsign, "in", Date.now());
     }
     return { ...r, channel: engine.channelOf(r.heat, r.slot) };
+  },
+  // The big screen, opened on the RD PC's second monitor from the console (its QR code).
+  "/api/open-screen": () => {
+    if (process.platform !== "win32") throw new EngineError("The big screen opens by itself only on the Windows RD PC. Open /screen in a browser there.");
+    return openBigScreen(PORT);
   },
   // The kiosk's card reader: a known card signs its pilot in, or out when they're signed in.
   "/api/card": (b) => {
