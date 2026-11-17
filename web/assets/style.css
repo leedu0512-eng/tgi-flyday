@@ -1067,3 +1067,9 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
   .td-join-only .td-qr .txt { align-items: center; }
   .td-join-only .td-qr .pay-qr { width: calc(56 * var(--u)); }
 }
+
+/* Calendar looks from the portal (the website's calendar rules, website-integration.md) */
+.td-cal .ev.has-color { border-left-color: var(--ev); background: color-mix(in srgb, var(--ev) 16%, #222); }
+.td-cal .ev.look-open { border: calc(.25 * var(--u)) dashed var(--ev, #FF6B00); border-left-width: calc(.6 * var(--u)); border-left-style: solid; }
+.td-cal .ev.look-club { border-left-color: #FFFFFF; background: #2c2c2c; }
+.td-cal .ev.look-closed { border-left-color: #FFFFFF; background: repeating-linear-gradient(135deg, #2a2a2a 0 calc(.8 * var(--u)), #161616 calc(.8 * var(--u)) calc(1.6 * var(--u))); }

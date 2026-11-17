@@ -10,7 +10,9 @@ import { join } from 'node:path';
 export const SCREEN_TAILNET = 'https://flyday.tail543cf5.ts.net:8443/api/hz/tgiflyday/screen';
 
 type Text = string | { et?: string; en?: string };
-export interface ScreenEvent { id: string; start: string; end: string | null; all_day: boolean; kind: 'track' | 'drone' | 'class' | 'other'; title: Text; cancelled: boolean }
+export interface ScreenEvent { id: string; start: string; end: string | null; all_day: boolean; kind: 'track' | 'drone' | 'class' | 'other'; title: Text; cancelled: boolean;
+  /** The group's colour and the public calendar's look (website-integration.md), when the portal sends them. */
+  color: string | null; look: string | null }
 export interface ScreenData {
   events: ScreenEvent[];
   join_url: Text | null;
@@ -32,6 +34,7 @@ function text(v: unknown, max = 200): Text {
   return str(v, max);
 }
 const isDate = (v: unknown) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+const LOOKS = new Set(['ring', 'race', 'club', 'open', 'closed', 'off', 'period']);
 const KIND: Record<string, ScreenEvent['kind']> = { trackday: 'track', drone_practice: 'drone', class: 'class' };
 /** Only https on hobizone.org: a QR code on the big screen must never point anywhere else. */
 function hobizoneUrl(v: unknown): string | null {
@@ -54,7 +57,9 @@ export function cleanScreen(body: any, now = Date.now()): ScreenData | null {
       all_day: !!e.all_day,
       kind: KIND[e.kind] ?? 'other',
       title: text(e.title, 80),
-      cancelled: !!e.cancelled,
+      cancelled: !!e.cancelled || e.look === 'off',
+      color: typeof e.color === 'string' && /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : null,
+      look: LOOKS.has(e.look) ? e.look : null,
     });
   }
   let join_url: Text | null = null;

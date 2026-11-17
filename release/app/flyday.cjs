@@ -48,6 +48,7 @@ function text(v, max = 200) {
   return str(v, max);
 }
 var isDate = (v) => typeof v === "string" && !Number.isNaN(Date.parse(v));
+var LOOKS = /* @__PURE__ */ new Set(["ring", "race", "club", "open", "closed", "off", "period"]);
 var KIND = { trackday: "track", drone_practice: "drone", class: "class" };
 function hobizoneUrl(v) {
   try {
@@ -69,7 +70,9 @@ function cleanScreen(body, now = Date.now()) {
       all_day: !!e.all_day,
       kind: KIND[e.kind] ?? "other",
       title: text(e.title, 80),
-      cancelled: !!e.cancelled
+      cancelled: !!e.cancelled || e.look === "off",
+      color: typeof e.color === "string" && /^#[0-9a-f]{6}$/i.test(e.color) ? e.color : null,
+      look: LOOKS.has(e.look) ? e.look : null
     });
   }
   let join_url = null;
@@ -407,7 +410,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1528" : "dev";
+var VERSION = true ? "2026.11.17-1534" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {

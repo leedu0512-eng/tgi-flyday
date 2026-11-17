@@ -151,15 +151,15 @@ function demoData() {
   const at = (day, h, m = 0) => { const d = new Date(mon); d.setDate(d.getDate() + day); d.setHours(h, m); return d.toISOString(); };
   const events = [];
   for (const w of [-7, 0, 7, 14]) {
-    const e = (day, h1, m1, h2, m2, kind, title) => events.push({ id: `${w}-${day}-${h1}`, start: at(day + w, h1, m1), end: at(day + w, h2, m2), kind, title });
-    e(0, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' });
-    e(1, 16, 0, 17, 30, 'class', { et: 'Droonide huviring', en: "Kids' drone class" });
-    e(2, 9, 0, 21, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
-    e(3, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' });
-    e(4, 18, 0, 21, 0, 'other', { et: 'Ehitusõhtu', en: 'Build night' });
-    e(5, 10, 0, 18, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
-    if (w === 0) e(5, 12, 0, 15, 0, 'other', { et: 'RC-autode võistlus', en: 'RC car race' });
-    e(6, 10, 0, 16, 0, 'track', { et: 'Rajapäev', en: 'Track day' });
+    const e = (day, h1, m1, h2, m2, kind, title, color = null, look = null) => events.push({ id: `${w}-${day}-${h1}`, start: at(day + w, h1, m1), end: at(day + w, h2, m2), kind, title, color, look });
+    e(0, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' }, '#22C55E', 'ring');
+    e(1, 16, 0, 17, 30, 'class', { et: 'Varblane', en: 'Sparrow' }, '#3B82F6', 'ring');
+    e(2, 9, 0, 21, 0, 'track', { et: 'Vaba rada', en: 'Open track' }, '#FF6B00', 'open');
+    e(3, 17, 30, 20, 0, 'drone', { et: 'Droonitrenn', en: 'Drone practice' }, '#22C55E', 'ring');
+    e(4, 13, 30, 15, 30, 'other', { et: 'Suletud', en: 'Closed' }, null, 'closed');
+    e(5, 10, 0, 18, 0, 'track', { et: 'Vaba rada', en: 'Open track' }, '#FF6B00', 'open');
+    if (w === 0) e(5, 12, 0, 15, 0, 'other', { et: 'Klubipäev', en: 'Club day' }, null, 'club');
+    e(6, 10, 0, 16, 0, 'track', { et: 'Vaba rada', en: 'Open track' }, '#E879F9', 'open');
   }
   const names = ['Karl', 'Sven', 'Mari', 'Liis', 'Kristjan', 'Mia', 'Leo', 'Rasmus', 'Hanna', 'Oskar', 'Laura', 'Markus', 'Eliise', 'Robin', 'Kaspar', 'Grete', 'Martin', 'Sofia', 'Andres', 'Kertu', 'Joonas', 'Emma', 'Tanel', 'Maria', 'Siim', 'Anna', 'Rein', 'Helen', 'Marko', 'Kadri', 'Funrent', 'Velvet', 'Priit', 'Triin', 'Aivar', 'Elisabeth', 'Henri', 'Johanna', 'Kevin', 'Merilin', 'Tõnu', 'Ülle', 'Jüri', 'Katrin', 'Taavi', 'Pille', 'Erik', 'Hobipood', 'Janek', 'Signe', 'Mihkel', 'Lisette', 'Toomas', 'Getter', 'Artur', 'Liisa'];
   const mixed = names.map((name) => ({ name, new: false })).sort(() => Math.random() - 0.5);
@@ -188,7 +188,10 @@ function calendarHtml(data) {
     const items = evs.map((e) => {
       const st = new Date(e.start), en = e.end ? new Date(e.end) : null;
       const when = e.all_day ? tr('All day') : `${hhmm(st)}${en ? `–${hhmm(en)}` : ''}`;
-      return `<div class="ev ${esc(e.kind ?? 'other')}${e.cancelled ? ' off' : ''}"><span class="t num">${when}${e.cancelled ? ` · ${tr('cancelled')}` : ''}</span><b>${esc(pick(e.title))}</b></div>`;
+      // The website's calendar colours (website-integration.md): group colour, open dashed, club solid, closed hatched.
+      const look = e.look ? ` look-${esc(e.look)}` : '';
+      const col = e.color && /^#[0-9a-f]{6}$/i.test(e.color) ? ` style="--ev:${e.color}"` : '';
+      return `<div class="ev ${esc(e.kind ?? 'other')}${look}${col ? ' has-color' : ''}${e.cancelled ? ' off' : ''}"${col}><span class="t num">${when}${e.cancelled ? ` · ${tr('cancelled')}` : ''}</span><b>${esc(pick(e.title))}</b></div>`;
     }).join('');
     return `<div class="day ${d.toDateString() === today ? 'today' : ''}">
       <div class="dh"><span>${d.toLocaleDateString(loc, { weekday: 'short' }).replace('.', '')}</span><b class="num">${d.getDate()}</b></div>
