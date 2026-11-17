@@ -508,6 +508,13 @@ export const ET = {
   'No second monitor: the big screen opens in a window.': 'Teist monitori pole: suur ekraan avaneb aknas.',
   'The big screen opens by itself only on the Windows RD PC. Open /screen in a browser there.': 'Suur ekraan avaneb ise ainult Windowsiga RD arvutis. Ava seal brauseris /screen.',
 
+  'Big screen calendar and names:': 'Suure ekraani kalender ja nimed:',
+  'showing the copy from {ago}; ': 'näitan koopiat ajast {ago}; ',
+  'the last fetch failed:': 'viimane laadimine ebaõnnestus:',
+  '{n} events, {m} names, fetched {ago}.': '{n} sündmust, {m} nime, laaditud {ago}.',
+  'fetching…': 'laadin…',
+  'not fetched yet.': 'pole veel laaditud.',
+
   // ---- messages from the server (shown in toasts) ----
   'Type your pilot name.': 'Kirjuta oma piloodinimi.',
   'Pilot name is too long (max 24 characters).': 'Piloodinimi on liiga pikk (kuni 24 märki).',

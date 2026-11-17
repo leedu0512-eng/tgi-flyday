@@ -407,7 +407,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-1510" : "dev";
+var VERSION = true ? "2026.11.17-1526" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -3471,6 +3471,7 @@ var snapshot = (now) => ({
   trackdayUrl: pairing.state.trackdayUrl,
   trackdayScreen: screenFeed.data,
   trackdayScreenError: screenFeed.lastError,
+  trackdayScreenTry: screenFeed.lastTry,
   outbox: { ...outbox.status(), venue: outbox.venue(), base: outbox.base(), flyday: publicInstall(pairing.state) }
 });
 async function helloFlyday() {
@@ -3487,8 +3488,12 @@ setInterval(() => {
     void helloFlyday();
   }
 }, 6e4);
-async function refreshScreen() {
-  if (pairing.state.status !== "approved" || !pairing.state.token || !screenFeed.due()) return;
+async function refreshScreen(now = false) {
+  if (pairing.state.status !== "approved" || !pairing.state.token) {
+    screenFeed.lastError = pairing.state.status !== "approved" ? "this PC is not approved in the Flyday admin yet" : "no token from Flyday yet";
+    return;
+  }
+  if (!now && !screenFeed.due()) return;
   if (await screenFeed.refresh(outbox.base(), pairing.state.token)) stateDirty = true;
   else console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Screen data from Flyday: ${screenFeed.lastError}`);
 }
@@ -3765,6 +3770,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     lastHelloTry = Date.now();
     await pairing.hello(outbox.base(), outbox.venue(), (0, import_node_os2.hostname)(), VERSION);
     const st = { ...await outbox.flush(true), flyday: publicInstall(pairing.state) };
+    await refreshScreen(true);
     stateDirty = true;
     return json(res, 200, { ok: true, result: st });
   }

@@ -214,6 +214,7 @@
             <div class="field"><label for="oUrl">Flyday address (empty: built in)</label><input id="oUrl" class="input" placeholder="https://hobizone.org/api/hz/tgiflyday/" autocomplete="off" spellcheck="false"></div>
             <div class="defaults-row"><button id="oSave" class="btn small primary">Save</button><button id="oSend" class="btn small">Ask Flyday and send now</button></div>
             <p class="hint" id="oStatus"></p>
+            <p class="hint" id="oScreen"></p>
             <p class="hint" id="oPresence"></p>
           </div>
         </section>
@@ -916,6 +917,12 @@ function renderOutbox() {
     o.lastOk ? tr('Last sent {ago}.', { ago: ago(o.lastOk) }) : '',
     sending && o.lastError ? `${tr('Last try failed:')} ${o.lastError}. ${tr(o.stopped ? 'Stopped until Send now.' : 'Trying again by itself.')}` : '',
   ].filter(Boolean).join(' ');
+  // The big screen's calendar and thank-you names (the portal's screen door).
+  const sd = state.trackdayScreen, se = state.trackdayScreenError;
+  $('oScreen').innerHTML = se
+    ? `<b class="warn-text">${tr('Big screen calendar and names:')}</b> ${sd ? tr('showing the copy from {ago}; ', { ago: ago(Date.parse(sd.updated)) }) : ''}${tr('the last fetch failed:')} ${esc(se)}.`
+    : sd ? `${tr('Big screen calendar and names:')} ${tr('{n} events, {m} names, fetched {ago}.', { n: sd.events.length, m: sd.thanks?.names?.length ?? 0, ago: ago(Date.parse(sd.updated)) })}`
+    : `${tr('Big screen calendar and names:')} ${tr(state.trackdayScreenTry ? 'fetching…' : 'not fetched yet.')}`;
   // Presence: what the kiosk webcam reports, and the last row that went to Flyday.
   const light = state.light ?? { state: 'unknown' }, p = state.presenceSent;
   const said = (v) => tr(v === true ? 'somebody is here' : v === false ? 'nobody is here' : "can't tell");

@@ -173,7 +173,7 @@ outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostnam
 /** What the screens get: the engine's state plus how the outbox and the Flyday pairing are doing (no secret, no token). */
 const screenFeed = new ScreenFeed(resolve(DATA_FILE, '..'));
 const snapshot = (now: number) => ({ ...engine.snapshot(now), trackdayUrl: pairing.state.trackdayUrl, trackdayScreen: screenFeed.data,
-  trackdayScreenError: screenFeed.lastError, outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
+  trackdayScreenError: screenFeed.lastError, trackdayScreenTry: screenFeed.lastTry, outbox: { ...outbox!.status(), venue: outbox!.venue(), base: outbox!.base(), flyday: publicInstall(pairing.state) } });
 /** Hello to Flyday: approval, token, send on or off, all decided there. Then send what's waiting. */
 async function helloFlyday() {
   await pairing.hello(outbox!.base(), outbox!.venue(), hostname(), VERSION);
@@ -189,8 +189,12 @@ setInterval(() => {
 }, 60_000);
 // The big screen's TrackDay data from the portal (calendar, thank-you names): every 10 minutes
 // once Flyday has approved this PC (the door takes the same token as uploads).
-async function refreshScreen() {
-  if (pairing.state.status !== 'approved' || !pairing.state.token || !screenFeed.due()) return;
+async function refreshScreen(now = false) {
+  if (pairing.state.status !== 'approved' || !pairing.state.token) {
+    screenFeed.lastError = pairing.state.status !== 'approved' ? 'this PC is not approved in the Flyday admin yet' : 'no token from Flyday yet';
+    return;
+  }
+  if (!now && !screenFeed.due()) return;
   if (await screenFeed.refresh(outbox!.base(), pairing.state.token)) stateDirty = true;
   else console.log(new Date().toLocaleTimeString(), `Screen data from Flyday: ${screenFeed.lastError}`);
 }
@@ -489,6 +493,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     lastHelloTry = Date.now();
     await pairing.hello(outbox!.base(), outbox!.venue(), hostname(), VERSION);
     const st = { ...(await outbox!.flush(true)), flyday: publicInstall(pairing.state) };
+    await refreshScreen(true);
     stateDirty = true;
     return json(res, 200, { ok: true, result: st });
   }
