@@ -171,6 +171,27 @@ async function typeKeys(scope, text) {
     await ph.click('[data-leave-yes]');
     await ph.click('[data-switch]');
     check(!!(await ph.$('[data-last]')), 'phone: remembers the name after Going home');
+
+    // ---- Estonian: the switch, and the kiosk still works with on-screen keys ----
+    console.log('Estonian');
+    const et = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    et.on('pageerror', (e) => errors.push(`kiosk (et): ${e.message}`));
+    await et.goto(B + '/kiosk');
+    await et.click('[data-lang="et"]');
+    await et.waitForSelector('[data-lang="et"].on', { timeout: 5000 });
+    check(/LENDAN TÄNA/i.test(await et.textContent('[data-flow=join]')), 'EST switch: the kiosk turns Estonian');
+    await et.click('[data-flow=join]');
+    await typeKeys(et, 'Eesti');
+    check(await et.inputValue('#nameInput') === 'Eesti', 'EST: on-screen keys still type');
+    await et.click('[data-next]');
+    await et.waitForSelector('[data-snap], .done:not(.photo-step)', { timeout: 5000 });
+    if (await et.$('[data-snap]')) { await et.click('[data-snap]'); await et.waitForSelector('[data-use]', { timeout: 6000 }); await et.click('[data-use]'); }
+    await et.waitForSelector('.done:not(.photo-step) .big-msg', { timeout: 5000 });
+    const etMsg = await et.textContent('.done .big-msg'); check(/Grupp \d/i.test(etMsg), 'EST: signed in, heat shown as "Grupp"');
+    await et.click('[data-go=home]');
+    await et.click('[data-lang="en"]');
+    await et.waitForSelector('[data-lang="en"].on', { timeout: 5000 });
+    check(/Fly today/i.test(await et.textContent('[data-flow=join]')), 'ENG switch: back to English');
   } catch (err) {
     failures++;
     console.log('  FAIL', err.message.split('\n')[0]);

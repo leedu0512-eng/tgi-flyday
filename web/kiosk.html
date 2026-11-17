@@ -27,7 +27,7 @@
 <div id="toast" class="toast"></div>
 
 <script type="module">
-import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl, meUrl, qrSvg, timerMark } from '/assets/common.js';
+import { connect, remaining, fmt, post, phaseOf, SLOT_COLORS, esc, pilotMap, wallClock, clockMs, NAME, photoUrl, meUrl, qrSvg, timerMark, tr, langSwitch } from '/assets/common.js';
 setInterval(() => { document.getElementById('wallclock').textContent = wallClock(state); }, 250);
 
 const $ = (id) => document.getElementById(id);
@@ -84,7 +84,7 @@ function homeView() {
       <button class="big" data-flow="move">Change channel<small>Move to another channel or heat</small></button>
       <button class="big" data-go="leave">Going home<small>Free up your slot</small></button>
     </div>
-    ${EMBED ? '' : `<h1 style="margin-top:6vh">Heats</h1>${board(false)}`}`;
+    ${EMBED ? '' : `<div class="kiosk-lang">${langSwitch('lg')}</div><h1 style="margin-top:6vh">Heats</h1>${board(false)}`}`;
 }
 
 function nameView() {
@@ -171,9 +171,9 @@ function whenText(h, pilotId) {
   if (c.phase === 'stopped') return 'Practice starts when the race director starts it.';
   if (h === c.heat && ['running', 'freeflight'].includes(c.phase)) return 'Your heat is flying right now: get ready to join in.';
   const n = heatsBefore(h, pilotId);
-  if (n === 0) return '<b>Your heat is next.</b> Get your quad ready.';
+  if (n === 0) return tr('<b>Your heat is next.</b> Get your quad ready.');
   const min = Math.max(1, Math.round((n * (state.config.heatSeconds + state.config.changeoverSeconds)) / 60));
-  return `${n} heat${n === 1 ? '' : 's'} before yours, about ${min} min.`;
+  return n === 1 ? tr('1 heat before yours, about {min} min.', { min }) : tr('{n} heats before yours, about {min} min.', { n, min });
 }
 
 /** Where a pilot is now, if anywhere. */
@@ -243,8 +243,8 @@ function leaveView() {
   seated.sort((a, b) => a.p.callsign.localeCompare(b.p.callsign));
   if (leaving) {
     const who = seated.find((x) => x.p.id === leaving);
-    return `<div class="done"><div class="big-msg">Leave, ${esc(NAME(who?.p.callsign))}?</div>
-      <p>Your slot in heat ${who ? who.heat + 1 : ''} will be free for someone else.</p>
+    return `<div class="done"><div class="big-msg">${tr('Leave, {name}?', { name: esc(NAME(who?.p.callsign)) })}</div>
+      <p>${tr('Your slot in heat {heat} will be free for someone else.', { heat: who ? who.heat + 1 : '' })}</p>
       <div class="confirm-row">
         <button class="big" data-cancel>Cancel</button>
         <button class="big primary" data-confirm-leave>Yes, leave</button>
@@ -262,7 +262,7 @@ function doneView() {
   // After signing in: a QR code that opens this pilot's own phone page, already as them.
   const qr = doneMsg.qr ? `<div class="done-qr"><div id="doneQr"></div><span>Your heat on your phone: scan me</span></div>` : '';
   return `<div class="done ${qr ? 'with-qr' : ''}"><div><div class="big-msg">${doneMsg.title}</div><p>${doneMsg.text}</p>
-    <div class="confirm-row">${doneMsg.notYou ? `<button class="big" data-not-you>Not ${esc(NAME(doneMsg.notYou.callsign))}?</button>` : ''}<button class="big primary" data-go="home">OK</button></div></div>${qr}</div>`;
+    <div class="confirm-row">${doneMsg.notYou ? `<button class="big" data-not-you>${tr('Not {name}?', { name: esc(NAME(doneMsg.notYou.callsign)) })}</button>` : ''}<button class="big primary" data-go="home">OK</button></div></div>${qr}</div>`;
 }
 async function fillDoneQr(callsign) {
   try {
@@ -274,7 +274,7 @@ async function fillDoneQr(callsign) {
 // ---------- photo step: remembered photo, or a new one from the webcam ----------
 
 function isYouView() {
-  return `<div class="done photo-step"><div class="big-msg">Is this you, ${esc(NAME(me.callsign))}?</div>
+  return `<div class="done photo-step"><div class="big-msg">${tr('Is this you, {name}?', { name: esc(NAME(me.callsign)) })}</div>
     <img class="me-photo" src="${photoUrl(me)}" alt="">
     <div class="confirm-row">
       ${camOK ? '<button class="big" data-retake>No, take a new photo</button>' : '<button class="big" data-not-me>No, remove it</button>'}
@@ -287,7 +287,7 @@ const FACE_GUIDE = `<svg class="face-guide" viewBox="0 0 160 90" aria-hidden="tr
   <path class="dim" fill-rule="evenodd" d="M0 0H160V90H0Z M80 18a14 18 0 1 0 0.01 0Z"/>
   <ellipse class="line" cx="80" cy="36" rx="14" ry="18"/>
   <path class="line" d="M48 90C48 72 60 62 80 62C100 62 112 72 112 90"/>
-  <text x="80" y="10">FACE IN THE OVAL</text>
+  <text x="80" y="10">${tr('FACE IN THE OVAL')}</text>
 </svg>`;
 
 function cameraView() {
@@ -388,8 +388,8 @@ function renderBar() {
   $('phase').className = 'pill ' + ph.cls;
   $('status').textContent = c.phase === 'stopped' ? 'Practice not running'
     : c.phase === 'waiting' ? 'Pick a heat to get it going'
-    : c.phase === 'freeflight' ? `Free flight in heat ${c.heat + 1}`
-    : c.phase === 'running' ? `Heat ${c.heat + 1} flying` : `Heat ${c.heat + 1} next`;
+    : c.phase === 'freeflight' ? tr('Free flight in heat {heat}', { heat: c.heat + 1 })
+    : c.phase === 'running' ? tr('Heat {heat} flying', { heat: c.heat + 1 }) : tr('Heat {heat} next', { heat: c.heat + 1 });
 }
 setInterval(() => {
   if (state) $('clock').textContent = state.clock.phase === 'stopped' || state.clock.phase === 'waiting' || state.clock.phase === 'arming' ? '' : fmt(clockMs(state.clock));
@@ -429,12 +429,13 @@ async function toSlots() {
 /** The "you're in" screen after a walk-in (Fly today, or a card tap). */
 function walkInMsg(r, welcome = '') {
   const ch = esc(r.channel);
-  const mates = r.mates?.length ? ` You share it with ${r.mates.map((m) => `${esc(NAME(m.callsign))}${m.heat >= 0 ? ` (heat ${m.heat + 1})` : ''}`).join(', ')}.` : '';
+  const mates = r.mates?.length ? ' ' + tr('You share it with {who}.', { who: r.mates.map((m) => `${esc(NAME(m.callsign))}${m.heat >= 0 ? ` (${tr('heat {heat}', { heat: m.heat + 1 })})` : ''}`).join(', ') }) : '';
+  const added = r.added ? ' ' + tr('Every heat was full, so this is a new one.') : '';
   return {
-    title: r.already ? `You're already in heat ${r.heat + 1} · ${ch}` : `${welcome}Heat ${r.heat + 1} · ${ch}`,
+    title: r.already ? tr("You're already in heat {heat} · {ch}", { heat: r.heat + 1, ch }) : `${welcome}${tr('Heat {heat} · {ch}', { heat: r.heat + 1, ch })}`,
     text: r.quad
-      ? `${esc(NAME(r.pilot.callsign))}, you fly club quad <b>${esc(r.quad)}</b>, video on <b>${ch}</b>.${mates}${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}`
-      : `${esc(NAME(r.pilot.callsign))}, set your video to <b>${ch}</b>.${r.added ? ' Every heat was full, so this is a new one.' : ''}<br>${whenText(r.heat, r.pilot.id)}<br><small>Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.</small>`,
+      ? `${tr('{name}, you fly club quad <b>{quad}</b>, video on <b>{ch}</b>.', { name: esc(NAME(r.pilot.callsign)), quad: esc(r.quad), ch })}${mates}${added}<br>${whenText(r.heat, r.pilot.id)}`
+      : `${tr('{name}, set your video to <b>{ch}</b>.', { name: esc(NAME(r.pilot.callsign)), ch })}${added}<br>${whenText(r.heat, r.pilot.id)}<br><small>${tr('Wrong channel for your quad? Tap <b>Change channel</b> on the start screen.')}</small>`,
   };
 }
 
@@ -490,12 +491,12 @@ async function cardTapped(id) {
       return go('name');
     }
     if (r.action === 'out') {
-      doneMsg = { title: `Bye, ${esc(NAME(r.callsign))}!`, text: r.again ? "You're signed out. See you next time!" : 'Your slot is free again. See you next time!' };
+      doneMsg = { title: tr('Bye, {name}!', { name: esc(NAME(r.callsign)) }), text: tr(r.again ? "You're signed out. See you next time!" : 'Your slot is free again. See you next time!') };
       go('done');
       setTimeout(() => { if (view === 'done') go('home'); }, 6000);
       return;
     }
-    const msg = walkInMsg(r, r.again ? '' : `Welcome, ${esc(NAME(r.pilot.callsign))}! `);
+    const msg = walkInMsg(r, r.again ? '' : tr('Welcome, {name}!', { name: esc(NAME(r.pilot.callsign)) }) + ' ');
     // Just signed in by this tap: "Not you?" undoes it and frees the card for its real owner.
     if (!r.again) msg.notYou = { card: id, pilotId: r.pilot.id, callsign: r.pilot.callsign };
     // A card is quick: no "Is this you?" and no QR. Only a pilot with no photo yet gets the camera.
@@ -512,7 +513,7 @@ async function seat(heat, slot) {
   const callsign = flow === 'move' ? mover.callsign : name;
   const pilot = await post('/api/join', { name: callsign, heat, slot });
   const ch = state.heats[heat]?.slots[slot]?.channel ?? state.config.channels[slot];
-  const msg = { title: `Heat ${heat + 1} · ${esc(ch)}`, text: `${esc(NAME(pilot.callsign))}, set your video to <b>${esc(ch)}</b>.<br>${whenText(heat, pilot.id)}` };
+  const msg = { title: tr('Heat {heat} · {ch}', { heat: heat + 1, ch: esc(ch) }), text: `${tr('{name}, set your video to <b>{ch}</b>.', { name: esc(NAME(pilot.callsign)), ch: esc(ch) })}<br>${whenText(heat, pilot.id)}` };
   if (flow === 'move') { doneMsg = msg; mover = null; return finish(); }
   signedIn(pilot, msg);
 }
@@ -528,7 +529,7 @@ $('view').addEventListener('click', async (e) => {
   if (t.dataset.mover) {
     const who = state.pilots.find((p) => p.id === t.dataset.mover);
     const club = (state.config.clubQuads ?? []).find((q) => q.name.toLowerCase() === who?.quad?.toLowerCase());
-    if (club) return toast(`You fly club quad ${club.name} on ${club.channel}. Its channel is set by the race director.`);
+    if (club) return toast(tr('You fly club quad {quad} on {ch}. Its channel is set by the race director.', { quad: club.name, ch: club.channel }));
     mover = who;
     return go('slot');
   }
@@ -558,8 +559,8 @@ $('view').addEventListener('click', async (e) => {
       const pilot = await post('/api/pilot/add', { callsign: name });
       const seat = state.heats.flatMap((h) => h.slots.map((s, i) => ({ heat: h.index, slot: i, s }))).find((x) => x.s.pilotId === pilot.id);
       signedIn(pilot, seat
-        ? { title: `You're already in heat ${seat.heat + 1}`, text: `${esc(NAME(pilot.callsign))}, your channel is <b>${esc(seat.s.channel)}</b>.` }
-        : { title: "You're signed in", text: `${esc(NAME(pilot.callsign))}, the race director will put you in a heat. Watch the big screen for your name.` });
+        ? { title: tr("You're already in heat {heat}", { heat: seat.heat + 1 }), text: tr('{name}, your channel is <b>{ch}</b>.', { name: esc(NAME(pilot.callsign)), ch: esc(seat.s.channel) }) }
+        : { title: tr("You're signed in"), text: tr('{name}, the race director will put you in a heat. Watch the big screen for your name.', { name: esc(NAME(pilot.callsign)) }) });
     } catch (err) { toast(err.message); }
     return;
   }

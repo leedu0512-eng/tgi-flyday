@@ -97,6 +97,8 @@ The RD can pause, end a heat, skip to the next heat or move pilots between slots
 
 **Stays awake.** While tgiFlyDay runs, the RD PC doesn't sleep or switch its screens off. The console, big screen and kiosk pages also keep their screen on (phones don't, to save batteries). On the Linux kiosk, kiosk.sh switches off screen blanking and, where the PC allows it, blocks sleep while the kiosk is open.
 
+**Languages.** Every screen has an **EST / ENG** switch (each screen remembers its own). The voice callouts stay in English.
+
 **Kiosk.** Three buttons: **Fly today**, **Change channel**, **Going home**.
 - *Fly today:* type your name, that's all. tgiFlyDay puts you in the first heat to fly that has a free seat, on your usual channel (the one you flew last time) when that heat has it free, and adds a new heat when every heat is full. The screen says your heat, your channel and how many heats are before yours.
 - *Change channel:* tap your name, then a free slot on the heat board (your current seat is outlined).
