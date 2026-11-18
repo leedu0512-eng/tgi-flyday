@@ -1,9 +1,9 @@
 {
- "version": "2026.11.17-2152",
+ "version": "2026.11.18-1308",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "78aadd5756ff957c94188bd8fc5e8fc450401799fcf28ecfd1118bb4594f8781"
+   "sha256": "19ac37552905ce81d1b34de32f8354b4ca170fd2c75ee8852d64274790fa020e"
   },
   {
    "path": "web/assets/avatars.js",
@@ -59,7 +59,7 @@
   },
   {
    "path": "web/assets/i18n-et.js",
-   "sha256": "581e951b4376831b5fbd9e60ad8e60c885f2c2b48bcb6063339ab0507180c4d9"
+   "sha256": "75fd8f610a3b95a8e9c35ee0da3ac035188401d687b502e5e81118a0b9fde914"
   },
   {
    "path": "web/assets/i18n.js",
@@ -123,7 +123,7 @@
   },
   {
    "path": "web/assets/light.js",
-   "sha256": "ae8290ed91deff49a794746efafb4745ec3dc07653c7c5cee4d215b008c660ed"
+   "sha256": "7b4a590cd1175ed0585d78929fc26c22c71f443544f5c4bfc38300203a896163"
   },
   {
    "path": "web/assets/mark-car-small.svg",
@@ -155,7 +155,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "4b0df18cfda37d509f03ab2a5b55d87f402b8b8b2e92b08df49fdaa88b73d855"
+   "sha256": "46bfe43c5dbc19f96f1ebc4cc6d4406f2ba79f7051b4e262a3c7e3aa445104f2"
   },
   {
    "path": "web/favicon.ico",

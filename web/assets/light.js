@@ -10,6 +10,13 @@ import { post } from './common.js';
 const LIGHT_OPEN_MS = 10_000;
 /** How often, and how long the picture gets to settle before it is measured. */
 const EVERY_MS = 60_000, SETTLE_MS = 1500;
+/**
+ * A fixed exposure (Janno 18.11.2026: daylight read as "lights on"). Left to itself a webcam
+ * brightens a dim picture, so a daylit room without lamps looks as bright as a lamp-lit one.
+ * With a fixed exposure the number follows the real light. 10 ms (the unit is 100 µs), where
+ * the camera allows it; cameras that can't keep adjusting, and the console says so.
+ */
+const FIXED_EXPOSURE = 100;
 const inTime = (promise, ms) => Promise.race([promise, new Promise((_, no) => setTimeout(() => no(Object.assign(new Error('no answer'), { name: 'TimeoutError' })), ms))]);
 
 const WHY = {
@@ -28,8 +35,21 @@ const WHY = {
  * no webcam at all (a big screen without one mustn't talk over the real kiosk).
  * Returns { stop } (stop() lets go of the webcam until the next check).
  */
+/** Fix the webcam's exposure if it lets us: 'fixed', else 'auto'. */
+async function fixExposure(track) {
+  try {
+    const caps = track?.getCapabilities?.() ?? {};
+    if (!caps.exposureMode?.includes('manual') || !caps.exposureTime) return 'auto';
+    const t = Math.min(caps.exposureTime.max, Math.max(caps.exposureTime.min, FIXED_EXPOSURE));
+    const want = { exposureMode: 'manual', exposureTime: t };
+    if (caps.whiteBalanceMode?.includes('manual')) want.whiteBalanceMode = 'manual';
+    await track.applyConstraints({ advanced: [want] });
+    return track.getSettings?.().exposureMode === 'manual' ? 'fixed' : 'auto';
+  } catch { return 'auto'; }
+}
+
 export function startLightMeter({ busy = () => false, quietWithoutCamera = false, where = 'the kiosk' } = {}) {
-  let lightStream = null, lightVideo = null, retryAt = 0, problem = '', opening = false, noCamera = false;
+  let lightStream = null, lightVideo = null, retryAt = 0, problem = '', opening = false, noCamera = false, exposure = 'auto';
   const canvas = document.createElement('canvas');
   canvas.width = 64; canvas.height = 48;
 
@@ -40,6 +60,7 @@ export function startLightMeter({ busy = () => false, quietWithoutCamera = false
     try {
       lightStream = await inTime(asking, LIGHT_OPEN_MS);
       if (busy()) throw Object.assign(new Error('the photo step has the webcam'), { name: 'AbortError' });
+      exposure = await fixExposure(lightStream.getVideoTracks()[0]);
       lightVideo = document.createElement('video');
       lightVideo.muted = true; lightVideo.playsInline = true;
       lightVideo.srcObject = lightStream;
@@ -82,7 +103,7 @@ export function startLightMeter({ busy = () => false, quietWithoutCamera = false
     const l = busy() ? null : level();
     stop(); // closed until the next look: the webcam's light is only on for a moment
     if (busy()) return;
-    if (l !== null) post('/api/light', { level: Math.round(l) }).catch(() => {});
+    if (l !== null) post('/api/light', { level: Math.round(l), exposure }).catch(() => {});
     else if (!(quietWithoutCamera && noCamera)) post('/api/light', { problem: problem || (opening ? 'the webcam is still opening' : 'the webcam opened but gives no picture yet') }).catch(() => {});
   }
   setTimeout(check, 3000);

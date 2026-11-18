@@ -371,7 +371,7 @@ const API: Record<string, Handler> = {
   },
   '/api/light': (b) => {
     if (typeof b.problem === 'string') engine.lightProblem(b.problem, Date.now());
-    else engine.lightReading(Number(b.level), Date.now());
+    else engine.lightReading(Number(b.level), Date.now(), b.exposure);
     return { enabled: true };
   },
   '/api/club-quads': (b) => engine.setClubQuads(b.quads),

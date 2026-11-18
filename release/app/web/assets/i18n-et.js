@@ -79,6 +79,8 @@ export const ET = {
   'Use this photo': 'Kasuta seda pilti',
   'Not right now': 'Praegu mitte',
   'Kiosk screen': 'Kioski ekraan',
+  '(Fixed exposure: the number follows the real light.)': '(Fikseeritud säritus: number näitab tegelikku valgust.)',
+  "(This webcam adjusts itself and won't take a fixed exposure: daylight can look like lamps.)": '(See veebikaamera reguleerib ennast ise ega luba säritust fikseerida: päevavalgus võib paista nagu lambid.)',
   'Flyday asked for an update: it happens as soon as practice stops.': 'Flyday küsis uuendust: see tehakse kohe, kui trenn lõpeb.',
   'Set up this PC (Linux)': 'Seadista see arvuti (Linux)',
   'Copy the command.': 'Kopeeri käsk.',

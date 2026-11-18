@@ -195,8 +195,10 @@ export class Engine {
     readerAt: number | null;
   } = { state: 'off', f0: null, db: [], channels: {}, at: null, problem: '', readerAt: null };
   /** Room lights as the kiosk webcam sees them. */
-  light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null; problem: string; kioskAt: number | null } =
-    { state: 'unknown', level: null, at: null, darkSince: null, problem: '', kioskAt: null };
+  light: { state: 'unknown' | 'on' | 'off'; level: number | null; at: number | null; darkSince: number | null; problem: string; kioskAt: number | null;
+    /** The webcam's exposure: fixed (the number follows the real light) or auto (it adjusts itself, daylight can pass for lamps). */
+    exposure?: 'fixed' | 'auto' | null } =
+    { state: 'unknown', level: null, at: null, darkSince: null, problem: '', kioskAt: null, exposure: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
   /** What the last presence row said (present|lights|practice), to send only on a change. */
   private presence: string | undefined = undefined;
@@ -645,10 +647,11 @@ export class Engine {
    * means the lights are off; one bright reading means they're on. Readings stop coming
    * (kiosk off, no camera): unknown after three minutes (lightTick).
    */
-  lightReading(level: number, now: number) {
+  lightReading(level: number, now: number, exposure?: string) {
     const n = Number(level);
     if (!Number.isFinite(n) || n < 0 || n > 255) throw new EngineError('Brightness is 0 to 255.');
     const l = this.light;
+    l.exposure = exposure === 'fixed' ? 'fixed' : exposure === 'auto' ? 'auto' : null;
     l.kioskAt = now;
     l.problem = '';
     l.level = Math.round(n);

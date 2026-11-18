@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.17-2152" : "dev";
+var VERSION = true ? "2026.11.18-1308" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -683,7 +683,7 @@ var Engine = class {
    */
   spectrum = { state: "off", f0: null, db: [], channels: {}, at: null, problem: "", readerAt: null };
   /** Room lights as the kiosk webcam sees them. */
-  light = { state: "unknown", level: null, at: null, darkSince: null, problem: "", kioskAt: null };
+  light = { state: "unknown", level: null, at: null, darkSince: null, problem: "", kioskAt: null, exposure: null };
   /** Last presence sent to the outbox (true: somebody is here, false: nobody, null: can't tell). */
   /** What the last presence row said (present|lights|practice), to send only on a change. */
   presence = void 0;
@@ -1099,10 +1099,11 @@ var Engine = class {
    * means the lights are off; one bright reading means they're on. Readings stop coming
    * (kiosk off, no camera): unknown after three minutes (lightTick).
    */
-  lightReading(level, now) {
+  lightReading(level, now, exposure) {
     const n = Number(level);
     if (!Number.isFinite(n) || n < 0 || n > 255) throw new EngineError("Brightness is 0 to 255.");
     const l = this.light;
+    l.exposure = exposure === "fixed" ? "fixed" : exposure === "auto" ? "auto" : null;
     l.kioskAt = now;
     l.problem = "";
     l.level = Math.round(n);
@@ -3692,7 +3693,7 @@ var API2 = {
   },
   "/api/light": (b) => {
     if (typeof b.problem === "string") engine.lightProblem(b.problem, Date.now());
-    else engine.lightReading(Number(b.level), Date.now());
+    else engine.lightReading(Number(b.level), Date.now(), b.exposure);
     return { enabled: true };
   },
   "/api/club-quads": (b) => engine.setClubQuads(b.quads),

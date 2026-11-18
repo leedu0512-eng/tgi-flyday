@@ -859,7 +859,9 @@ function renderSetup() {
     $('lightsDark').value = String(lt.dark);
   }
   $('lightNow').textContent = light.state === 'unknown' ? (light.problem ? tr('Now: no reading from the kiosk webcam ({why}).', { why: light.problem }) : tr('Now: no reading from the kiosk webcam.'))
-    : tr(light.state === 'on' ? "Now: lights on, the picture's brightness is {level}." : "Now: lights off, the picture's brightness is {level}.", { level: light.level });
+    : tr(light.state === 'on' ? "Now: lights on, the picture's brightness is {level}." : "Now: lights off, the picture's brightness is {level}.", { level: light.level })
+      + (light.exposure === 'fixed' ? ' ' + tr('(Fixed exposure: the number follows the real light.)')
+        : light.exposure === 'auto' ? ' ' + tr("(This webcam adjusts itself and won't take a fixed exposure: daylight can look like lamps.)") : '');
   renderOutbox();
   // What a clean start goes back to, and whether the setup differs from it now.
   const d = cfg.sessionDefaults ?? { heatSeconds: 180, changeoverSeconds: 120, heatCount: 4, channels: ['R1', 'R2', 'F2', 'F4', 'R7', 'R8'] };
