@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.18-1308" : "dev";
+var VERSION = true ? "2026.11.18-1310" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -3422,6 +3422,31 @@ function rememberChannel(pilotId) {
   }
 }
 var CARDS_FILE = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "cards.json");
+var LIGHT_LOG = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "light-log.jsonl");
+function logLight(row) {
+  try {
+    (0, import_node_fs7.appendFileSync)(LIGHT_LOG, JSON.stringify(row) + "\n");
+    if ((0, import_node_fs7.statSync)(LIGHT_LOG).size > 3e6) {
+      const lines = (0, import_node_fs7.readFileSync)(LIGHT_LOG, "utf8").trim().split("\n");
+      (0, import_node_fs7.writeFileSync)(LIGHT_LOG + ".tmp", lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
+      (0, import_node_fs7.renameSync)(LIGHT_LOG + ".tmp", LIGHT_LOG);
+    }
+  } catch {
+  }
+}
+function readLightLog(since) {
+  try {
+    return (0, import_node_fs7.readFileSync)(LIGHT_LOG, "utf8").split("\n").filter(Boolean).map((l) => {
+      try {
+        return JSON.parse(l);
+      } catch {
+        return null;
+      }
+    }).filter((r) => r && r.t >= since);
+  } catch {
+    return [];
+  }
+}
 var cards = (() => {
   try {
     return JSON.parse((0, import_node_fs7.readFileSync)(CARDS_FILE, "utf8"));
@@ -3692,8 +3717,14 @@ var API2 = {
     return { enabled: engine.config.spectrum.enabled, gain: engine.config.spectrum.gain };
   },
   "/api/light": (b) => {
-    if (typeof b.problem === "string") engine.lightProblem(b.problem, Date.now());
-    else engine.lightReading(Number(b.level), Date.now(), b.exposure);
+    const now = Date.now();
+    if (typeof b.problem === "string") {
+      engine.lightProblem(b.problem, now);
+      logLight({ t: now, p: String(b.problem).slice(0, 160) });
+    } else {
+      engine.lightReading(Number(b.level), now, b.exposure);
+      logLight({ t: now, l: engine.light.level, e: engine.light.exposure === "fixed" ? "f" : engine.light.exposure === "auto" ? "a" : void 0, s: engine.light.state, d: engine.config.lights.dark });
+    }
     return { enabled: true };
   },
   "/api/club-quads": (b) => engine.setClubQuads(b.quads),
@@ -3768,6 +3799,24 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     res.writeHead(200, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
     return res.end(`${restartNow ? "restart" : k.awake ? "on" : "dark"}
 `);
+  }
+  if ((path === "/api/light-log" || path === "/api/light-log.csv") && req.method === "GET") {
+    const days = Math.min(31, Math.max(1, Number(url.searchParams.get("days")) || 1));
+    const rows = readLightLog(Date.now() - days * 864e5);
+    if (path.endsWith(".csv")) {
+      const iso2 = (t) => {
+        const d = new Date(t);
+        const p = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      };
+      const csv = [
+        "time,brightness,exposure,lights,dark_line,problem",
+        ...rows.map((r) => [iso2(r.t), r.l ?? "", r.e === "f" ? "fixed" : r.e === "a" ? "auto" : "", r.s ?? "", r.d ?? "", r.p ? `"${String(r.p).replace(/"/g, '""')}"` : ""].join(","))
+      ].join("\r\n");
+      res.writeHead(200, { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="tgiflyday-light-${days}d.csv"`, "cache-control": "no-store" });
+      return res.end(csv);
+    }
+    return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
   if (path === "/api/kiosk/restart" && req.method === "POST") {
     kioskRestartAt = Date.now();

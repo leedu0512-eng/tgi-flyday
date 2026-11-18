@@ -5,7 +5,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { readFile, writeFile, rename, unlink, mkdir } from 'node:fs/promises';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, watch, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, watch, writeFileSync } from 'node:fs';
 import { hostname, networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,6 +93,31 @@ function rememberChannel(pilotId: string) {
  * to (data/cards.json). Stays on this PC: card numbers are never shown on a screen or uploaded.
  */
 const CARDS_FILE = join(resolve(DATA_FILE, '..'), 'cards.json');
+
+/**
+ * Every light reading, kept on this PC for the graph (Janno 18.11.2026: to see what was going
+ * on). data/light-log.jsonl, one line per reading: {t: epoch ms, l: brightness, e: 'f' fixed |
+ * 'a' auto exposure, s: lights on/off/unknown, d: the dark line then} or {t, p: problem}.
+ * About 1 400 lines a day; past 3 MB the older half goes (a few weeks stay).
+ */
+const LIGHT_LOG = join(resolve(DATA_FILE, '..'), 'light-log.jsonl');
+function logLight(row: Record<string, unknown>) {
+  try {
+    appendFileSync(LIGHT_LOG, JSON.stringify(row) + '\n');
+    if (statSync(LIGHT_LOG).size > 3_000_000) {
+      const lines = readFileSync(LIGHT_LOG, 'utf8').trim().split('\n');
+      writeFileSync(LIGHT_LOG + '.tmp', lines.slice(Math.floor(lines.length / 2)).join('\n') + '\n');
+      renameSync(LIGHT_LOG + '.tmp', LIGHT_LOG);
+    }
+  } catch {}
+}
+function readLightLog(since: number): any[] {
+  try {
+    return readFileSync(LIGHT_LOG, 'utf8').split('\n').filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter((r) => r && r.t >= since);
+  } catch { return []; }
+}
 const cards: Record<string, string> = (() => {
   try { return JSON.parse(readFileSync(CARDS_FILE, 'utf8')); } catch { return {}; }
 })();
@@ -370,8 +395,14 @@ const API: Record<string, Handler> = {
     return { enabled: engine.config.spectrum.enabled, gain: engine.config.spectrum.gain };
   },
   '/api/light': (b) => {
-    if (typeof b.problem === 'string') engine.lightProblem(b.problem, Date.now());
-    else engine.lightReading(Number(b.level), Date.now(), b.exposure);
+    const now = Date.now();
+    if (typeof b.problem === 'string') {
+      engine.lightProblem(b.problem, now);
+      logLight({ t: now, p: String(b.problem).slice(0, 160) });
+    } else {
+      engine.lightReading(Number(b.level), now, b.exposure);
+      logLight({ t: now, l: engine.light.level, e: engine.light.exposure === 'fixed' ? 'f' : engine.light.exposure === 'auto' ? 'a' : undefined, s: engine.light.state, d: engine.config.lights.dark });
+    }
     return { enabled: true };
   },
   '/api/club-quads': (b) => engine.setClubQuads(b.quads),
@@ -445,6 +476,19 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (kioskRestartAt !== null) { kioskRestartAt = null; stateDirty = true; }
     res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
     return res.end(`${restartNow ? 'restart' : k.awake ? 'on' : 'dark'}\n`);
+  }
+  // The light readings for the console's graph, or as a CSV file to look at elsewhere.
+  if ((path === '/api/light-log' || path === '/api/light-log.csv') && req.method === 'GET') {
+    const days = Math.min(31, Math.max(1, Number(url.searchParams.get('days')) || 1));
+    const rows = readLightLog(Date.now() - days * 86_400_000);
+    if (path.endsWith('.csv')) {
+      const iso = (t: number) => { const d = new Date(t); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
+      const csv = ['time,brightness,exposure,lights,dark_line,problem',
+        ...rows.map((r) => [iso(r.t), r.l ?? '', r.e === 'f' ? 'fixed' : r.e === 'a' ? 'auto' : '', r.s ?? '', r.d ?? '', r.p ? `"${String(r.p).replace(/"/g, '""')}"` : ''].join(','))].join('\r\n');
+      res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="tgiflyday-light-${days}d.csv"`, 'cache-control': 'no-store' });
+      return res.end(csv);
+    }
+    return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
   if (path === '/api/kiosk/restart' && req.method === 'POST') {
     kioskRestartAt = Date.now();

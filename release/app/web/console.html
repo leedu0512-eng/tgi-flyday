@@ -207,6 +207,12 @@
           <div class="kiosk-info" id="kioskInfo"><p class="hint">Looking up this PC's address…</p></div>
         </section>
         <section class="drawer-sec">
+          <h3>Room light <span class="muted" id="lightGraphSum"></span></h3>
+          <p class="hint">Every reading from the kiosk webcam (one a minute). Orange behind the line: tgiFlyDay counted the lights as on. Dashed: the "dark below" line. Grey line: the webcam was adjusting its own exposure. Red ticks: no reading (the kiosk said why: hover them).</p>
+          <div class="light-graph-tools"><button class="btn small on" data-lg="1">24 h</button><button class="btn small" data-lg="7">7 days</button><a class="btn small" id="lightCsv" href="/api/light-log.csv?days=1" download>Download (CSV)</a></div>
+          <div id="lightGraph" class="light-graph"></div>
+        </section>
+        <section class="drawer-sec">
           <h3>Kiosk screen</h3>
           <label class="toggle wide"><input type="checkbox" id="kioskSleep"><span><b>Dark when nothing is on</b>: the kiosk PC's screen is on from an hour before the day's first event in the calendar until an hour after the last, and while practice runs or somebody uses tgiFlyDay. Otherwise it switches off (the PC keeps running), and comes back on by itself. A touch wakes it for 10 minutes. Off: always on, never the screensaver.</span></label>
           <p class="hint" id="kioskScreenNow"></p>
@@ -417,6 +423,7 @@ function showView(v) {
   if (view === 'timer') renderTimerView(true);
   if (view === 'club') renderClubView(true);
   if (view === 'time') renderTimeView(true);
+  if (view === 'settings') loadLightGraph();
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
 const toggleView = (v) => showView(view === v ? 'heats' : v);
@@ -885,6 +892,69 @@ $('kioskSleep').onchange = (e) => act('/api/config', { kioskSleep: e.target.chec
 $('kioskRestart').onclick = async () => {
   try { await post('/api/kiosk/restart'); toast(tr('The kiosk restarts within a minute.'), true); } catch (err) { toast(err.message); }
 };
+// ---------- room light graph (Janno 18.11.2026) ----------
+let lgDays = 1;
+for (const b of document.querySelectorAll('[data-lg]')) b.onclick = () => {
+  lgDays = Number(b.dataset.lg);
+  document.querySelectorAll('[data-lg]').forEach((x) => x.classList.toggle('on', x === b));
+  $('lightCsv').href = `/api/light-log.csv?days=${lgDays}`;
+  loadLightGraph();
+};
+setInterval(() => { if (view === 'settings') loadLightGraph(); }, 60_000);
+async function loadLightGraph() {
+  try {
+    const r = await fetch(`/api/light-log?days=${lgDays}`, { cache: 'no-store' });
+    const { rows, dark } = await r.json();
+    $('lightGraph').innerHTML = lightGraphSvg(rows, dark, lgDays);
+    const lv = rows.filter((x) => x.l != null);
+    $('lightGraphSum').textContent = lv.length ? tr('{n} readings, brightness {min}–{max}', { n: lv.length, min: Math.min(...lv.map((x) => x.l)), max: Math.max(...lv.map((x) => x.l)) }) : '';
+  } catch { $('lightGraph').innerHTML = `<p class="hint">${tr('No readings yet.')}</p>`; }
+}
+function lightGraphSvg(rows, dark, days) {
+  if (!rows.length) return `<p class="hint">${tr('No readings yet.')}</p>`;
+  const W = 1000, H = 260, top = 10, bottom = 230, left = 34;
+  const to = Date.now(), from = to - days * 86_400_000;
+  const x = (t) => left + ((t - from) / (to - from)) * (W - left - 6);
+  const y = (l) => bottom - (l / 255) * (bottom - top);
+  const GAP = 5 * 60_000;
+  let out = '';
+  // Hours / days on the time axis.
+  const step = days === 1 ? 3 * 3600_000 : 86_400_000;
+  const first = new Date(from); first.setMinutes(0, 0, 0);
+  if (days === 1) first.setHours(Math.ceil(first.getHours() / 3) * 3); else { first.setHours(24); }
+  for (let t = first.getTime(); t < to; t += step) {
+    const d = new Date(t);
+    const label = days === 1 ? `${String(d.getHours()).padStart(2, '0')}:00` : `${d.getDate()}.${d.getMonth() + 1}`;
+    out += `<line x1="${x(t)}" x2="${x(t)}" y1="${top}" y2="${bottom}" class="lg-grid"/><text x="${x(t) + 3}" y="${H - 14}" class="lg-label">${label}</text>`;
+  }
+  for (const l of [0, 64, 128, 192, 255]) out += `<line x1="${left}" x2="${W - 6}" y1="${y(l)}" y2="${y(l)}" class="lg-grid"/><text x="2" y="${y(l) + 4}" class="lg-label">${l}</text>`;
+  // Lights counted as on: a band behind the line.
+  const lv = rows.filter((r) => r.l != null);
+  for (let i = 0; i < lv.length; i++) {
+    const r = lv[i], next = lv[i + 1];
+    if (r.s !== 'on') continue;
+    const end = next && next.t - r.t < GAP ? next.t : r.t + 60_000;
+    out += `<rect x="${x(r.t)}" y="${top}" width="${Math.max(1, x(end) - x(r.t))}" height="${bottom - top}" class="lg-on"/>`;
+  }
+  // The dark line (as it was at each reading).
+  let dl = '';
+  for (let i = 0; i < lv.length; i++) dl += `${i && lv[i].t - lv[i - 1].t < GAP ? 'L' : 'M'}${x(lv[i].t).toFixed(1)},${y(lv[i].d ?? dark).toFixed(1)}`;
+  if (dl) out += `<path d="${dl}" class="lg-dark"/>`;
+  // The readings: one path per stretch, grey where the webcam set its own exposure.
+  let seg = '', cls = '';
+  const flush = () => { if (seg) out += `<path d="${seg}" class="${cls}"/>`; seg = ''; };
+  for (let i = 0; i < lv.length; i++) {
+    const r = lv[i], c = r.e === 'a' ? 'lg-line lg-auto' : 'lg-line';
+    const joined = i && r.t - lv[i - 1].t < GAP && c === cls;
+    if (!joined) { flush(); cls = c; seg = i && r.t - lv[i - 1].t < GAP ? `M${x(lv[i - 1].t).toFixed(1)},${y(lv[i - 1].l).toFixed(1)}` : ''; }
+    seg += `${seg ? 'L' : 'M'}${x(r.t).toFixed(1)},${y(r.l).toFixed(1)}`;
+  }
+  flush();
+  // No reading: red ticks along the bottom, the kiosk's reason in the tooltip.
+  for (const r of rows.filter((r) => r.p)) out += `<line x1="${x(r.t)}" x2="${x(r.t)}" y1="${bottom}" y2="${bottom - 10}" class="lg-problem"><title>${esc(new Date(r.t).toLocaleString('et-EE'))}: ${esc(r.p)}</title></line>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="lg-svg" role="img" aria-label="${esc(tr('Room light'))}">${out}</svg>`;
+}
+
 /** What the kiosk PC's screen does now, and whether the kiosk PC is following it. */
 function renderKioskScreen() {
   const k = state?.kioskScreen;
