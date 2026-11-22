@@ -570,3 +570,88 @@ export function issuesOf(tr) {
   }
   return out;
 }
+
+// ---------- to WebFPV (Janno 22.11.2026: fly today's track in the sim at home) ----------
+// A track document in WebFPV's own format (schemaVersion 3, its src/trackbuilder/schema.md): the
+// same frame as ours (x across from the left wall, y up the page, z up, metres, yaw counter
+// clockwise from +x), a whoop room ('micro', which grows to fit the hall). Pieces become its
+// elements: gates and the timing gate `gate`, ladders a stack of openings, a cube five gates in
+// one group (its edges), rings `hoop`s up on their sill, flags `flag` markers flown round on one
+// side. The flying order is ours, pass by pass. WebFPV draws its own line through them.
+const OPEN = 0.5, PIPE = 0.03, SILL = 0.03;
+const r6 = (v) => Math.round(v * 1e6) / 1e6;
+function hash8(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, '0'); }
+export function toWebFPV(tr, level = 'full', now = new Date()) {
+  const L = tr.levels[level];
+  const elements = [], sequence = [], pieceEls = new Map();
+  let ne = 0, nq = 0;
+  const el = (type, x, y, yaw, dims, extra = {}) => {
+    const e = { id: `el-${++ne}`, type, name: '', position: { x: r6(x), y: r6(y), z: 0 }, yaw: r6(Math.atan2(Math.sin(yaw), Math.cos(yaw))), pitch: 0, yawOverridden: true, dims, ...extra };
+    elements.push(e);
+    return e;
+  };
+  const yawOf = (pc) => Math.atan2(pc.dy, pc.dx);
+  tr.pieces.forEach((pc, i) => {
+    const yaw = yawOf(pc);
+    if (pc.type === 'gate' || pc.type === 'timing') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: pc.type === 'timing' ? 'Timing gate' : '' }), yaw });
+    else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: TYPES[pc.type].label }), yaw });
+    else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring' }), yaw });
+    else if (pc.type === 'flag') pieceEls.set(i, { el: el('flag', pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: 'Flag' }) });
+    else if (pc.type === 'cube') {
+      // a 70 cm cube: front and back whole, the sides without their own uprights (they are the front's and back's)
+      const c = Math.cos(yaw), s = Math.sin(yaw), h = 0.35, e = 0.7 - PIPE, group = `grp-${i + 1}`;
+      const dims = { levels: 1, sillH: 0, clearW: e, clearH: e, levelPitch: e + PIPE };
+      const back = el('gate', pc.x - h * c, pc.y - h * s, yaw, dims, { group, name: 'Cube' });
+      const front = el('gate', pc.x + h * c, pc.y + h * s, yaw, dims, { group, name: 'Cube' });
+      for (const k of [1, -1]) el('gate', pc.x - k * h * s, pc.y + k * h * c, yaw + Math.PI / 2, dims, { group, name: 'Cube', unbuiltSides: ['left', 'right'] });
+      pieceEls.set(i, { back, front, yaw });
+    }
+  });
+  // the flying order: every pass, and each flag where the line goes round it
+  const events = [];
+  tr.pieces.forEach((pc, i) => (L.passes[i] || []).forEach((ps) => events.push({ s: ps.s, i, ps })));
+  const pts = L.line.pts;
+  tr.pieces.forEach((pc, i) => {
+    if (pc.type !== 'flag') return;
+    let best = null;
+    pts.forEach((p, k) => { const d = Math.hypot(p.x - pc.x, p.y - pc.y); if (!best || d < best.d) best = { d, k }; });
+    if (best && best.d < 1.2) events.push({ s: pts[best.k].s, i, at: best.k, d: best.d });
+  });
+  events.sort((a, b) => a.s - b.s);
+  const t0 = events.findIndex((e) => tr.pieces[e.i].type === 'timing');
+  const order = [...events.slice(Math.max(0, t0)), ...events.slice(0, Math.max(0, t0))];
+  let prev = null;
+  for (const ev of order) {
+    const pc = tr.pieces[ev.i], m = pieceEls.get(ev.i);
+    const q = (elementId, extra) => sequence.push({ id: `sq-${++nq}`, elementId, apertureIndex: null, entry: null, passSide: null, clearance: null, overridden: true, ...extra });
+    if (pc.type === 'flag') {
+      const p = pts[ev.at], n = pts[(ev.at + 1) % pts.length];
+      const cross = (n.x - p.x) * (pc.y - p.y) - (n.y - p.y) * (pc.x - p.x); // > 0: the flag is on the left of the way flown
+      q(m.el.id, { passSide: cross > 0 ? 'right' : 'left', clearance: r6(Math.max(0.2, ev.d)) });
+    } else {
+      const dir = Math.atan2(ev.ps.dy, ev.ps.dx), entry = Math.cos(dir - m.yaw) >= 0 ? 1 : -1;
+      if (pc.type === 'cube') { q(m.back.id, { apertureIndex: 0, entry }); q(m.front.id, { apertureIndex: 0, entry }); }
+      else {
+        const stage = pc.type.startsWith('ladder') ? ev.ps.info?.stage ?? 0 : 0;
+        q(m.el.id, { apertureIndex: stage, entry, ...(prev === ev.i && pc.type.startsWith('ladder') ? { wrap: 'left' } : {}) });
+      }
+    }
+    prev = ev.i;
+  }
+  // the start pads where our start is, facing up the page like the lap
+  elements.push({ id: `el-${++ne}`, type: 'startPads', name: '', position: { x: START.x, y: START.y, z: 0 }, yaw: r6(Math.PI / 2), pitch: 0, yawOverridden: true, dims: { pads: 1, spacing: 0.5, padSize: 0.4 } });
+  const iso = now.toISOString().replace(/\.\d+Z$/, 'Z');
+  const tag = code(tr.seed) + (level === 'easy' ? ' Beginner' : '');
+  return {
+    schemaVersion: 3,
+    id: 'trk-' + hash8(tag + JSON.stringify(tr.edits || {})),
+    name: `HOBIzone hall · ${tag}`,
+    createdUtc: iso,
+    modifiedUtc: iso,
+    trackClass: 'micro',
+    field: { width: HALL.w, depth: HALL.l, gridSize: 0.1 },
+    credit: { designer: 'tgiFlyDay track generator', series: 'HOBIzone', source: 'tgiFlyDay', note: 'HOBIzone whoop hall, 10 × 26 × 3.5 m' },
+    elements,
+    sequence,
+  };
+}

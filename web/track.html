@@ -93,6 +93,13 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 .trk .pp-keys button.ok { background: var(--accent); border-color: var(--accent); color: #000; font-size: 24px; }
 .trk .pp-shake { animation: ppShake .3s; }
 @keyframes ppShake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.trk .sim-box { width: min(94vw, 560px); }
+.trk .sim-qr { background: #fff; padding: 10px; border-radius: 8px; width: min(78vw, 420px); margin: 0 auto; }
+.trk .sim-qr svg { display: block; width: 100%; height: auto; }
+.trk .sim-help { margin: 0; color: var(--muted); font-size: 15px; }
+.trk .sim-link { width: 100%; font: 12px ui-monospace, monospace; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+.trk .sim-row { display: flex; gap: 10px; justify-content: center; }
+.trk a.tb { text-decoration: none; }
 @media (max-width: 900px) {
   .trk-grid { grid-template-columns: 1fr; grid-template-areas: "ctrl" "stage" "side" "list"; }
   .trk .stage, .trk.editing .stage { height: 62vh; }
@@ -107,6 +114,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
   <h1 id="title">Today's track</h1>
   <span class="code" id="code"></span>
   <span class="spacer"></span>
+  <button type="button" class="tb" id="simBtn">Fly it in the sim</button>
   <button type="button" class="tb primary" id="editBtn">Edit track</button>
   <button type="button" class="tb primary" id="saveBtn" hidden>Save as today's track</button>
   <button type="button" class="tb" id="cancelBtn" hidden>Cancel</button>
@@ -176,6 +184,15 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
   </section>
 </main>
 <div class="toast2" id="toast2" role="status"></div>
+<div class="pinpad" id="simBox" hidden>
+  <div class="pp-box sim-box" role="dialog" aria-label="Fly it in the sim">
+    <h3 id="simTitle">Fly it in the sim</h3>
+    <div class="sim-qr" id="simQr"></div>
+    <p class="sim-help">Scan it with your phone and open it on a computer at home: WebFPV runs in the browser, fly with your radio on USB or a gamepad.</p>
+    <input class="sim-link" id="simLink" readonly data-no-i18n aria-label="Link">
+    <div class="sim-row"><a class="tb primary" id="simOpen" target="_blank" rel="noopener">Open WebFPV</a><button type="button" class="tb" id="simClose">Close</button></div>
+  </div>
+</div>
 <div class="pinpad" id="pinpad" hidden>
   <div class="pp-box" role="dialog" aria-label="PIN to save">
     <h3>PIN to save</h3>
@@ -193,7 +210,8 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
-import { HALL, RAILS, START, TIMING, TYPES, code, generate, rebuild, relayout, makeTrack, cleanEdits } from '/assets/trackgen.js';
+import { HALL, RAILS, START, TIMING, TYPES, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV } from '/assets/trackgen.js';
+import { qrSvg } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -558,6 +576,7 @@ function setEditing(on) {
   document.body.classList.toggle('editing', on);
   $('ctrl').hidden = !on;
   $('editBtn').hidden = on;
+  $('simBtn').hidden = on;
   $('saveBtn').hidden = !on;
   $('cancelBtn').hidden = !on;
   $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
@@ -630,6 +649,30 @@ $('pinpad').addEventListener('click', async (e) => {
   pinDots();
 });
 $('genBtn').onclick = runGenerate;
+
+// ---------- fly it in WebFPV (a link that carries the whole track, nothing to host) ----------
+const WEBFPV = 'https://webfpv.org/sim/src/trackbuilder/index.html';
+async function simLink(t) {
+  const bytes = new TextEncoder().encode(JSON.stringify(toWebFPV(t, level)));
+  let payload;
+  if (typeof CompressionStream === 'function') {
+    const z = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+    payload = 'z.' + b64url(z);
+  } else payload = 'j.' + b64url(bytes);
+  return `${WEBFPV}#track=${payload}`;
+}
+function b64url(u8) { let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+$('simBtn').onclick = async () => {
+  if (!track) return;
+  const link = await simLink(track);
+  $('simLink').value = link;
+  $('simOpen').href = link;
+  $('simTitle').textContent = `${tr('Fly it in the sim')} · ${code(track.seed)}${level === 'easy' ? ' · ' + tr('Beginner') : ''}`;
+  $('simQr').innerHTML = await qrSvg(link);
+  $('simBox').hidden = false;
+};
+$('simClose').onclick = () => { $('simBox').hidden = true; };
+$('simBox').addEventListener('click', (e) => { if (e.target === $('simBox')) $('simBox').hidden = true; });
 $('history').onchange = () => {
   const s = saved.history[Number($('history').value)];
   $('history').value = '';

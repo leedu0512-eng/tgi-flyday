@@ -234,6 +234,10 @@ async function typeKeys(scope, text) {
     await tk.waitForSelector('#pinpad[hidden]', { state: 'attached', timeout: 5000 });
     const saved2 = await (await fetch(B + '/api/track')).json();
     check(saved2.locked && saved2.today.seed !== saved.today.seed && saved2.history.length === 1, 'Track: with a PIN, the number pad refuses a wrong one and saves with the right one');
+    await tk.click('#simBtn');
+    await tk.waitForSelector('#simBox:not([hidden]) #simQr svg', { timeout: 5000 });
+    const simUrl = await tk.inputValue('#simLink');
+    check(/^https:\/\/webfpv\.org\/sim\/src\/trackbuilder\/index\.html#track=[zj]\.[A-Za-z0-9_-]{200,}$/.test(simUrl), 'Track: Fly it in the sim shows a QR code and a WebFPV link carrying the track');
   } catch (err) {
     failures++;
     console.log('  FAIL', err.message.split('\n')[0]);

@@ -80,3 +80,26 @@ test('saving can be locked with a PIN, kept only as a salted hash; five wrong on
   again.setPin({ old: '2580', pin: null });
   assert.equal(again.view().locked, false);
 });
+
+test('a track goes to WebFPV as its own document: every pass in our order, flags flown round', () => {
+  const r = G.generate(OPTS, { ms: 6000, want: 1, start: 11 });
+  for (const level of ['full', 'easy']) {
+    const doc = G.toWebFPV(r.best, level, new Date('2026-11-22T20:00:00Z'));
+    assert.equal(doc.schemaVersion, 3);
+    assert.equal(doc.trackClass, 'micro');
+    assert.deepEqual(doc.field, { width: 10, depth: 26, gridSize: 0.1 });
+    const ids = new Set(doc.elements.map((e: any) => e.id));
+    assert.ok(doc.sequence.every((q: any) => ids.has(q.elementId)), 'every pass names an element');
+    const L = r.best.levels[level];
+    const passes = r.best.pieces.reduce((n: number, pc: any, i: number) => n + L.passes[i].length * (pc.type === 'cube' ? 2 : 1), 0);
+    const flags = r.best.pieces.filter((p: any) => p.type === 'flag').length;
+    assert.equal(doc.sequence.length, passes + flags);
+    assert.equal(doc.elements.find((e: any) => e.id === doc.sequence[0].elementId).name, 'Timing gate', 'the lap starts at the timing gate');
+    for (const q of doc.sequence) {
+      const e = doc.elements.find((x: any) => x.id === q.elementId);
+      if (e.type === 'flag') assert.ok(q.passSide === 'left' || q.passSide === 'right');
+      else assert.ok(q.entry === 1 || q.entry === -1);
+    }
+    assert.equal(doc.id, G.toWebFPV(r.best, level).id, 'the same track keeps its id');
+  }
+});
