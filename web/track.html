@@ -150,6 +150,9 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
     <div class="field"><span>Hand tuning</span>
       <div class="sel" id="sel"></div>
     </div>
+    <div class="field"><span>Add from the kit</span>
+      <div class="sel" id="addBox"></div>
+    </div>
   </section>
 
   <div class="stage" id="stage">
@@ -210,7 +213,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
-import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink } from '/assets/trackgen.js';
+import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, ADDABLE } from '/assets/trackgen.js';
 import { qrSvg } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -544,20 +547,44 @@ function renderSheet() {
     ? `<ul>${t.issues.map((i) => `<li>${esc(tr(i.text))}${i.level === 'easy' ? ' ' + esc(tr('(Beginner line)')) : ''}</li>`).join('')}</ul>`
     : `<p class="ok">${tr('The track keeps every rule.')}</p>`;
 }
+function ladderNow(pc) {
+  const l = track.changes?.ladders?.[pc.key];
+  if (l) return l;
+  const st = pc.stages || [pc.level || 0];
+  return { mode: st.length > 1 ? (st[1] > st[0] ? 'up' : 'down') : 'once', n: Math.max(2, st.length), at: st[0] || 0 };
+}
 function renderSel() {
   if (!editing) return;
+  renderAdd();
   const pc = track && picked >= 0 ? track.pieces[picked] : null;
+  const undoBtn = `<button type="button" class="tb" data-undo ${undo.length ? '' : 'disabled'}>${tr('Undo')}</button>`;
   if (!pc || pc.type === 'timing') {
-    $('sel').innerHTML = `<span class="muted">${tr(pc ? 'The timing gate stays where it is.' : 'Drag a piece on the floor plan to move it, tap it to turn it.')}</span>`
-      + `<button type="button" class="tb" data-undo ${undo.length ? '' : 'disabled'}>${tr('Undo')}</button>`;
+    $('sel').innerHTML = `<span class="muted">${tr(pc ? 'The timing gate stays where it is.' : 'Drag a piece on the floor plan to move it, tap it to turn it.')}</span>` + undoBtn;
     return;
   }
   const step = pc.type === 'ring' ? 90 : 15;
-  $('sel').innerHTML = `<span class="name">${picked + 1} · ${tr(LABEL[pc.type])}</span>`
+  let html = `<span class="name">${picked + 1} · ${tr(LABEL[pc.type])}</span>`
     + `<button type="button" class="tb" data-rot="${-step}" aria-label="Turn left">⟲ ${step}°</button><button type="button" class="tb" data-rot="${step}" aria-label="Turn right">⟳ ${step}°</button>`
-    + `<button type="button" class="tb" data-nudge="-0.1,0" aria-label="Left 10 cm">←</button><button type="button" class="tb" data-nudge="0,0.1" aria-label="Up 10 cm">↑</button><button type="button" class="tb" data-nudge="0,-0.1" aria-label="Down 10 cm">↓</button><button type="button" class="tb" data-nudge="0.1,0" aria-label="Right 10 cm">→</button>`
-    + `<button type="button" class="tb" data-reset>${tr('Put back')}</button>`
-    + `<button type="button" class="tb" data-undo ${undo.length ? '' : 'disabled'}>${tr('Undo')}</button>`;
+    + `<button type="button" class="tb" data-nudge="-0.1,0" aria-label="Left 10 cm">←</button><button type="button" class="tb" data-nudge="0,0.1" aria-label="Up 10 cm">↑</button><button type="button" class="tb" data-nudge="0,-0.1" aria-label="Down 10 cm">↓</button><button type="button" class="tb" data-nudge="0.1,0" aria-label="Right 10 cm">→</button>`;
+  if (pc.type.startsWith('ladder')) { // how the ladder is flown (Janno 23.11.2026)
+    const l = ladderNow(pc), max = pc.type === 'ladder3' ? 3 : 5;
+    html += `<span class="seg">${[['up', 'Climb'], ['down', 'Down'], ['once', 'Once']].map(([m, w]) => `<button type="button" data-lmode="${m}" aria-pressed="${l.mode === m}">${tr(w)}</button>`).join('')}</span>`;
+    html += l.mode === 'once'
+      ? `<button type="button" class="tb" data-lat="-1" ${l.at <= 0 ? 'disabled' : ''} aria-label="Lower stage">−</button><span class="muted">${tr('Stage {n}', { n: l.at + 1 })}</span><button type="button" class="tb" data-lat="1" ${l.at >= max - 1 ? 'disabled' : ''} aria-label="Higher stage">+</button>`
+      : `<button type="button" class="tb" data-ln="-1" ${l.n <= 2 ? 'disabled' : ''} aria-label="Fewer stages">−</button><span class="muted">${tr('{n} stages', { n: l.n })}</span><button type="button" class="tb" data-ln="1" ${l.n >= max ? 'disabled' : ''} aria-label="More stages">+</button>`;
+  }
+  if (!pc.added) html += `<button type="button" class="tb" data-reset>${tr('Put back')}</button>`;
+  html += `<button type="button" class="tb" data-remove>${tr('Remove')}</button>` + undoBtn;
+  $('sel').innerHTML = html;
+}
+function renderAdd() {
+  if (!track) { $('addBox').innerHTML = ''; return; }
+  const used = {};
+  for (const pc of track.pieces) used[pc.type] = (used[pc.type] || 0) + 1;
+  $('addBox').innerHTML = ADDABLE.filter((t) => t !== 'ring' || track.opts.rings).map((t) => {
+    const left = (KIT_COUNT[t] || 0) - (used[t] || 0);
+    return `<button type="button" class="tb" data-add="${t}" ${left > 0 ? '' : 'disabled'}>+ ${tr(LABEL[t])} <span class="muted">${left}</span></button>`;
+  }).join('');
 }
 function show(t, { keep3d = false } = {}) {
   track = t;
@@ -583,11 +610,67 @@ function showToday() {
 }
 
 // ---------- editing ----------
-function current() { return track ? { seed: track.seed, opts: { ...track.opts }, edits: { ...(track.edits || {}) } } : null; }
+function current() {
+  if (!track) return null;
+  const ch = track.changes || {};
+  return JSON.parse(JSON.stringify({ seed: track.seed, opts: track.opts, edits: track.edits || {}, removed: ch.removed || [], added: ch.added || [], ladders: ch.ladders || {} }));
+}
 function remember() { const c = current(); if (c) { undo.push(c); if (undo.length > 60) undo.shift(); } }
-function apply(c, o = {}) {
+function build(c) {
   const base = baseOf(c.seed, c.opts);
-  show(base ? relayout(base, c.edits) : null, o);
+  return base ? relayout(base, c.edits, { removed: c.removed, added: c.added, ladders: c.ladders }) : null;
+}
+function apply(c, o = {}) { show(build(c), o); }
+/** Move or turn the piece with this key: a generated one through its edit, an added one where it stands. */
+function moveBy(c, key, dx, dy, drot) {
+  if (key[0] === 'a') {
+    const a = c.added[Number(key.slice(1))]; if (!a) return;
+    a.x += dx; a.y += dy; a.rot = (((a.rot + drot) % 360) + 360) % 360;
+    return;
+  }
+  const e = { dx: 0, dy: 0, rot: 0, ...(c.edits[key] || {}) };
+  e.dx += dx; e.dy += dy; e.rot = (((e.rot + drot) % 360) + 360) % 360;
+  c.edits[key] = e;
+  c.edits = cleanEdits(c.edits, baseOf(c.seed, c.opts).pieces);
+}
+function change(f, keepPicked = true) {
+  if (!track) return;
+  remember();
+  const c = current();
+  f(c);
+  const key = picked >= 0 ? track.pieces[picked]?.key : null;
+  apply(c);
+  if (keepPicked && key != null) picked = track ? track.pieces.findIndex((p) => p.key === key) : -1;
+  renderSheet(); renderSel();
+}
+function removePiece(key) {
+  change((c) => {
+    if (key[0] === 'a') {
+      const k = Number(key.slice(1));
+      c.added.splice(k, 1);
+      const lad = {};
+      for (const [kk, v] of Object.entries(c.ladders)) {
+        if (kk[0] !== 'a') { lad[kk] = v; continue; }
+        const j = Number(kk.slice(1));
+        if (j < k) lad[kk] = v; else if (j > k) lad['a' + (j - 1)] = v;
+      }
+      c.ladders = lad;
+    } else {
+      c.removed.push(Number(key));
+      delete c.edits[key];
+      delete c.ladders[key];
+    }
+  }, false);
+  picked = -1; renderSheet(); renderSel();
+}
+/** A free spot for a new piece: as far from everything as the hall allows. */
+function freeSpot() {
+  let best = { x: HALL.w / 2, y: HALL.l / 2, d: -1 };
+  for (let x = 1.5; x <= HALL.w - 1.5; x += 0.5) for (let y = 2; y <= HALL.l - 2; y += 0.5) {
+    const d = Math.min(...track.pieces.map((pc) => Math.hypot(pc.x - x, pc.y - y)), ...track.levels.full.line.pts.filter((_, i) => i % 5 === 0).map((p) => Math.hypot(p.x - x, p.y - y) + 0.6));
+    if (d > best.d) best = { x, y, d };
+  }
+  return best;
 }
 function setEditing(on) {
   editing = on;
@@ -620,19 +703,9 @@ function runGenerate() {
     remember();
     bases.set(r.best.seed + JSON.stringify(r.best.opts), r.best);
     picked = -1;
-    show(relayout(r.best, {}));
+    show(build({ seed: r.best.seed, opts: r.best.opts, edits: {}, removed: [], added: [], ladders: {} }));
   }, 30);
 }
-function changeEdit(i, f) {
-  if (!track || i < 0) return;
-  remember();
-  const c = current(), e = { dx: 0, dy: 0, rot: 0, ...(c.edits[i] || {}) };
-  f(e);
-  c.edits[i] = e;
-  c.edits = cleanEdits(c.edits, baseOf(c.seed, c.opts).pieces);
-  apply(c);
-}
-
 $('editBtn').onclick = () => setEditing(true);
 $('cancelBtn').onclick = () => { setEditing(false); showToday(); };
 async function doSave(pin) {
@@ -687,7 +760,7 @@ $('history').onchange = () => {
   if (!s) return;
   remember(); picked = -1;
   Object.assign(opts, s.opts); syncControls();
-  apply({ seed: s.seed, opts: s.opts, edits: s.edits || {} });
+  apply({ seed: s.seed, opts: s.opts, edits: s.edits || {}, removed: s.removed || [], added: s.added || [], ladders: s.ladders || {} });
 };
 for (const id of ['style', 'ceiling', 'flags']) $(id).addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
@@ -698,9 +771,21 @@ $('pieces').addEventListener('input', () => { opts.pieces = Number($('pieces').v
 $('sel').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.undo != null) { const c = undo.pop(); if (c) { Object.assign(opts, c.opts); syncControls(); apply(c); } return; }
-  if (b.dataset.rot) return changeEdit(picked, (x) => { x.rot = (((x.rot + Number(b.dataset.rot)) % 360) + 360) % 360; });
-  if (b.dataset.nudge) { const [dx, dy] = b.dataset.nudge.split(',').map(Number); return changeEdit(picked, (x) => { x.dx += dx; x.dy += dy; }); }
-  if (b.dataset.reset != null) return changeEdit(picked, (x) => { x.dx = 0; x.dy = 0; x.rot = 0; });
+  const pc = track?.pieces[picked]; if (!pc) return;
+  const key = pc.key;
+  if (b.dataset.rot) return change((c) => moveBy(c, key, 0, 0, Number(b.dataset.rot)));
+  if (b.dataset.nudge) { const [dx, dy] = b.dataset.nudge.split(',').map(Number); return change((c) => moveBy(c, key, dx, dy, 0)); }
+  if (b.dataset.reset != null) return change((c) => { delete c.edits[key]; delete c.ladders[key]; });
+  if (b.dataset.remove != null) return removePiece(key);
+  if (b.dataset.lmode) return change((c) => { c.ladders[key] = { ...ladderNow(pc), mode: b.dataset.lmode }; });
+  if (b.dataset.ln) return change((c) => { const l = ladderNow(pc); c.ladders[key] = { ...l, n: l.n + Number(b.dataset.ln) }; });
+  if (b.dataset.lat) return change((c) => { const l = ladderNow(pc); c.ladders[key] = { ...l, at: l.at + Number(b.dataset.lat) }; });
+});
+$('addBox').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-add]'); if (!b || b.disabled || !track) return;
+  const spot = freeSpot();
+  change((c) => { c.added.push({ type: b.dataset.add, x: spot.x, y: spot.y, rot: 0 }); }, false);
+  picked = track.pieces.length - 1; renderSheet(); renderSel();
 });
 $('rows').addEventListener('click', (e) => {
   const r = e.target.closest('[data-row]'); if (!r || !editing) return;
@@ -725,8 +810,7 @@ $('plan').addEventListener('pointerdown', (ev) => {
   picked = best;
   ev.preventDefault();
   $('plan').setPointerCapture(ev.pointerId);
-  const c = current();
-  drag = { i: best, start: h, from: { dx: 0, dy: 0, rot: 0, ...(c.edits[best] || {}) }, moved: false, wasPicked, before: c };
+  drag = { i: best, key: track.pieces[best].key, start: h, moved: false, wasPicked, before: current() };
   renderSheet(); renderSel();
 });
 let dragFrame = 0;
@@ -739,8 +823,8 @@ $('plan').addEventListener('pointermove', (ev) => {
   dragFrame = requestAnimationFrame(() => {
     dragFrame = 0;
     if (!drag) return;
-    const c = { ...drag.before, edits: { ...drag.before.edits, [drag.i]: { ...drag.from, dx: drag.from.dx + dx, dy: drag.from.dy + dy } } };
-    c.edits = cleanEdits(c.edits, baseOf(c.seed, c.opts).pieces);
+    const c = JSON.parse(JSON.stringify(drag.before));
+    moveBy(c, drag.key, dx, dy, 0);
     apply(c, { keep3d: true });                              // the plan follows the finger; 3D on letting go
   });
 });
@@ -748,7 +832,7 @@ const endDrag = () => {
   if (!drag) return;
   const d = drag; drag = null;
   if (d.moved) { undo.push(d.before); draw3d(track); renderSel(); return; }
-  if (d.wasPicked && track.pieces[d.i].type !== 'timing') changeEdit(d.i, (x) => { x.rot = (x.rot + (track.pieces[d.i].type === 'ring' ? 90 : 15)) % 360; });
+  if (d.wasPicked && track.pieces[d.i].type !== 'timing') change((c) => moveBy(c, d.key, 0, 0, track.pieces[d.i].type === 'ring' ? 90 : 15));
 };
 $('plan').addEventListener('pointerup', endDrag);
 $('plan').addEventListener('pointercancel', endDrag);

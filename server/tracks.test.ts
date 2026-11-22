@@ -103,3 +103,26 @@ test('a track goes to WebFPV as its own document: every pass in our order, flags
     assert.equal(doc.id, G.toWebFPV(r.best, level).id, 'the same track keeps its id');
   }
 });
+
+test('pieces can be taken away, added from the kit and ladders flown another way; saved and built again', () => {
+  const r = G.generate({ ...OPTS, pieces: 12 }, { ms: 6000, want: 1, start: 3 });
+  const b = r.best, types = b.pieces.map((p: any) => p.type);
+  const gate = types.indexOf('gate'), lad = types.indexOf('ladder5') >= 0 ? types.indexOf('ladder5') : types.indexOf('ladder3');
+  const changes = { removed: [gate], added: [{ type: 'gate', x: 5, y: 3, rot: 90 }, { type: 'flag', x: 3, y: 20, rot: 0 }], ladders: { [lad]: { mode: 'down', n: 2 } } };
+  const t = G.relayout(b, {}, changes);
+  assert.equal(t.pieces.filter((p: any) => p.key === String(gate)).length, 0, 'the removed gate is gone');
+  const added = t.pieces.filter((p: any) => p.added);
+  assert.equal(added[0].type, 'gate');
+  assert.ok(added[0].passes.length === 1 && Math.hypot(added[0].passes[0].x - 5, added[0].passes[0].y - 3) < 0.05, 'the line goes through the added gate');
+  const L = t.pieces.find((p: any) => p.key === String(lad));
+  assert.equal(L.trick, 'descend');
+  assert.equal(L.passes.length, 2);
+  assert.ok(t.levels.easy.passes.every((ps: any, i: number) => !t.pieces[i].type.startsWith('ladder') || ps.length <= 1), 'beginners fly a ladder once');
+  // never more than the club has
+  const many = G.cleanChanges({ added: Array.from({ length: 8 }, () => ({ type: 'gate', x: 5, y: 5 })) }, b);
+  assert.ok(many.added.length <= G.KIT_COUNT.gate - b.pieces.filter((p: any) => p.type === 'gate').length);
+  // saved on the RD PC and built again the same
+  const saved = cleanTrack({ track: { seed: b.seed, opts: b.opts, edits: {}, ...changes } });
+  const again = G.rebuild(saved);
+  assert.equal(again.facts.length.toFixed(3), t.facts.length.toFixed(3));
+});

@@ -1,9 +1,9 @@
 {
- "version": "2026.11.22-2333",
+ "version": "2026.11.23-0009",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "1147d6ceacc903a15fdab68936bda2ccb35eae134cd558ba9448ba100483e551"
+   "sha256": "6820ec2e46d0af8f06343c8539867d25d434df3b3cda8f4a961a5443aeae9817"
   },
   {
    "path": "web/assets/avatars.js",
@@ -59,7 +59,7 @@
   },
   {
    "path": "web/assets/i18n-et.js",
-   "sha256": "7b5422f0b14f2ef6cebd486e7bbba42c24324a6b34d6b7a757fcf879e17e7c30"
+   "sha256": "56601fc466563b3824bbda58a9a8e238820222505e30ac82ade9655d196d874a"
   },
   {
    "path": "web/assets/i18n.js",
@@ -151,7 +151,7 @@
   },
   {
    "path": "web/assets/trackgen.js",
-   "sha256": "5bedf7657c52e0b67a124d7cfbfeddf0ea2fcf0e668e1974190657b2f98485ef"
+   "sha256": "7d1fbb57907bb01ea44cb6886b9dcb0f3d6aa476364d2b2ea8b3b81cbe38de17"
   },
   {
    "path": "web/assets/vendor/LICENSE-three.txt",
@@ -211,7 +211,7 @@
   },
   {
    "path": "web/track.html",
-   "sha256": "364576a8487a2b4c422c47b87e8ce4834370c4de5ae4cea225f247c76764636e"
+   "sha256": "dac7dc24f0d0ee4b0e8361d2d1f56b278c37d1646e8d909a879f532bc6d28e4c"
   }
  ]
 }

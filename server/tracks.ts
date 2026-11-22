@@ -8,7 +8,9 @@ import { EngineError } from './engine.ts';
 
 export type TrackOpts = { style: 'flowing' | 'technical'; pieces: number; rings: boolean; flags: boolean };
 export type TrackEdit = { dx: number; dy: number; rot: number };
-export type SavedTrack = { seed: number; opts: TrackOpts; edits: Record<string, TrackEdit>; code: string; savedAt: string; from: string };
+export type TrackAdded = { type: string; x: number; y: number; rot: number };
+export type TrackLadder = { mode: 'up' | 'down' | 'once'; n: number; at: number };
+export type SavedTrack = { seed: number; opts: TrackOpts; edits: Record<string, TrackEdit>; removed?: number[]; added?: TrackAdded[]; ladders?: Record<string, TrackLadder>; code: string; savedAt: string; from: string };
 export type TrackData = { today: SavedTrack | null; history: SavedTrack[] };
 
 const HISTORY = 10;
@@ -28,9 +30,21 @@ export function cleanTrack(b: any, now = new Date()): SavedTrack {
     const x = e as any, ed = { dx: Math.round(num(x.dx, -26, 26) * 100) / 100, dy: Math.round(num(x.dy, -26, 26) * 100) / 100, rot: Math.round(num(x.rot, 0, 359)) };
     if (ed.dx || ed.dy || ed.rot) edits[k] = ed;
   }
+  // pieces taken away, added from the kit, ladders flown another way (trackgen.js cleanChanges checks the rest)
+  const removed = [...new Set((Array.isArray(t?.removed) ? t.removed : []).map(Number))].filter((i) => Number.isInteger(i) && i > 0 && i < 40).slice(0, 40);
+  const TYPES = ['gate', 'cube', 'ladder3', 'ladder5', 'ring', 'flag'];
+  const added: TrackAdded[] = (Array.isArray(t?.added) ? t.added : []).slice(0, 20)
+    .filter((a: any) => a && TYPES.includes(a.type))
+    .map((a: any) => ({ type: a.type, x: Math.round(num(a.x, 0, 30) * 100) / 100, y: Math.round(num(a.y, 0, 30) * 100) / 100, rot: Math.round(num(a.rot, 0, 359)) }));
+  const ladders: Record<string, TrackLadder> = {};
+  for (const [k, l] of Object.entries(t?.ladders ?? {}).slice(0, 10)) {
+    if (!/^(\d{1,2}|a\d{1,2})$/.test(k) || !l || typeof l !== 'object') continue;
+    const x = l as any;
+    ladders[k] = { mode: x.mode === 'up' || x.mode === 'down' ? x.mode : 'once', n: Math.round(num(x.n, 1, 5)), at: Math.round(num(x.at, 0, 4)) };
+  }
   const code = String(t?.code ?? '').replace(/[^A-Z0-9-]/gi, '').slice(0, 12);
   const from = String(b?.from ?? '').replace(/[^a-z]/g, '').slice(0, 12) || 'page';
-  return { seed, opts, edits, code, savedAt: now.toISOString(), from };
+  return { seed, opts, edits, ...(removed.length ? { removed } : {}), ...(added.length ? { added } : {}), ...(Object.keys(ladders).length ? { ladders } : {}), code, savedAt: now.toISOString(), from };
 }
 
 /**

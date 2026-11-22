@@ -213,10 +213,24 @@ async function typeKeys(scope, text) {
     await tk.waitForTimeout(300);
     const moved = await tk.evaluate((i) => parseFloat(document.querySelector(`#rows tr[data-row="${i}"]`).children[2].textContent), row[0]);
     check(Math.abs(moved - row[1] - 1) < 0.15, 'Track: a gate dragged on the floor plan moves 1 m');
+    // take a gate away, add one from the kit, fly a ladder another way
+    const before = await tk.$$eval('#rows tr[data-row]', (r) => r.length);
+    await tk.click(`#rows tr[data-row="${row[0]}"]`);
+    await tk.click('#sel [data-remove]');
+    check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before - 1, 'Track: Remove takes a gate away');
+    await tk.click('#addBox [data-add="gate"]');
+    check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before, 'Track: + Gate adds one from the kit');
+    const lad = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Ladder/.test(t.children[1].textContent)); return r ? r.dataset.row : null; });
+    if (lad != null) {
+      await tk.click(`#rows tr[data-row="${lad}"]`);
+      await tk.click('#sel [data-lmode="down"]');
+      const txt = await tk.textContent(`#rows tr[data-row="${lad}"]`);
+      check(/down: stages/.test(txt), 'Track: a ladder set to Down is flown down');
+    }
     await tk.click('#saveBtn');
     await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 5000 });
     const saved = await (await fetch(B + '/api/track')).json();
-    check(saved.today && Object.keys(saved.today.edits).length === 1, 'Track: saved as today\'s track, with the hand tuning');
+    check(saved.today && saved.today.removed?.length === 1 && saved.today.added?.length === 1, 'Track: saved as today\'s track, with the hand tuning, the removed and the added gate');
     // with a PIN set (RD console), saving asks for it on the number pad
     await fetch(B + '/api/track/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: '2580' }) });
     await tk.reload();

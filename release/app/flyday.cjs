@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.22-2333" : "dev";
+var VERSION = true ? "2026.11.23-0009" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2670,9 +2670,18 @@ function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
     const x = e, ed = { dx: Math.round(num(x.dx, -26, 26) * 100) / 100, dy: Math.round(num(x.dy, -26, 26) * 100) / 100, rot: Math.round(num(x.rot, 0, 359)) };
     if (ed.dx || ed.dy || ed.rot) edits[k] = ed;
   }
+  const removed = [...new Set((Array.isArray(t?.removed) ? t.removed : []).map(Number))].filter((i) => Number.isInteger(i) && i > 0 && i < 40).slice(0, 40);
+  const TYPES2 = ["gate", "cube", "ladder3", "ladder5", "ring", "flag"];
+  const added = (Array.isArray(t?.added) ? t.added : []).slice(0, 20).filter((a) => a && TYPES2.includes(a.type)).map((a) => ({ type: a.type, x: Math.round(num(a.x, 0, 30) * 100) / 100, y: Math.round(num(a.y, 0, 30) * 100) / 100, rot: Math.round(num(a.rot, 0, 359)) }));
+  const ladders = {};
+  for (const [k, l] of Object.entries(t?.ladders ?? {}).slice(0, 10)) {
+    if (!/^(\d{1,2}|a\d{1,2})$/.test(k) || !l || typeof l !== "object") continue;
+    const x = l;
+    ladders[k] = { mode: x.mode === "up" || x.mode === "down" ? x.mode : "once", n: Math.round(num(x.n, 1, 5)), at: Math.round(num(x.at, 0, 4)) };
+  }
   const code = String(t?.code ?? "").replace(/[^A-Z0-9-]/gi, "").slice(0, 12);
   const from = String(b?.from ?? "").replace(/[^a-z]/g, "").slice(0, 12) || "page";
-  return { seed, opts, edits, code, savedAt: now.toISOString(), from };
+  return { seed, opts, edits, ...removed.length ? { removed } : {}, ...added.length ? { added } : {}, ...Object.keys(ladders).length ? { ladders } : {}, code, savedAt: now.toISOString(), from };
 }
 var PIN_TRIES = 5;
 var PIN_WAIT_MS = 6e4;

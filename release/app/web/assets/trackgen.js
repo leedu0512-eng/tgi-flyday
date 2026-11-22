@@ -495,52 +495,140 @@ export function cleanEdits(edits, pieces) {
   }
   return out;
 }
-export function relayout(base, edits) {
+// changes (Janno 23.11.2026): pieces taken away, pieces added from the kit, ladders flown another
+// way. { removed: [index], added: [{ type, x, y, rot }], ladders: { <key>: { mode: up | down | once,
+// n, at } } }. A piece's key is its index in the generated track, or 'a0', 'a1'… for added ones.
+// An added piece goes into the lap where it makes the shortest detour, flown the way its face
+// points (or the other way, whichever suits the lap). Never more of a kind than the club has.
+export const KIT_COUNT = Object.fromEntries([...KIT, ['flag', FLAGS]]);
+export const ADDABLE = ['gate', 'cube', 'ladder3', 'ladder5', 'ring', 'flag'];
+const yawOfRot = (rot) => ((90 - rot) * Math.PI) / 180;      // rot: degrees clockwise from up the page
+const nearRail = (x) => RAILS.reduce((b, r) => (Math.abs(r - x) < Math.abs(b - x) ? r : b), RAILS[0]);
+export function cleanChanges(changes, base) {
+  const c = changes || {}, n = base.pieces.length;
+  const removed = [...new Set((Array.isArray(c.removed) ? c.removed : []).map(Number))].filter((i) => Number.isInteger(i) && i > 0 && i < n).sort((x, y) => x - y);
+  const have = {};
+  base.pieces.forEach((pc, i) => { if (pc.type !== 'timing' && !removed.includes(i)) have[pc.type] = (have[pc.type] || 0) + 1; });
+  const added = [];
+  for (const a of (Array.isArray(c.added) ? c.added : []).slice(0, 20)) {
+    if (!a || !ADDABLE.includes(a.type) || (have[a.type] || 0) >= (KIT_COUNT[a.type] || 0)) continue;
+    have[a.type] = (have[a.type] || 0) + 1;
+    let x = clampN(Number(a.x) || HALL.w / 2, 0.3, HALL.w - 0.3), rot = ((Math.round(Number(a.rot) || 0) % 360) + 360) % 360;
+    const y = clampN(Number(a.y) || HALL.l / 2, 0.3, HALL.l - 0.3);
+    if (a.type === 'ring') { x = nearRail(x); rot = Math.round(rot / 90) * 90 % 360; }
+    added.push({ type: a.type, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, rot });
+  }
+  const ladders = {};
+  const typeOf = (key) => (key[0] === 'a' ? added[Number(key.slice(1))]?.type : removed.includes(Number(key)) ? null : base.pieces[Number(key)]?.type);
+  for (const [key, l] of Object.entries(c.ladders || {})) {
+    const t = /^(\d{1,2}|a\d{1,2})$/.test(key) ? typeOf(key) : null;
+    if (!t || !t.startsWith('ladder') || !l) continue;
+    const levels = TYPES[t].levels.length, mode = ['up', 'down', 'once'].includes(l.mode) ? l.mode : 'once';
+    ladders[key] = { mode, n: clampN(Math.round(Number(l.n) || levels), 2, levels), at: clampN(Math.round(Number(l.at) || 0), 0, levels - 1) };
+  }
+  return { removed, added, ladders };
+}
+const ladderStages = (l, levels) => (l.mode === 'up' ? Array.from({ length: l.n }, (_, i) => i) : l.mode === 'down' ? Array.from({ length: l.n }, (_, i) => l.n - 1 - i) : [Math.min(l.at, levels - 1)]);
+export function relayout(base, edits, changes) {
   edits = cleanEdits(edits, base.pieces);
-  if (!Object.keys(edits).length) return { ...base, edits, issues: issuesOf(base) };
+  const ch = cleanChanges(changes, base);
+  const changed = ch.removed.length || ch.added.length || Object.keys(ch.ladders).length;
+  if (!Object.keys(edits).length && !changed) return { ...base, pieces: base.pieces.map((pc, i) => ({ ...pc, key: String(i) })), edits, changes: ch, issues: issuesOf(base) };
   const st = STYLE[base.opts.style];
-  const pieces = base.pieces.map((pc) => ({ ...pc }));
+  const all = base.pieces.map((pc, i) => ({ ...pc, key: String(i) }));
   const moves = new Map();
   for (const [k, e] of Object.entries(edits)) {
-    const i = Number(k), pc = pieces[i], a = (-e.rot * Math.PI) / 180;
+    const i = Number(k), pc = all[i], a = (-e.rot * Math.PI) / 180;
     moves.set(i, { cx: pc.x, cy: pc.y, nx: pc.x + e.dx, ny: pc.y + e.dy, c: Math.cos(a), s: Math.sin(a) });
     pc.x += e.dx; pc.y += e.dy;
   }
+  ch.added.forEach((a, k) => {
+    const yaw = yawOfRot(a.rot), z = a.type === 'ring' ? RING_Z : a.type === 'cube' ? 0.35 : a.type === 'flag' ? 0 : GATE_Z;
+    all.push({ type: a.type, x: a.x, y: a.y, z, trick: 'once', key: 'a' + k, added: true, dx: Math.cos(yaw), dy: Math.sin(yaw), passes: [] });
+  });
+  const removed = new Set(ch.removed);
   const flagAt = new Map();
   base.pieces.forEach((pc, i) => { if (pc.type === 'flag') flagAt.set(pc.x.toFixed(4) + ',' + pc.y.toFixed(4), i); });
+  const ladderOf = (i) => ch.ladders[all[i].key];
+  const ladderKeys = (i, tmpl, level) => { // the passes of a ladder flown as set (Beginner: through the bottom stage)
+    const pc = all[i], lv = TYPES[pc.type].levels, l = ladderOf(i) || { mode: 'once', n: 1, at: 0 };
+    const sts = level === 'easy' ? [0] : ladderStages(l, lv.length);
+    return sts.map((sIdx, j) => ({ x: tmpl.x, y: tmpl.y, z: lv[sIdx], hx: tmpl.hx, hy: tmpl.hy, zone: tmpl.zone || 'L' + pc.key,
+      pass: { piece: i, info: { local: 0, stage: sIdx, dir: { f: 1, l: 0 }, orbit: j < sts.length - 1 ? st.orbit : 0 } } }));
+  };
   const levels = {};
   for (const k of ['full', 'easy']) {
     const src = base.al[k], m = src.length;
-    const A = src.map((a, i) => {
+    let A = [];
+    const done = new Set();
+    src.forEach((a, i) => {
       const q = { ...a };
       if (q.pass && q.hx == null) { const p = src[(i - 1 + m) % m], n = src[(i + 1) % m]; q.hx = n.x - p.x; q.hy = n.y - p.y; }
       const who = q.pass ? q.pass.piece : q.round ? flagAt.get(q.x.toFixed(4) + ',' + q.y.toFixed(4)) : undefined;
+      if (who != null && removed.has(who)) return;                 // taken away: the lap goes past
       const mv = who != null ? moves.get(who) : null;
       if (mv) {
         const dx = q.x - mv.cx, dy = q.y - mv.cy;
         q.x = mv.nx + dx * mv.c - dy * mv.s; q.y = mv.ny + dx * mv.s + dy * mv.c;
         if (q.hx != null) { const hx = q.hx * mv.c - q.hy * mv.s, hy = q.hx * mv.s + q.hy * mv.c; q.hx = hx; q.hy = hy; }
       }
-      return q;
+      if (q.pass && ladderOf(who) && all[who].type.startsWith('ladder')) { // a ladder flown another way
+        if (done.has(who)) return;
+        done.add(who);
+        A.push(...ladderKeys(who, q, k));
+        return;
+      }
+      A.push(q);
     });
-    const b = buildLine(A, pieces.length, st);
-    levels[k] = { line: b.line, passes: b.passes, facts: { length: b.line.length, rmin: Math.min(st.turn, st.orbit, st.pole) } };
+    // added pieces, each where it makes the shortest detour
+    for (let i = base.pieces.length; i < all.length; i++) {
+      const pc = all[i];
+      if (k === 'easy' && pc.type === 'ring') continue;               // beginners leave the ceiling out
+      const keys = A.map((a, j) => (a.pass || a.round ? j : -1)).filter((j) => j >= 0);
+      let best = null;
+      keys.forEach((j1, n) => {
+        const j2 = keys[(n + 1) % keys.length], P = A[j1], Q = A[j2];
+        if (P.pass && Q.pass && P.pass.piece === Q.pass.piece) return;   // not inside a ladder's orbit
+        const cost = Math.hypot(pc.x - P.x, pc.y - P.y) + Math.hypot(Q.x - pc.x, Q.y - pc.y) - Math.hypot(Q.x - P.x, Q.y - P.y);
+        if (!best || cost < best.cost) best = { cost, at: j2 === 0 ? A.length : j2, P, Q };
+      });
+      if (!best) continue;
+      let hx = pc.dx, hy = pc.dy;
+      if (hx * (best.Q.x - best.P.x) + hy * (best.Q.y - best.P.y) < 0) { hx = -hx; hy = -hy; }
+      const zone = 'U' + pc.key;
+      const ins = pc.type === 'flag' ? [{ x: pc.x, y: pc.y, z: null, round: { r: st.pole }, zone }]
+        : pc.type.startsWith('ladder') ? ladderKeys(i, { x: pc.x, y: pc.y, hx, hy, zone: 'L' + pc.key }, k)
+        : [{ x: pc.x, y: pc.y, z: pc.z, hx, hy, zone, pass: { piece: i, info: { local: 0 } } }];
+      A.splice(best.at, 0, ...ins);
+    }
+    const b = buildLine(A, all.length, st);
+    levels[k] = { line: b.line, allPasses: b.passes, facts: { length: b.line.length, rmin: Math.min(st.turn, st.orbit, st.pole) } };
   }
-  pieces.forEach((pc, i) => {
-    pc.passes = levels.full.passes[i];
+  // what is left on the floor, numbered again in order (the generated pieces first, then the added ones)
+  const keep = all.map((_, i) => i).filter((i) => !removed.has(i));
+  for (const k in levels) { levels[k].passes = keep.map((i) => levels[k].allPasses[i]); delete levels[k].allPasses; }
+  const pieces = keep.map((i, v) => {
+    const pc = { ...all[i], passes: levels.full.passes[v] };
     if (pc.passes.length) { pc.dx = pc.passes[0].dx; pc.dy = pc.passes[0].dy; }
     else if (moves.has(i)) { const mv = moves.get(i), dx = pc.dx * mv.c - pc.dy * mv.s, dy = pc.dx * mv.s + pc.dy * mv.c; pc.dx = dx; pc.dy = dy; }
+    if (pc.type.startsWith('ladder')) {
+      const sts = pc.passes.map((p) => p.info.stage);
+      pc.stages = sts.length ? sts : pc.stages;
+      pc.level = sts[0] ?? 0;
+      pc.trick = sts.length > 1 ? (sts[1] > sts[0] ? 'climb' : 'descend') : 'once';
+    }
+    return pc;
   });
   pieces[0].dx = 0; pieces[0].dy = 1;
-  const tr = { ...base, pieces, passes: pieces.map((pc) => ({ x: pc.x, y: pc.y, z: pc.z, dx: pc.dx, dy: pc.dy })), line: levels.full.line, facts: levels.full.facts, levels, edits };
+  const tr = { ...base, pieces, passes: pieces.map((pc) => ({ x: pc.x, y: pc.y, z: pc.z, dx: pc.dx, dy: pc.dy })), line: levels.full.line, facts: levels.full.facts, levels, edits, changes: ch };
   tr.issues = issuesOf(tr);
   return tr;
 }
-/** A saved track ({ seed, opts, edits }) as a whole track again, or null. */
+/** A saved track ({ seed, opts, edits, removed, added, ladders }) as a whole track again, or null. */
 export function rebuild(saved) {
   if (!saved || !Number.isFinite(saved.seed) || !saved.opts || !STYLE[saved.opts.style]) return null;
   const base = makeTrack(saved.seed >>> 0, saved.opts);
-  return base ? relayout(base, saved.edits) : null;
+  return base ? relayout(base, saved.edits, { removed: saved.removed, added: saved.added, ladders: saved.ladders }) : null;
 }
 /** What breaks a rule, for the editor: [{ text, x, y, level }] (x, y where on the plan). */
 export function issuesOf(tr) {
