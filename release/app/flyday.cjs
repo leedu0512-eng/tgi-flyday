@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.22-2152" : "dev";
+var VERSION = true ? "2026.11.22-2241" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2650,6 +2650,7 @@ function spokenChannel(ch) {
 
 // server/tracks.ts
 var import_node_fs4 = require("node:fs");
+var import_node_crypto2 = require("node:crypto");
 var import_node_path4 = require("node:path");
 var HISTORY = 10;
 var num = (v, lo, hi) => {
@@ -2673,18 +2674,82 @@ function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
   const from = String(b?.from ?? "").replace(/[^a-z]/g, "").slice(0, 12) || "page";
   return { seed, opts, edits, code, savedAt: now.toISOString(), from };
 }
+var PIN_TRIES = 5;
+var PIN_WAIT_MS = 6e4;
+var pinHash = (salt, pin) => (0, import_node_crypto2.createHash)("sha256").update(salt + ":" + pin).digest("hex");
+function cleanPin(v) {
+  const p = String(v ?? "").trim();
+  if (!/^\d{4,8}$/.test(p)) throw new EngineError("A PIN is 4 to 8 digits.");
+  return p;
+}
 var TrackStore = class {
   data = { today: null, history: [] };
   file;
-  constructor(file) {
+  pinFile;
+  pin = null;
+  wrong = 0;
+  waitUntil = 0;
+  constructor(file, pinFile = file.replace(/\.json$/, "") + "-pin.json") {
     this.file = file;
+    this.pinFile = pinFile;
+    try {
+      const p = JSON.parse((0, import_node_fs4.readFileSync)(pinFile, "utf8"));
+      if (p?.salt && p?.hash) this.pin = { salt: String(p.salt), hash: String(p.hash) };
+    } catch {
+    }
     try {
       const d = JSON.parse((0, import_node_fs4.readFileSync)(file, "utf8"));
       this.data = { today: d.today ?? null, history: Array.isArray(d.history) ? d.history.slice(0, HISTORY) : [] };
     } catch {
     }
   }
+  get locked() {
+    return !!this.pin;
+  }
+  /** What screens get: the tracks and whether saving asks for the PIN. */
+  view() {
+    return { ...this.data, locked: this.locked };
+  }
+  /** Throws unless the PIN is right (or there is none). Five wrong in a row: a minute's wait. */
+  checkPin(v, now = Date.now()) {
+    if (!this.pin) return;
+    if (now < this.waitUntil) throw new EngineError("Too many wrong PINs. Try again in a minute.");
+    const p = String(v ?? "").trim();
+    const a = Buffer.from(pinHash(this.pin.salt, p), "hex"), b = Buffer.from(this.pin.hash, "hex");
+    if (a.length === b.length && (0, import_node_crypto2.timingSafeEqual)(a, b)) {
+      this.wrong = 0;
+      return;
+    }
+    this.wrong++;
+    if (this.wrong >= PIN_TRIES) {
+      this.wrong = 0;
+      this.waitUntil = now + PIN_WAIT_MS;
+      throw new EngineError("Too many wrong PINs. Try again in a minute.");
+    }
+    throw new EngineError("Wrong PIN.");
+  }
+  /** A new PIN (the current one first, when there is one); pin null = no PIN any more. */
+  setPin(body, now = Date.now()) {
+    this.checkPin(body?.old, now);
+    if (body?.pin == null || body.pin === "") {
+      this.pin = null;
+      try {
+        (0, import_node_fs4.unlinkSync)(this.pinFile);
+      } catch {
+      }
+      return { locked: false };
+    }
+    const salt = (0, import_node_crypto2.randomBytes)(12).toString("hex");
+    this.pin = { salt, hash: pinHash(salt, cleanPin(body.pin)) };
+    try {
+      (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.pinFile), { recursive: true });
+      (0, import_node_fs4.writeFileSync)(this.pinFile, JSON.stringify(this.pin));
+    } catch {
+    }
+    return { locked: true };
+  }
   save(body, now = /* @__PURE__ */ new Date()) {
+    this.checkPin(body?.pin, now.getTime());
     const t = cleanTrack(body, now);
     const prev = this.data.today;
     const same = prev && prev.seed === t.seed && JSON.stringify(prev.opts) === JSON.stringify(t.opts);
@@ -2966,31 +3031,31 @@ var RotorHazardLink = class {
 };
 
 // server/outbox.ts
-var import_node_crypto3 = require("node:crypto");
+var import_node_crypto4 = require("node:crypto");
 var import_node_fs7 = require("node:fs");
 var import_node_path7 = require("node:path");
 
 // server/flyday.ts
-var import_node_crypto2 = require("node:crypto");
+var import_node_crypto3 = require("node:crypto");
 var import_node_fs6 = require("node:fs");
 var import_node_path6 = require("node:path");
 var FLYDAY_BASE = "https://hobizone.org/api/hz/tgiflyday/";
 var ALNUM = "abcdefghijklmnopqrstuvwxyz0123456789";
 function newId() {
-  const b = (0, import_node_crypto2.randomBytes)(15);
+  const b = (0, import_node_crypto3.randomBytes)(15);
   let out = "";
   for (const x of b) out += ALNUM[x % 36];
   return out;
 }
 function stableId(...parts) {
-  const h = (0, import_node_crypto2.createHash)("sha256").update(parts.map((p) => String(p ?? "")).join("\0")).digest();
+  const h = (0, import_node_crypto3.createHash)("sha256").update(parts.map((p) => String(p ?? "")).join("\0")).digest();
   let out = "";
   for (let i = 0; i < 15; i++) out += ALNUM[h[i] % 36];
   return out;
 }
 function pairingCodeOf(secret) {
   const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  const h = (0, import_node_crypto2.createHash)("sha256").update("pair\0" + secret).digest();
+  const h = (0, import_node_crypto3.createHash)("sha256").update("pair\0" + secret).digest();
   let s = "";
   for (let i = 0; i < 6; i++) s += A[h[i] % A.length];
   return `${s.slice(0, 3)}-${s.slice(3)}`;
@@ -3018,7 +3083,7 @@ var Install = class {
       if ((0, import_node_fs6.existsSync)(this.file)) saved2 = JSON.parse((0, import_node_fs6.readFileSync)(this.file, "utf8"));
     } catch {
     }
-    const secret = typeof saved2.secret === "string" && saved2.secret.length >= 32 ? saved2.secret : (0, import_node_crypto2.randomBytes)(32).toString("hex");
+    const secret = typeof saved2.secret === "string" && saved2.secret.length >= 32 ? saved2.secret : (0, import_node_crypto3.randomBytes)(32).toString("hex");
     this.state = {
       id: typeof saved2.id === "string" && /^[a-z0-9]{15}$/.test(saved2.id) ? saved2.id : newId(),
       secret,
@@ -3318,7 +3383,7 @@ var Outbox = class {
     return this.config().venue || this.venueFallback;
   }
   add(type, data, at = Date.now()) {
-    const ev = { id: (0, import_node_crypto3.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
+    const ev = { id: (0, import_node_crypto4.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
     this.pending.push(ev);
     try {
       (0, import_node_fs7.mkdirSync)((0, import_node_path7.dirname)(this.file), { recursive: true });
@@ -3693,6 +3758,7 @@ function json(res, status, body) {
 }
 var API2 = {
   "/api/track/save": (b) => tracks.save(b),
+  "/api/track/pin": (b) => tracks.setPin(b),
   "/api/action": (b) => engine.action(String(b.type), Date.now()),
   "/api/join": (b) => {
     const pilot = engine.join(b.name, Number(b.heat), Number(b.slot));
@@ -3873,7 +3939,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     }
     return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
-  if (path === "/api/track" && req.method === "GET") return json(res, 200, tracks.data);
+  if (path === "/api/track" && req.method === "GET") return json(res, 200, tracks.view());
   if (path === "/api/kiosk/restart" && req.method === "POST") {
     kioskRestartAt = Date.now();
     stateDirty = true;

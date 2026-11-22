@@ -57,3 +57,26 @@ test('today\'s track: checked, saved, the one before kept', () => {
   assert.equal(new TrackStore(join(dir, 'track.json')).data.today!.edits[1].dx, 1);
   assert.ok(readFileSync(join(dir, 'track.json'), 'utf8').includes('"history"'));
 });
+
+test('saving can be locked with a PIN, kept only as a salted hash; five wrong ones wait a minute', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'trackpin-'));
+  const s = new TrackStore(join(dir, 'track.json'));
+  assert.equal(s.view().locked, false);
+  s.save({ track: { seed: 1, opts: OPTS } });                       // no PIN yet: open
+  assert.throws(() => s.setPin({ pin: '12' }), /4 to 8/);
+  s.setPin({ pin: '2580' });
+  assert.equal(s.view().locked, true);
+  assert.ok(!readFileSync(join(dir, 'track-pin.json'), 'utf8').includes('2580'));
+  assert.throws(() => s.save({ track: { seed: 2, opts: OPTS } }), /Wrong PIN/);
+  s.save({ track: { seed: 2, opts: OPTS }, pin: '2580' });
+  assert.equal(s.data.today!.seed, 2);
+  const again = new TrackStore(join(dir, 'track.json'));            // kept over a restart
+  const t0 = 1_000_000;
+  for (let i = 0; i < 4; i++) assert.throws(() => again.checkPin('0000', t0), /Wrong PIN/);
+  assert.throws(() => again.checkPin('0000', t0), /Too many/);
+  assert.throws(() => again.checkPin('2580', t0 + 30_000), /Too many/); // even the right one waits
+  again.checkPin('2580', t0 + 61_000);
+  assert.throws(() => again.setPin({ pin: '1111' }), /Wrong PIN/);    // changing it needs the old one
+  again.setPin({ old: '2580', pin: null });
+  assert.equal(again.view().locked, false);
+});

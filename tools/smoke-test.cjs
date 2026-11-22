@@ -217,6 +217,23 @@ async function typeKeys(scope, text) {
     await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 5000 });
     const saved = await (await fetch(B + '/api/track')).json();
     check(saved.today && Object.keys(saved.today.edits).length === 1, 'Track: saved as today\'s track, with the hand tuning');
+    // with a PIN set (RD console), saving asks for it on the number pad
+    await fetch(B + '/api/track/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: '2580' }) });
+    await tk.reload();
+    await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 8000 });
+    await tk.click('#editBtn');
+    await tk.click('#genBtn');
+    await tk.waitForFunction(() => !document.querySelector('#genBtn').disabled, null, { timeout: 15000 });
+    await tk.click('#saveBtn');
+    await tk.waitForSelector('#pinpad:not([hidden])', { timeout: 3000 });
+    for (const d of '1111') await tk.click(`#ppKeys [data-k="${d}"]`);
+    await tk.click('#ppKeys [data-k="ok"]');
+    await tk.waitForFunction(() => /Wrong PIN/.test(document.querySelector('#ppMsg').textContent), null, { timeout: 3000 });
+    for (const d of '2580') await tk.click(`#ppKeys [data-k="${d}"]`);
+    await tk.click('#ppKeys [data-k="ok"]');
+    await tk.waitForSelector('#pinpad[hidden]', { state: 'attached', timeout: 5000 });
+    const saved2 = await (await fetch(B + '/api/track')).json();
+    check(saved2.locked && saved2.today.seed !== saved.today.seed && saved2.history.length === 1, 'Track: with a PIN, the number pad refuses a wrong one and saves with the right one');
   } catch (err) {
     failures++;
     console.log('  FAIL', err.message.split('\n')[0]);

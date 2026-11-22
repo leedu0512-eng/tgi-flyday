@@ -78,6 +78,21 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 .trk .passno.t { background: var(--timing); }
 .trk .toast2 { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #111; border: 1px solid var(--accent); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
 .trk .toast2.on { opacity: 1; }
+/* the PIN pad for saving (no keyboard at the kiosk) */
+.trk .pinpad { position: fixed; inset: 0; background: rgba(0, 0, 0, .78); display: grid; place-items: center; z-index: 8; }
+.trk .pinpad[hidden] { display: none; }
+.trk .pp-box { background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; padding: 22px; width: min(92vw, 380px); display: grid; gap: 14px; text-align: center; }
+.trk .pp-box h3 { font-size: 24px; }
+.trk .pp-dots { display: flex; justify-content: center; gap: 14px; height: 26px; }
+.trk .pp-dots i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--muted); }
+.trk .pp-dots i.on { background: var(--accent); border-color: var(--accent); }
+.trk .pp-msg { margin: 0; min-height: 1.3em; color: #ffb3ad; font-size: 16px; }
+.trk .pp-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.trk .pp-keys button { all: unset; cursor: pointer; padding: 18px 0; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); font: 800 30px/1 var(--display); text-align: center; color: var(--text); }
+.trk .pp-keys button:active { background: #2a2a2a; }
+.trk .pp-keys button.ok { background: var(--accent); border-color: var(--accent); color: #000; font-size: 24px; }
+.trk .pp-shake { animation: ppShake .3s; }
+@keyframes ppShake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
 @media (max-width: 900px) {
   .trk-grid { grid-template-columns: 1fr; grid-template-areas: "ctrl" "stage" "side" "list"; }
   .trk .stage, .trk.editing .stage { height: 62vh; }
@@ -161,6 +176,20 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
   </section>
 </main>
 <div class="toast2" id="toast2" role="status"></div>
+<div class="pinpad" id="pinpad" hidden>
+  <div class="pp-box" role="dialog" aria-label="PIN to save">
+    <h3>PIN to save</h3>
+    <div class="pp-dots" id="ppDots"></div>
+    <p class="pp-msg" id="ppMsg"></p>
+    <div class="pp-keys" id="ppKeys">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <button type="button" data-k="del" aria-label="Delete">⌫</button><button type="button" data-k="0">0</button><button type="button" class="ok" data-k="ok">OK</button>
+    </div>
+    <button type="button" class="tb" data-k="cancel">Cancel</button>
+  </div>
+</div>
 
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
@@ -569,17 +598,37 @@ function changeEdit(i, f) {
 
 $('editBtn').onclick = () => setEditing(true);
 $('cancelBtn').onclick = () => { setEditing(false); showToday(); };
+async function doSave(pin) {
+  const c = current();
+  await post('/api/track/save', { track: { ...c, code: code(c.seed) }, from: FROM_KIOSK ? 'kiosk' : 'page', pin });
+  $('pinpad').hidden = true;
+  await loadSaved();
+  setEditing(false);
+  showToday();
+  toast(tr('Saved. This is today\'s track now.'));
+}
+// Saving asks for the PIN on a number pad when the RD console has set one (Janno 22.11.2026)
+let pinBuf = '';
+const pinDots = () => { $('ppDots').innerHTML = Array.from({ length: Math.max(4, pinBuf.length) }, (_, i) => `<i class="${i < pinBuf.length ? 'on' : ''}"></i>`).join(''); };
 $('saveBtn').onclick = async () => {
   if (!track) return;
-  const c = current();
-  try {
-    await post('/api/track/save', { track: { ...c, code: code(c.seed) }, from: FROM_KIOSK ? 'kiosk' : 'page' });
-    await loadSaved();
-    setEditing(false);
-    showToday();
-    toast(tr('Saved. This is today\'s track now.'));
-  } catch (err) { toast(err.message); }
+  if (saved.locked) { pinBuf = ''; pinDots(); $('ppMsg').textContent = ''; $('pinpad').hidden = false; return; }
+  try { await doSave(); } catch (err) { toast(err.message); }
 };
+$('pinpad').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  const k = b.dataset.k;
+  if (k === 'cancel') { $('pinpad').hidden = true; return; }
+  if (k === 'del') pinBuf = pinBuf.slice(0, -1);
+  else if (k === 'ok') {
+    if (pinBuf.length < 4) return;
+    try { await doSave(pinBuf); } catch (err) {
+      pinBuf = ''; $('ppMsg').textContent = err.message;
+      const box = $('pinpad').querySelector('.pp-box'); box.classList.remove('pp-shake'); void box.offsetWidth; box.classList.add('pp-shake');
+    }
+  } else if (pinBuf.length < 8) pinBuf += k;
+  pinDots();
+});
 $('genBtn').onclick = runGenerate;
 $('history').onchange = () => {
   const s = saved.history[Number($('history').value)];

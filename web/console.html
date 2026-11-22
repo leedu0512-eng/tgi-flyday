@@ -219,6 +219,17 @@
           <p><button class="btn" id="kioskRestart">Restart the kiosk</button> <span class="hint" id="kioskRestartNote">Closes and opens the kiosk browser on the Linux kiosk PC, within a minute. Setting up a new kiosk PC: on it, the kiosk page's corner menu → Set up this PC.</span></p>
         </section>
         <section class="drawer-sec">
+          <h3>Today's track</h3>
+          <p class="hint" id="trackPinNote">The kiosk's Today's track page: anyone can make and tune tracks there. With a PIN set, saving one as today's track asks for it on a number pad.</p>
+          <div class="row" id="trackPinRow">
+            <input class="input" id="trackPinOld" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Current PIN" hidden>
+            <input class="input" id="trackPinNew" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="New PIN (4 to 8 digits)">
+            <button class="btn" id="trackPinSave">Set PIN</button>
+            <button class="btn" id="trackPinOff" hidden>No PIN</button>
+            <a class="btn" href="/track" target="_blank" rel="noopener">Open the track page</a>
+          </div>
+        </section>
+        <section class="drawer-sec">
           <h3>Online history <span id="outboxSum" class="muted"></span></h3>
           <div class="outbox" id="outboxBody">
             <p class="hint">Practice start and end, every timed heat with its laps and whether anybody is here are kept on this PC and sent to the Flyday server once Flyday has approved this PC, so pilots can look at their times at home. With no connection, they wait and go later.</p>
@@ -889,6 +900,28 @@ $('freeFlight').onchange = (e) => act('/api/config', { freeFlight: e.target.chec
 $('autoStart').onchange = (e) => act('/api/config', { autoStart: e.target.checked });
 $('nightStop').onchange = (e) => act('/api/config', { nightStop: e.target.checked });
 $('kioskSleep').onchange = (e) => act('/api/config', { kioskSleep: e.target.checked });
+// ---------- today's track: the PIN for saving (Janno 22.11.2026) ----------
+async function trackPinShow() {
+  let locked = false;
+  try { locked = !!(await (await fetch('/api/track', { cache: 'no-store' })).json()).locked; } catch {}
+  $('trackPinOld').hidden = !locked;
+  $('trackPinOff').hidden = !locked;
+  $('trackPinSave').textContent = tr(locked ? 'Change PIN' : 'Set PIN');
+  $('trackPinNote').textContent = tr(locked
+    ? 'Saving today\'s track asks for the PIN. Anyone can still make and tune tracks on the kiosk.'
+    : 'Saving today\'s track is open to anyone at the kiosk. Set a PIN to lock it.');
+}
+async function trackPinSet(pin) {
+  try {
+    await post('/api/track/pin', { old: $('trackPinOld').value, pin });
+    $('trackPinOld').value = ''; $('trackPinNew').value = '';
+    toast(tr(pin ? 'PIN set.' : 'No PIN: saving is open.'), true);
+    trackPinShow();
+  } catch (err) { toast(err.message); }
+}
+$('trackPinSave').onclick = () => trackPinSet($('trackPinNew').value);
+$('trackPinOff').onclick = () => trackPinSet(null);
+trackPinShow();
 $('kioskRestart').onclick = async () => {
   try { await post('/api/kiosk/restart'); toast(tr('The kiosk restarts within a minute.'), true); } catch (err) { toast(err.message); }
 };

@@ -327,6 +327,7 @@ type Handler = (body: any) => unknown;
 
 const API: Record<string, Handler> = {
   '/api/track/save': (b) => tracks.save(b),
+  '/api/track/pin': (b) => tracks.setPin(b),
   '/api/action': (b) => engine.action(String(b.type), Date.now()),
   '/api/join': (b) => {
     const pilot = engine.join(b.name, Number(b.heat), Number(b.slot));
@@ -497,7 +498,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
   // Today's track and the ten before it (the track page builds them with web/assets/trackgen.js).
-  if (path === '/api/track' && req.method === 'GET') return json(res, 200, tracks.data);
+  if (path === '/api/track' && req.method === 'GET') return json(res, 200, tracks.view());
   if (path === '/api/kiosk/restart' && req.method === 'POST') {
     kioskRestartAt = Date.now();
     stateDirty = true;
