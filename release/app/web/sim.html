@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tgiFlyDay · Fly today's track</title>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/assets/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/style.css">
+<style>
+/* The sim PCs' home page (Janno 22.11.2026): one thing to do, fly today's track in WebFPV. */
+body.simhome { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Archivo', system-ui, sans-serif; display: grid; grid-template-rows: auto 1fr auto; }
+.simhome header { display: flex; align-items: center; gap: 16px; padding: 14px 22px; border-bottom: 3px solid var(--accent); }
+.simhome header .logo { font-size: 28px; }
+.simhome header .spacer { flex: 1; }
+.simhome main { display: grid; place-items: center; align-content: center; gap: 22px; padding: 24px 16px; text-align: center; }
+.simhome h1 { margin: 0; font: 900 clamp(46px, 8vw, 110px)/.9 'Big Shoulders Stencil', 'Big Shoulders', Impact, sans-serif; text-transform: uppercase; letter-spacing: .02em; }
+.simhome .facts { font: 700 clamp(18px, 2.2vw, 26px)/1.3 'Big Shoulders', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.simhome .facts b { color: var(--text); }
+.simhome .go { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
+.simhome .go a { display: grid; gap: 6px; min-width: min(80vw, 340px); padding: 26px 30px; border-radius: 14px; text-decoration: none; background: var(--panel-2); border: 2px solid var(--line); color: var(--text); font: 900 clamp(30px, 4vw, 48px)/1 'Big Shoulders', sans-serif; text-transform: uppercase; letter-spacing: .04em; }
+.simhome .go a small { font: 600 16px/1.3 'Archivo', sans-serif; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.simhome .go a.pro { background: var(--accent); border-color: var(--accent); color: #000; }
+.simhome .go a.pro small { color: #2a1400; }
+.simhome .go a[aria-disabled="true"] { opacity: .4; pointer-events: none; }
+.simhome .hint { max-width: 62ch; color: var(--muted); font-size: 17px; margin: 0; }
+.simhome footer { padding: 12px 22px; color: var(--muted); font-size: 14px; display: flex; gap: 16px; justify-content: space-between; flex-wrap: wrap; }
+.simhome footer a { color: var(--muted); }
+</style>
+</head>
+<body class="simhome">
+<header>
+  <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span class="spacer"></span>
+  <span id="lang"></span>
+</header>
+<main>
+  <h1>Fly today's track</h1>
+  <div class="facts" id="facts">Looking for today's track…</div>
+  <div class="go">
+    <a class="pro" id="goPro" aria-disabled="true">Pro<small>Every trick: ladder climbs, the ceiling rings</small></a>
+    <a id="goEasy" aria-disabled="true">Beginner<small>Bottom stage of each ladder, no ceiling rings</small></a>
+  </div>
+  <p class="hint">It opens in WebFPV's track builder: press <b>Fly this track</b> (top right) and you're on the start pad. Plug your radio in on USB, or use a gamepad.</p>
+</main>
+<footer><span id="updated"></span><a href="/track">The track in 3D and its set-up list</a></footer>
+
+<script type="module">
+import { tr, langSwitch } from '/assets/common.js';
+import { rebuild, code, webfpvLink } from '/assets/trackgen.js';
+const $ = (id) => document.getElementById(id);
+$('lang').innerHTML = langSwitch();
+let shown = '';
+async function load() {
+  let data = null;
+  try { data = await (await fetch('/api/track', { cache: 'no-store' })).json(); } catch {}
+  const key = JSON.stringify(data?.today ?? null);
+  if (key === shown) return;
+  shown = key;
+  const t = data?.today ? rebuild(data.today) : null;
+  if (!t) {
+    $('facts').textContent = tr(data ? 'No track set up yet: make one on the kiosk (Today\'s track → Edit track).' : 'The race PC doesn\'t answer.');
+    for (const id of ['goPro', 'goEasy']) { $(id).removeAttribute('href'); $(id).setAttribute('aria-disabled', 'true'); }
+    return;
+  }
+  const pieces = t.pieces.filter((p) => p.type !== 'timing' && p.type !== 'flag').length;
+  $('facts').innerHTML = `${code(t.seed)} · ${tr('Lap length')} <b>${t.levels.full.facts.length.toFixed(0)} m</b> · <b>${pieces}</b> ${tr('pieces')}`;
+  $('goPro').href = await webfpvLink(t, 'full');
+  $('goEasy').href = await webfpvLink(t, 'easy');
+  for (const id of ['goPro', 'goEasy']) $(id).setAttribute('aria-disabled', 'false');
+  const d = new Date(data.today.savedAt);
+  $('updated').textContent = tr('Set up {when}', { when: `${d.getDate()}.${d.getMonth() + 1}. ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` });
+}
+load();
+setInterval(load, 60_000); // a new track saved on the kiosk shows within a minute
+</script>
+</body>
+</html>

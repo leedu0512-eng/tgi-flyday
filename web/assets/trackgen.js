@@ -6,19 +6,25 @@
 // ---------- the hall and the kit ----------
 // Hall frame: x across (0 = left wall, 10 = right wall), y up the page (0 = bottom wall, 26 = top), z up. Metres.
 export const HALL = { w: 10, l: 26, h: 3.5 };
-export const RING_Z = HALL.h - 0.2 - 0.25;               // ring centre: 50 cm opening, 20 cm below the ceiling
+// Every gate is 24 in (Janno 22.11.2026: RaceGOW's size, not 50 cm): the opening, the pipe round it,
+// the opening's bottom off the floor. A ladder's stages are one opening and one pipe apart.
+export const OPEN = 0.6096, PIPE = 0.03, SILL = 0.03;
+export const GATE_Z = SILL + OPEN / 2;                     // the middle of a floor gate's opening
+const STAGE = OPEN + PIPE;
+const stages = (n) => Array.from({ length: n }, (_, i) => Math.round((GATE_Z + i * STAGE) * 1000) / 1000);
+export const RING_Z = HALL.h - 0.2 - OPEN / 2;            // ring centre: 20 cm below the ceiling
 // Rings clip onto three rails under the ceiling (pairs of cables), hung along a rail or across it
 // (Janno 22.11.2026). Assumed: running the length of the hall, evenly across it.
 export const RAILS = [2.5, 5.0, 7.5];
 export const START = { x: 9.0, y: 1.0 };                 // lower right corner
 export const TIMING = { x: 9.0, y: 13.0 };               // middle of the right wall, flown upward
 export const TYPES = {
-  timing:  { label: 'Timing gate', zmin: 0, zmax: 0.58, r: 0.42, levels: [0.25] },
-  gate:    { label: 'Gate',        zmin: 0, zmax: 0.58, r: 0.42, levels: [0.25] },
+  timing:  { label: 'Timing gate', zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
+  gate:    { label: 'Gate',        zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
   cube:    { label: 'Cube',        zmin: 0, zmax: 0.74, r: 0.55, levels: [0.35] },
-  ring:    { label: 'Ring',        zmin: RING_Z - 0.3, zmax: HALL.h, r: 0.36, levels: [RING_Z] },
-  ladder3: { label: 'Ladder ×3',   zmin: 0, zmax: 1.58, r: 0.42, levels: [0.25, 0.75, 1.25] },
-  ladder5: { label: 'Ladder ×5',   zmin: 0, zmax: 2.58, r: 0.42, levels: [0.25, 0.75, 1.25, 1.75, 2.25] },
+  ring:    { label: 'Ring',        zmin: RING_Z - OPEN / 2 - 0.05, zmax: HALL.h, r: OPEN / 2 + 0.06, levels: [RING_Z] },
+  ladder3: { label: 'Ladder ×3',   zmin: 0, zmax: SILL + 3 * STAGE, r: OPEN / 2 + 0.12, levels: stages(3) },
+  ladder5: { label: 'Ladder ×5',   zmin: 0, zmax: SILL + 5 * STAGE, r: OPEN / 2 + 0.12, levels: stages(5) },
   flag:    { label: 'Flag',        zmin: 0, zmax: 1.9,  r: 0.3,  levels: [0] },
 };
 const KIT = [['gate', 6], ['cube', 2], ['ring', 5], ['ladder3', 1], ['ladder5', 1]];
@@ -98,7 +104,7 @@ function trickAlpha(st, rand, withRing) {
   return { anchors: withRing ? up : once, before: 2.2, after: withRing ? 1.2 : 3.9, inward: withRing ? 4.2 : 2.5, entryZ: z, exitZ: withRing ? null : z /* the way down from the ring is long enough */, pieces, sideOnly: withRing, levels };
 }
 function trickFinger(st, rand, gates) { // from the wall into the hall (through a gate), round a flag, back (through a gate)
-  const r = st.flagR, D = (gates ? 2.9 : 2.2) + rand() * 1.0, zone = 'F' + Math.floor(rand() * 1e6), z = 0.25;
+  const r = st.flagR, D = (gates ? 2.9 : 2.2) + rand() * 1.0, zone = 'F' + Math.floor(rand() * 1e6), z = GATE_Z;
   const A = [{ f: -(r + 1.7), l: 0, z: null }, { f: -(r + 0.45), l: 0.35, z: null, zone }, { f: -r, l: 1.35, z: null, zone }];
   const pieces = [];
   const mid = 1.35 + (D - 1.35) / 2;
@@ -183,7 +189,7 @@ function makeTrack1(seed, opts, once) {
   });
   // lay the items along the base loop's straights, with room for each climb
   const placed = [];
-  let u = 1.4, prevZ = 0.25, prevAfter = 0.6;
+  let u = 1.4, prevZ = GATE_Z, prevAfter = 0.6;
   for (const it of built) {
     const dz = it.entryZ == null ? 0 : Math.abs(it.entryZ - prevZ);
     let want = u + Math.max(0.4, CLIMB * dz - 0.4) + it.before + rand() * 0.8;
@@ -214,10 +220,10 @@ function makeTrack1(seed, opts, once) {
   // one anchor list per way of flying it (LEVELS): the pieces stay where they are
   const AL = { full: [], mid: [], easy: [] };
   const all = (a) => { for (const k in AL) AL[k].push({ ...a }); };
-  all({ x: TIMING.x, y: TIMING.y - 0.45, z: 0.25, zone: 'T' });
-  all({ x: TIMING.x, y: TIMING.y, z: 0.25, pass: { piece: 0, k: 0 }, zone: 'T' });
-  all({ x: TIMING.x, y: TIMING.y + 0.45, z: 0.25, zone: 'T' });
-  const pieces = [{ type: 'timing', x: TIMING.x, y: TIMING.y, z: 0.25, level: 0, passes: [], trick: 'once' }];
+  all({ x: TIMING.x, y: TIMING.y - 0.45, z: GATE_Z, zone: 'T' });
+  all({ x: TIMING.x, y: TIMING.y, z: GATE_Z, pass: { piece: 0, k: 0 }, zone: 'T' });
+  all({ x: TIMING.x, y: TIMING.y + 0.45, z: GATE_Z, zone: 'T' });
+  const pieces = [{ type: 'timing', x: TIMING.x, y: TIMING.y, z: GATE_Z, level: 0, passes: [], trick: 'once' }];
   const flagsOut = [];
   const busy = placed.map((p) => [p.u - p.before - 1.3, p.u + p.after + 1.3]);
   const freeAt = (uu) => !busy.some(([a, b]) => uu > a && uu < b) && uu > 0.8 && uu < PER - 0.8;
@@ -578,7 +584,6 @@ export function issuesOf(tr) {
 // elements: gates and the timing gate `gate`, ladders a stack of openings, a cube five gates in
 // one group (its edges), rings `hoop`s up on their sill, flags `flag` markers flown round on one
 // side. The flying order is ours, pass by pass. WebFPV draws its own line through them.
-const OPEN = 0.5, PIPE = 0.03, SILL = 0.03;
 const r6 = (v) => Math.round(v * 1e6) / 1e6;
 function hash8(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, '0'); }
 export function toWebFPV(tr, level = 'full', now = new Date()) {
@@ -654,4 +659,16 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
     elements,
     sequence,
   };
+}
+
+/** The link that opens a track in WebFPV: their own #track= fragment (deflate-raw, base64url). */
+export const WEBFPV_BUILDER = 'https://webfpv.org/sim/src/trackbuilder/index.html';
+export async function webfpvLink(tr, level = 'full') {
+  const bytes = new TextEncoder().encode(JSON.stringify(toWebFPV(tr, level)));
+  const b64 = (u8) => { let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+  if (typeof CompressionStream === 'function') {
+    const z = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+    return `${WEBFPV_BUILDER}#track=z.${b64(z)}`;
+  }
+  return `${WEBFPV_BUILDER}#track=j.${b64(bytes)}`;
 }

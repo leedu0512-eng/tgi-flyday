@@ -1,9 +1,9 @@
 {
- "version": "2026.11.22-2247",
+ "version": "2026.11.22-2324",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "2986c365589ac66febe1ecc062e52c5ea60342b554a624be614ab3f90655264a"
+   "sha256": "9103c5a5aa1df5cf616ed2a2fe0c15cfc10a5c4b4d3ba3aa05175d685cb98705"
   },
   {
    "path": "web/assets/avatars.js",
@@ -59,7 +59,7 @@
   },
   {
    "path": "web/assets/i18n-et.js",
-   "sha256": "77279a3dbf3276dcd0167d1a2b70457a6021bf9b6d6b8517d4e121f4bf4a2b1b"
+   "sha256": "7b5422f0b14f2ef6cebd486e7bbba42c24324a6b34d6b7a757fcf879e17e7c30"
   },
   {
    "path": "web/assets/i18n.js",
@@ -151,7 +151,7 @@
   },
   {
    "path": "web/assets/trackgen.js",
-   "sha256": "bbdee8dc3998b10d465298257d398a244e4b5867ac0ee89d84ccf2fc04fc595c"
+   "sha256": "c0c01c405b3852b90f14c6026fc91470ee7716b7514f4ff3e031452311b9e3d2"
   },
   {
    "path": "web/assets/vendor/LICENSE-three.txt",
@@ -171,7 +171,7 @@
   },
   {
    "path": "web/console.html",
-   "sha256": "dc32a70f45d2bdcce652b4015147d6385a6d703f8e1deb7204e0e254aa6cd0a1"
+   "sha256": "53be9bd95877cdd9bf377f8a168378729c5ce73e4ed33f0f21facf8578731c65"
   },
   {
    "path": "web/favicon.ico",
@@ -206,8 +206,12 @@
    "sha256": "7bb6cbb8600cff2703cae348169ef0cc5d2aa72af453c85e619c0cb5016d30d4"
   },
   {
+   "path": "web/sim.html",
+   "sha256": "0fa0169269c74f973e163950a20f4c65f56669852ef9c7a12418ed6e02048734"
+  },
+  {
    "path": "web/track.html",
-   "sha256": "454b368e3b3658550397f3cb37ebff4975720e39b3f2387f586071144d28fe09"
+   "sha256": "ad5b6c1dcecb3e81e99c7b5c447af0611238e10778e8b9106e6a87b0cd33dc18"
   }
  ]
 }

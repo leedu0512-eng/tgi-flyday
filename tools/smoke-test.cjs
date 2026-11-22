@@ -238,6 +238,13 @@ async function typeKeys(scope, text) {
     await tk.waitForSelector('#simBox:not([hidden]) #simQr svg', { timeout: 5000 });
     const simUrl = await tk.inputValue('#simLink');
     check(/^https:\/\/webfpv\.org\/sim\/src\/trackbuilder\/index\.html#track=[zj]\.[A-Za-z0-9_-]{200,}$/.test(simUrl), 'Track: Fly it in the sim shows a QR code and a WebFPV link carrying the track');
+    // the sim PCs' home page: Fly today's track, Pro and Beginner
+    const sp = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    sp.on('pageerror', (e) => errors.push(`sim: ${e.message}`));
+    await sp.goto(B + '/sim');
+    await sp.waitForSelector('#goPro[aria-disabled="false"]', { timeout: 8000 });
+    const [pro, easy] = await Promise.all([sp.getAttribute('#goPro', 'href'), sp.getAttribute('#goEasy', 'href')]);
+    check(/#track=[zj]\./.test(pro) && /#track=[zj]\./.test(easy) && pro !== easy, 'Sim PCs: /sim links today\'s track in WebFPV, Pro and Beginner');
   } catch (err) {
     failures++;
     console.log('  FAIL', err.message.split('\n')[0]);
