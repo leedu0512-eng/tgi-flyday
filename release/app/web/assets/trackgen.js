@@ -598,7 +598,9 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
   const yawOf = (pc) => Math.atan2(pc.dy, pc.dx);
   tr.pieces.forEach((pc, i) => {
     const yaw = yawOf(pc);
-    if (pc.type === 'gate' || pc.type === 'timing') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: pc.type === 'timing' ? 'Timing gate' : '' }), yaw });
+    if (pc.type === 'gate') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
+    // the timing gate stands out in the sim too: WebFPV's flagged gate, a pennant on each side of its header
+    else if (pc.type === 'timing') pieceEls.set(i, { el: el('flaggedGate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: 'Timing gate', flagSide: 'both' }), yaw });
     else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: TYPES[pc.type].label }), yaw });
     else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring' }), yaw });
     else if (pc.type === 'flag') pieceEls.set(i, { el: el('flag', pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: 'Flag' }) });

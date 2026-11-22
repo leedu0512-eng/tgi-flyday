@@ -1,9 +1,9 @@
 {
- "version": "2026.11.22-2324",
+ "version": "2026.11.22-2333",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "9103c5a5aa1df5cf616ed2a2fe0c15cfc10a5c4b4d3ba3aa05175d685cb98705"
+   "sha256": "1147d6ceacc903a15fdab68936bda2ccb35eae134cd558ba9448ba100483e551"
   },
   {
    "path": "web/assets/avatars.js",
@@ -151,7 +151,7 @@
   },
   {
    "path": "web/assets/trackgen.js",
-   "sha256": "c0c01c405b3852b90f14c6026fc91470ee7716b7514f4ff3e031452311b9e3d2"
+   "sha256": "5bedf7657c52e0b67a124d7cfbfeddf0ea2fcf0e668e1974190657b2f98485ef"
   },
   {
    "path": "web/assets/vendor/LICENSE-three.txt",
@@ -211,7 +211,7 @@
   },
   {
    "path": "web/track.html",
-   "sha256": "ad5b6c1dcecb3e81e99c7b5c447af0611238e10778e8b9106e6a87b0cd33dc18"
+   "sha256": "364576a8487a2b4c422c47b87e8ce4834370c4de5ae4cea225f247c76764636e"
   }
  ]
 }

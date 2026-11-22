@@ -357,11 +357,28 @@ function draw3d(tr0) {
   const green = new THREE.MeshLambertMaterial({ color: 0x22c55e });
   const blue = new THREE.MeshLambertMaterial({ color: 0x7fc8ff });
   const T = 0.03;
+  // black and white squares for the timing gate's board and its line on the floor
+  const chequerTex = (cols, rows) => {
+    const c = document.createElement('canvas'); c.width = cols * 16; c.height = rows * 16;
+    const x = c.getContext('2d');
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { x.fillStyle = (i + j) % 2 ? '#111' : '#fff'; x.fillRect(i * 16, j * 16, 16, 16); }
+    const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
+  };
+  const chequer = new THREE.MeshBasicMaterial({ map: chequerTex(8, 2) });
+  const chequerFloor = new THREE.MeshBasicMaterial({ map: chequerTex(18, 2) });
   tr0.pieces.forEach((pc, i) => {
     const pass = tr0.passes[i], obj = new THREE.Group();
     const yaw = Math.atan2(pass.dx, -pass.dy); // turns the piece's +z to the way it is flown
-    if (pc.type === 'gate' || pc.type === 'timing') {
-      const f = frameMesh(OPEN, OPEN, T, pc.type === 'timing' ? green : white); f.position.y = GATE_Z; obj.add(f);
+    if (pc.type === 'gate') {
+      const f = frameMesh(OPEN, OPEN, T, white); f.position.y = GATE_Z; obj.add(f);
+    } else if (pc.type === 'timing') {
+      // the timing gate stands out (Janno 22.11.2026): a thicker green frame, a chequered board on top
+      // and a chequered line on the floor through it, like a finish line
+      const f = frameMesh(OPEN, OPEN, 0.055, green); f.position.y = GATE_Z; obj.add(f);
+      const board = new THREE.Mesh(new THREE.BoxGeometry(OPEN + 0.11, 0.16, 0.02), [chequer, chequer, chequer, chequer, chequer, chequer]);
+      board.position.y = GATE_Z + OPEN / 2 + 0.055 + 0.08; obj.add(board);
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(OPEN + 0.5, 0.12), chequerFloor);
+      line.rotation.x = -Math.PI / 2; line.position.y = 0.006; obj.add(line);
     } else if (pc.type.startsWith('ladder')) {
       const k = pc.type === 'ladder3' ? 3 : 5;
       const flown = tr0.levels[level].passes[i].map((ps) => (ps.info && ps.info.stage != null ? ps.info.stage : -1));
@@ -460,6 +477,7 @@ function planSvg(t) {
       const shape = pc.type === 'flag' ? `<g transform="rotate(${-ang})"><line x1="0" y1="0" x2="0" y2="-14" stroke="#fff" stroke-width="1.6"/><path d="M0,-14 L9,-11 L0,-8 Z" fill="#ff6b00"/><circle r="2.2" fill="#fff"/></g>`
         : pc.type === 'cube' ? `<rect x="${-w / 2}" y="${-w / 2}" width="${w}" height="${w}" fill="none" stroke="${col}" stroke-width="2"/>`
         : pc.type === 'ring' ? `<ellipse rx="${w / 2}" ry="3" fill="none" stroke="${col}" stroke-width="2"/>`
+        : pc.type === 'timing' ? `<rect x="${-w / 2 - 3}" y="-4" width="${w + 6}" height="8" fill="#fff"/>${Array.from({ length: 8 }, (_, k) => `<rect x="${-w / 2 - 3 + k * (w + 6) / 8}" y="${k % 2 ? 0 : -4}" width="${(w + 6) / 8}" height="4" fill="#111"/>`).join('')}<rect x="${-w / 2 - 3}" y="-4" width="${w + 6}" height="8" fill="none" stroke="#22c55e" stroke-width="2"/>`
         : `<line x1="${-w / 2}" x2="${w / 2}" y1="0" y2="0" stroke="${col}" stroke-width="${pc.type.startsWith('ladder') ? 6 : 4}" stroke-linecap="round"/>`;
       if (editing && i === picked) g += `<circle cx="${px(pc)}" cy="${py(pc)}" r="15" fill="rgba(255,107,0,.18)" stroke="#ff6b00" stroke-width="2"/>`;
       g += `<g transform="translate(${px(pc)},${py(pc)}) rotate(${ang})">${shape}</g>`;
