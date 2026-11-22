@@ -40,6 +40,7 @@ The folder version (start.bat) keeps working as before, with screens updating by
 | RD console | `http://localhost:8080/console` | RD PC. Runs the session; this is the screen that makes sound. |
 | Spectator view | `http://localhost:8080/screen` | Second monitor of the RD PC, through the HDMI splitter to both TVs. |
 | Pilot kiosk | `http://<RD PC address>:8080/kiosk` | The wired touchscreen. The server window prints the exact address when it starts. |
+| Today's track | `http://<RD PC address>:8080/track` | The hall's track in 3D, the floor plan and the set-up list. **Edit track** generates one and lets you move and turn pieces by hand, then **Save as today's track**. The kiosk opens it with its **Today's track** button. |
 
 ### Kiosk on another PC
 

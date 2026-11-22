@@ -196,6 +196,27 @@ async function typeKeys(scope, text) {
     await et.click('[data-lang="en"]');
     await et.waitForSelector('[data-lang="en"].on', { timeout: 5000 });
     check(/Fly today/i.test(await et.textContent('[data-flow=join]')), 'ENG switch: back to English');
+
+    // Today's track: from the kiosk, generate, move a piece on the floor plan with the mouse, save
+    const tk = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+    tk.on('pageerror', (e) => errors.push(`track: ${e.message}`));
+    await tk.goto(B + '/kiosk');
+    await tk.click('a.kiosk-track');
+    await tk.waitForSelector('#editBtn', { timeout: 8000 });
+    await tk.click('#editBtn');
+    await tk.waitForSelector('#rows tr[data-row]', { timeout: 15000 });
+    const row = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Gate/.test(t.children[1].textContent)); return r && [Number(r.dataset.row), parseFloat(r.children[2].textContent), parseFloat(r.children[3].textContent)]; });
+    const box = await tk.evaluate(() => { const s = document.querySelector('#plan svg'), r = s.getBoundingClientRect(); return { k: r.width / s.viewBox.baseVal.width, left: r.left, top: r.top }; });
+    const at = (fromRight, up) => [box.left + (18 + (10 - fromRight) * 22) * box.k, box.top + (18 + (26 - up) * 22) * box.k];
+    const [ax, ay] = at(row[1], row[2]), [bx] = at(row[1] + 1, row[2]);
+    await tk.mouse.move(ax, ay); await tk.mouse.down(); await tk.mouse.move(bx, ay, { steps: 8 }); await tk.mouse.up();
+    await tk.waitForTimeout(300);
+    const moved = await tk.evaluate((i) => parseFloat(document.querySelector(`#rows tr[data-row="${i}"]`).children[2].textContent), row[0]);
+    check(Math.abs(moved - row[1] - 1) < 0.15, 'Track: a gate dragged on the floor plan moves 1 m');
+    await tk.click('#saveBtn');
+    await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 5000 });
+    const saved = await (await fetch(B + '/api/track')).json();
+    check(saved.today && Object.keys(saved.today.edits).length === 1, 'Track: saved as today\'s track, with the hand tuning');
   } catch (err) {
     failures++;
     console.log('  FAIL', err.message.split('\n')[0]);

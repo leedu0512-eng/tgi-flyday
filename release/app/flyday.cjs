@@ -26,9 +26,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server/main.ts
 var import_node_http = require("node:http");
 var import_promises2 = require("node:fs/promises");
-var import_node_fs7 = require("node:fs");
+var import_node_fs8 = require("node:fs");
 var import_node_os2 = require("node:os");
-var import_node_path7 = require("node:path");
+var import_node_path8 = require("node:path");
 var import_node_url = require("node:url");
 var sea = __toESM(require("node:sea"), 1);
 
@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.18-1310" : "dev";
+var VERSION = true ? "2026.11.22-2152" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2387,15 +2387,15 @@ var Engine = class {
    */
   setConfig(patch) {
     const next = { ...this.config };
-    const num = (v, min, max, label) => {
+    const num2 = (v, min, max, label) => {
       const n = Number(v);
       if (!Number.isFinite(n) || n < min || n > max) throw new EngineError(`${label} must be between ${min} and ${max}.`);
       return Math.round(n);
     };
-    if (patch.heatSeconds !== void 0) next.heatSeconds = num(patch.heatSeconds, 10, 1800, "Heat length");
-    if (patch.changeoverSeconds !== void 0) next.changeoverSeconds = num(patch.changeoverSeconds, 10, 1800, "Changeover");
+    if (patch.heatSeconds !== void 0) next.heatSeconds = num2(patch.heatSeconds, 10, 1800, "Heat length");
+    if (patch.changeoverSeconds !== void 0) next.changeoverSeconds = num2(patch.changeoverSeconds, 10, 1800, "Changeover");
     if (patch.heatCount !== void 0) {
-      next.heatCount = num(patch.heatCount, 1, MAX_HEATS, "Number of heats");
+      next.heatCount = num2(patch.heatCount, 1, MAX_HEATS, "Number of heats");
       for (let h = next.heatCount; h < this.config.heatCount; h++) {
         if (!this.heatIsEmpty(h)) throw new EngineError(`Heat ${h + 1} still has pilots. Empty it first.`);
       }
@@ -2648,12 +2648,64 @@ function spokenChannel(ch) {
   return ch.replace(/^([A-Z]+)(\d+)$/i, "$1, $2");
 }
 
-// server/store.ts
+// server/tracks.ts
 var import_node_fs4 = require("node:fs");
 var import_node_path4 = require("node:path");
+var HISTORY = 10;
+var num = (v, lo, hi) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : 0;
+};
+function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
+  const t = b?.track ?? b;
+  const seed = Number(t?.seed);
+  if (!Number.isInteger(seed) || seed < 0 || seed > 4294967295) throw new EngineError("That track has no proper number.");
+  const o = t?.opts ?? {};
+  if (o.style !== "flowing" && o.style !== "technical") throw new EngineError("Unknown track style.");
+  const opts = { style: o.style, pieces: Math.round(num(o.pieces, 6, 15)) || 15, rings: !!o.rings, flags: !!o.flags };
+  const edits = {};
+  for (const [k, e] of Object.entries(t?.edits ?? {}).slice(0, 40)) {
+    if (!/^\d{1,2}$/.test(k) || !e || typeof e !== "object") continue;
+    const x = e, ed = { dx: Math.round(num(x.dx, -26, 26) * 100) / 100, dy: Math.round(num(x.dy, -26, 26) * 100) / 100, rot: Math.round(num(x.rot, 0, 359)) };
+    if (ed.dx || ed.dy || ed.rot) edits[k] = ed;
+  }
+  const code = String(t?.code ?? "").replace(/[^A-Z0-9-]/gi, "").slice(0, 12);
+  const from = String(b?.from ?? "").replace(/[^a-z]/g, "").slice(0, 12) || "page";
+  return { seed, opts, edits, code, savedAt: now.toISOString(), from };
+}
+var TrackStore = class {
+  data = { today: null, history: [] };
+  file;
+  constructor(file) {
+    this.file = file;
+    try {
+      const d = JSON.parse((0, import_node_fs4.readFileSync)(file, "utf8"));
+      this.data = { today: d.today ?? null, history: Array.isArray(d.history) ? d.history.slice(0, HISTORY) : [] };
+    } catch {
+    }
+  }
+  save(body, now = /* @__PURE__ */ new Date()) {
+    const t = cleanTrack(body, now);
+    const prev = this.data.today;
+    const same = prev && prev.seed === t.seed && JSON.stringify(prev.opts) === JSON.stringify(t.opts);
+    const history = prev && !same ? [prev, ...this.data.history] : this.data.history;
+    this.data = { today: t, history: history.filter((h) => !(h.seed === t.seed && JSON.stringify(h.opts) === JSON.stringify(t.opts))).slice(0, HISTORY) };
+    try {
+      (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
+      (0, import_node_fs4.writeFileSync)(this.file + ".tmp", JSON.stringify(this.data, null, 1));
+      (0, import_node_fs4.renameSync)(this.file + ".tmp", this.file);
+    } catch {
+    }
+    return this.data;
+  }
+};
+
+// server/store.ts
+var import_node_fs5 = require("node:fs");
+var import_node_path5 = require("node:path");
 function load(file) {
   try {
-    return JSON.parse((0, import_node_fs4.readFileSync)(file, "utf8"));
+    return JSON.parse((0, import_node_fs5.readFileSync)(file, "utf8"));
   } catch (err) {
     if (err?.code !== "ENOENT") console.warn(`Could not read ${file}, starting fresh:`, err.message);
     return {};
@@ -2663,10 +2715,10 @@ function saver(file, get2) {
   let timer = null;
   const write = () => {
     timer = null;
-    (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(file), { recursive: true });
+    (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(file), { recursive: true });
     const tmp = `${file}.tmp`;
-    (0, import_node_fs4.writeFileSync)(tmp, JSON.stringify(get2(), null, 2));
-    (0, import_node_fs4.renameSync)(tmp, file);
+    (0, import_node_fs5.writeFileSync)(tmp, JSON.stringify(get2(), null, 2));
+    (0, import_node_fs5.renameSync)(tmp, file);
   };
   return {
     soon() {
@@ -2915,13 +2967,13 @@ var RotorHazardLink = class {
 
 // server/outbox.ts
 var import_node_crypto3 = require("node:crypto");
-var import_node_fs6 = require("node:fs");
-var import_node_path6 = require("node:path");
+var import_node_fs7 = require("node:fs");
+var import_node_path7 = require("node:path");
 
 // server/flyday.ts
 var import_node_crypto2 = require("node:crypto");
-var import_node_fs5 = require("node:fs");
-var import_node_path5 = require("node:path");
+var import_node_fs6 = require("node:fs");
+var import_node_path6 = require("node:path");
 var FLYDAY_BASE = "https://hobizone.org/api/hz/tgiflyday/";
 var ALNUM = "abcdefghijklmnopqrstuvwxyz0123456789";
 function newId() {
@@ -2960,10 +3012,10 @@ var Install = class {
   state;
   file;
   constructor(dataDir) {
-    this.file = (0, import_node_path5.join)(dataDir, "install.json");
+    this.file = (0, import_node_path6.join)(dataDir, "install.json");
     let saved2 = {};
     try {
-      if ((0, import_node_fs5.existsSync)(this.file)) saved2 = JSON.parse((0, import_node_fs5.readFileSync)(this.file, "utf8"));
+      if ((0, import_node_fs6.existsSync)(this.file)) saved2 = JSON.parse((0, import_node_fs6.readFileSync)(this.file, "utf8"));
     } catch {
     }
     const secret = typeof saved2.secret === "string" && saved2.secret.length >= 32 ? saved2.secret : (0, import_node_crypto2.randomBytes)(32).toString("hex");
@@ -2982,10 +3034,10 @@ var Install = class {
   }
   save() {
     try {
-      (0, import_node_fs5.mkdirSync)((0, import_node_path5.dirname)(this.file), { recursive: true });
+      (0, import_node_fs6.mkdirSync)((0, import_node_path6.dirname)(this.file), { recursive: true });
       const { helloError, updateRequested, ...keep } = this.state;
-      (0, import_node_fs5.writeFileSync)(this.file + ".tmp", JSON.stringify(keep, null, 2));
-      (0, import_node_fs5.renameSync)(this.file + ".tmp", this.file);
+      (0, import_node_fs6.writeFileSync)(this.file + ".tmp", JSON.stringify(keep, null, 2));
+      (0, import_node_fs6.renameSync)(this.file + ".tmp", this.file);
     } catch {
     }
   }
@@ -3229,11 +3281,11 @@ var Outbox = class {
     this.config = config;
     this.venueFallback = venueFallback;
     this.log = log;
-    this.file = (0, import_node_path6.join)(dataDir, "outbox.jsonl");
-    this.sentFile = (0, import_node_path6.join)(dataDir, "outbox-sent.jsonl");
+    this.file = (0, import_node_path7.join)(dataDir, "outbox.jsonl");
+    this.sentFile = (0, import_node_path7.join)(dataDir, "outbox-sent.jsonl");
     try {
-      if ((0, import_node_fs6.existsSync)(this.file)) {
-        for (const line of (0, import_node_fs6.readFileSync)(this.file, "utf8").split("\n")) {
+      if ((0, import_node_fs7.existsSync)(this.file)) {
+        for (const line of (0, import_node_fs7.readFileSync)(this.file, "utf8").split("\n")) {
           if (!line.trim()) continue;
           try {
             this.pending.push(JSON.parse(line));
@@ -3241,9 +3293,9 @@ var Outbox = class {
           }
         }
       }
-      if ((0, import_node_fs6.existsSync)(this.sentFile)) {
+      if ((0, import_node_fs7.existsSync)(this.sentFile)) {
         const sent = [];
-        for (const line of (0, import_node_fs6.readFileSync)(this.sentFile, "utf8").split("\n")) {
+        for (const line of (0, import_node_fs7.readFileSync)(this.sentFile, "utf8").split("\n")) {
           if (!line.trim()) continue;
           try {
             sent.push(JSON.parse(line));
@@ -3269,11 +3321,11 @@ var Outbox = class {
     const ev = { id: (0, import_node_crypto3.randomUUID)(), venue: this.config().venue, at: new Date(at).toISOString(), type, data };
     this.pending.push(ev);
     try {
-      (0, import_node_fs6.mkdirSync)((0, import_node_path6.dirname)(this.file), { recursive: true });
+      (0, import_node_fs7.mkdirSync)((0, import_node_path7.dirname)(this.file), { recursive: true });
       if (this.pending.length > MAX_PENDING) {
         this.pending.splice(0, this.pending.length - MAX_PENDING);
         this.rewrite();
-      } else (0, import_node_fs6.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
+      } else (0, import_node_fs7.appendFileSync)(this.file, JSON.stringify(ev) + "\n");
     } catch (err) {
       this.log(`Outbox: could not save an event (${err.message}).`);
     }
@@ -3342,7 +3394,7 @@ var Outbox = class {
         }
         for (const [k, v] of notes) this.notes.set(k, v);
         const done = this.pending.splice(0, up.rows);
-        (0, import_node_fs6.appendFileSync)(this.sentFile, done.map((e) => JSON.stringify(e)).join("\n") + "\n");
+        (0, import_node_fs7.appendFileSync)(this.sentFile, done.map((e) => JSON.stringify(e)).join("\n") + "\n");
         this.rewrite();
         this.st.sent += done.length;
         this.st.pending = this.pending.length;
@@ -3360,43 +3412,44 @@ var Outbox = class {
   }
   rewrite() {
     const tmp = `${this.file}.tmp`;
-    (0, import_node_fs6.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
-    (0, import_node_fs6.renameSync)(tmp, this.file);
+    (0, import_node_fs7.writeFileSync)(tmp, this.pending.map((e) => JSON.stringify(e) + "\n").join(""));
+    (0, import_node_fs7.renameSync)(tmp, this.file);
   }
 };
 
 // server/main.ts
 var IN_EXE = sea.isSea();
-var ROOT = IN_EXE ? (0, import_node_path7.dirname)(process.execPath) : (0, import_node_path7.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
+var ROOT = IN_EXE ? (0, import_node_path8.dirname)(process.execPath) : (0, import_node_path8.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
 var APP_DIR = process.env.TGIFLYDAY_APP_DIR ?? process.env.FLYDAY_APP_DIR;
-var WEB = APP_DIR ? (0, import_node_path7.join)(APP_DIR, "web") : (0, import_node_path7.join)(ROOT, "web");
-var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs7.existsSync)((0, import_node_path7.join)(WEB, "console.html"));
+var WEB = APP_DIR ? (0, import_node_path8.join)(APP_DIR, "web") : (0, import_node_path8.join)(ROOT, "web");
+var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs8.existsSync)((0, import_node_path8.join)(WEB, "console.html"));
 async function webFile(full) {
   if (WEB_FROM_DISK) return (0, import_promises2.readFile)(full);
-  return Buffer.from(sea.getAsset("web/" + (0, import_node_path7.relative)(WEB, full).split(import_node_path7.sep).join("/")));
+  return Buffer.from(sea.getAsset("web/" + (0, import_node_path8.relative)(WEB, full).split(import_node_path8.sep).join("/")));
 }
-var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path7.join)(ROOT, "data", "flyday.json");
+var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path8.join)(ROOT, "data", "flyday.json");
 var PORT = Number(process.env.PORT ?? 8080);
-var PHOTOS = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "photos");
+var PHOTOS = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "photos");
 var photoFile = (id) => {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw new EngineError("No such pilot.");
-  return (0, import_node_path7.join)(PHOTOS, `${id}.jpg`);
+  return (0, import_node_path8.join)(PHOTOS, `${id}.jpg`);
 };
-var KNOWN = (0, import_node_path7.join)(PHOTOS, "known");
-var knownFile = (callsign) => (0, import_node_path7.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
+var KNOWN = (0, import_node_path8.join)(PHOTOS, "known");
+var knownFile = (callsign) => (0, import_node_path8.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
 function rememberPhoto(id) {
   const p = engine.pilots.get(id);
   if (!p?.photo) return;
   try {
-    (0, import_node_fs7.mkdirSync)(KNOWN, { recursive: true });
-    (0, import_node_fs7.copyFileSync)(photoFile(id), knownFile(p.callsign));
+    (0, import_node_fs8.mkdirSync)(KNOWN, { recursive: true });
+    (0, import_node_fs8.copyFileSync)(photoFile(id), knownFile(p.callsign));
   } catch {
   }
 }
-var KNOWN_FILE = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "known.json");
+var tracks = new TrackStore((0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "track.json"));
+var KNOWN_FILE = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "known.json");
 var known = (() => {
   try {
-    return JSON.parse((0, import_node_fs7.readFileSync)(KNOWN_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs8.readFileSync)(KNOWN_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -3414,29 +3467,29 @@ function rememberChannel(pilotId) {
     if (known[k]?.channel === channel && !!known[k]?.club === club) return;
     known[k] = { ...channel ? { channel } : {}, ...club ? { club } : {} };
     try {
-      (0, import_node_fs7.mkdirSync)((0, import_node_path7.resolve)(KNOWN_FILE, ".."), { recursive: true });
-      (0, import_node_fs7.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
+      (0, import_node_fs8.mkdirSync)((0, import_node_path8.resolve)(KNOWN_FILE, ".."), { recursive: true });
+      (0, import_node_fs8.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
     } catch {
     }
     return;
   }
 }
-var CARDS_FILE = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "cards.json");
-var LIGHT_LOG = (0, import_node_path7.join)((0, import_node_path7.resolve)(DATA_FILE, ".."), "light-log.jsonl");
+var CARDS_FILE = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "cards.json");
+var LIGHT_LOG = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "light-log.jsonl");
 function logLight(row) {
   try {
-    (0, import_node_fs7.appendFileSync)(LIGHT_LOG, JSON.stringify(row) + "\n");
-    if ((0, import_node_fs7.statSync)(LIGHT_LOG).size > 3e6) {
-      const lines = (0, import_node_fs7.readFileSync)(LIGHT_LOG, "utf8").trim().split("\n");
-      (0, import_node_fs7.writeFileSync)(LIGHT_LOG + ".tmp", lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
-      (0, import_node_fs7.renameSync)(LIGHT_LOG + ".tmp", LIGHT_LOG);
+    (0, import_node_fs8.appendFileSync)(LIGHT_LOG, JSON.stringify(row) + "\n");
+    if ((0, import_node_fs8.statSync)(LIGHT_LOG).size > 3e6) {
+      const lines = (0, import_node_fs8.readFileSync)(LIGHT_LOG, "utf8").trim().split("\n");
+      (0, import_node_fs8.writeFileSync)(LIGHT_LOG + ".tmp", lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
+      (0, import_node_fs8.renameSync)(LIGHT_LOG + ".tmp", LIGHT_LOG);
     }
   } catch {
   }
 }
 function readLightLog(since) {
   try {
-    return (0, import_node_fs7.readFileSync)(LIGHT_LOG, "utf8").split("\n").filter(Boolean).map((l) => {
+    return (0, import_node_fs8.readFileSync)(LIGHT_LOG, "utf8").split("\n").filter(Boolean).map((l) => {
       try {
         return JSON.parse(l);
       } catch {
@@ -3449,7 +3502,7 @@ function readLightLog(since) {
 }
 var cards = (() => {
   try {
-    return JSON.parse((0, import_node_fs7.readFileSync)(CARDS_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs8.readFileSync)(CARDS_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -3461,8 +3514,8 @@ function cardId(v) {
 }
 function saveCards() {
   try {
-    (0, import_node_fs7.mkdirSync)((0, import_node_path7.resolve)(CARDS_FILE, ".."), { recursive: true });
-    (0, import_node_fs7.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
+    (0, import_node_fs8.mkdirSync)((0, import_node_path8.resolve)(CARDS_FILE, ".."), { recursive: true });
+    (0, import_node_fs8.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
   } catch {
   }
 }
@@ -3479,17 +3532,17 @@ function restorePhotos() {
   for (const p of engine.pilots.values()) {
     if (p.photo) continue;
     const known2 = knownFile(p.callsign);
-    if (!(0, import_node_fs7.existsSync)(known2)) continue;
+    if (!(0, import_node_fs8.existsSync)(known2)) continue;
     try {
-      (0, import_node_fs7.mkdirSync)(PHOTOS, { recursive: true });
-      (0, import_node_fs7.copyFileSync)(known2, photoFile(p.id));
+      (0, import_node_fs8.mkdirSync)(PHOTOS, { recursive: true });
+      (0, import_node_fs8.copyFileSync)(known2, photoFile(p.id));
       engine.setPilotPhoto(p.id, Date.now().toString(36));
     } catch {
     }
   }
 }
-var OLD_DATA = (0, import_node_path7.join)(ROOT, "data", "eztimer.json");
-if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs7.existsSync)(DATA_FILE) && (0, import_node_fs7.existsSync)(OLD_DATA)) (0, import_node_fs7.renameSync)(OLD_DATA, DATA_FILE);
+var OLD_DATA = (0, import_node_path8.join)(ROOT, "data", "eztimer.json");
+if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs8.existsSync)(DATA_FILE) && (0, import_node_fs8.existsSync)(OLD_DATA)) (0, import_node_fs8.renameSync)(OLD_DATA, DATA_FILE);
 var clients = /* @__PURE__ */ new Set();
 function broadcast(type, payload) {
   const msg = `event: ${type}
@@ -3522,9 +3575,9 @@ var engine = new Engine(saved, {
   }
 });
 var store = saver(DATA_FILE, () => engine.toSaved());
-var pairing = new Install((0, import_node_path7.resolve)(DATA_FILE, ".."));
-outbox = new Outbox((0, import_node_path7.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
-var screenFeed = new ScreenFeed((0, import_node_path7.resolve)(DATA_FILE, ".."));
+var pairing = new Install((0, import_node_path8.resolve)(DATA_FILE, ".."));
+outbox = new Outbox((0, import_node_path8.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
+var screenFeed = new ScreenFeed((0, import_node_path8.resolve)(DATA_FILE, ".."));
 var kioskAskedAt = null;
 var kioskRestartAt = null;
 var kioskNow = (now) => kioskScreen({
@@ -3574,13 +3627,13 @@ setInterval(() => {
   });
 }, 3e4);
 engine.resume(saved.clock, Date.now());
-for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs7.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
+for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs8.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
 restorePhotos();
 timerLink = new RotorHazardLink(engine, (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
 var webVersion = String(Date.now());
 var reloadTimer = null;
 try {
-  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs7.watch)(WEB, { recursive: true }, () => {
+  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs8.watch)(WEB, { recursive: true }, () => {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       webVersion = String(Date.now());
@@ -3609,7 +3662,8 @@ var PAGES = {
   "/kiosk": "kiosk.html",
   "/screen": "screen.html",
   "/mobile": "mobile.html",
-  "/me": "me.html"
+  "/me": "me.html",
+  "/track": "track.html"
 };
 var TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -3638,6 +3692,7 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 var API2 = {
+  "/api/track/save": (b) => tracks.save(b),
   "/api/action": (b) => engine.action(String(b.type), Date.now()),
   "/api/join": (b) => {
     const pilot = engine.join(b.name, Number(b.heat), Number(b.slot));
@@ -3818,6 +3873,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     }
     return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
+  if (path === "/api/track" && req.method === "GET") return json(res, 200, tracks.data);
   if (path === "/api/kiosk/restart" && req.method === "POST") {
     kioskRestartAt = Date.now();
     stateDirty = true;
@@ -3826,10 +3882,10 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   if (path === "/kiosk.sh" && req.method === "GET") {
     let text2 = "";
     try {
-      text2 = (await webFile((0, import_node_path7.join)(WEB, "kiosk.sh"))).toString("utf8");
+      text2 = (await webFile((0, import_node_path8.join)(WEB, "kiosk.sh"))).toString("utf8");
     } catch {
       try {
-        text2 = await (0, import_promises2.readFile)((0, import_node_path7.join)(ROOT, "kiosk.sh"), "utf8");
+        text2 = await (0, import_promises2.readFile)((0, import_node_path8.join)(ROOT, "kiosk.sh"), "utf8");
       } catch {
       }
     }
@@ -3865,7 +3921,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
         await (0, import_promises2.unlink)(file2).catch(() => {
         });
         try {
-          (0, import_node_fs7.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
+          (0, import_node_fs8.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
         } catch {
         }
         engine.setPilotPhoto(id, null);
@@ -3920,12 +3976,12 @@ data: ${JSON.stringify(snapshot(Date.now()))}
       return json(res, known2 ? 400 : 500, { error: known2 ? err.message : "Something went wrong on the server." });
     }
   }
-  const file = PAGES[path] ?? (0, import_node_path7.normalize)(path).replace(/^([/\\])+/, "");
-  const full = (0, import_node_path7.join)(WEB, file);
+  const file = PAGES[path] ?? (0, import_node_path8.normalize)(path).replace(/^([/\\])+/, "");
+  const full = (0, import_node_path8.join)(WEB, file);
   if (!full.startsWith(WEB)) return json(res, 404, { error: "Not found." });
   try {
     const body = await webFile(full);
-    res.writeHead(200, { "content-type": TYPES[(0, import_node_path7.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": TYPES[(0, import_node_path8.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
     res.end(body);
   } catch {
     json(res, 404, { error: "Not found." });

@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tgiFlyDay · Today's track</title>
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/assets/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/assets/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/assets/style.css">
+<!-- three.js r128 (MIT, assets/vendor/LICENSE-three.txt), bundled: the venue has no internet -->
+<script src="/assets/vendor/three.min.js"></script>
+<script src="/assets/vendor/three-orbitcontrols.js"></script>
+<style>
+/* Today's track (Janno 22.11.2026): the hall in 3D to turn with a finger, the floor plan like a
+   portrait A4 page, the set-up list. Edit track: generate, then move and turn pieces on the plan. */
+body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'Arial Narrow', Impact, sans-serif; --stencil: 'Big Shoulders Stencil', 'Big Shoulders', Impact, sans-serif; margin: 0; background: var(--bg); color: var(--text); font-family: 'Archivo', system-ui, sans-serif; }
+.trk * { box-sizing: border-box; }
+.trk .tbar { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 3px solid var(--accent); }
+.trk .tbar .logo { font-size: 26px; }
+.trk .tbar h1 { margin: 0; font: 900 clamp(26px, 3.2vw, 40px)/1 var(--stencil); text-transform: uppercase; letter-spacing: .02em; }
+.trk .tbar .code { font: 600 14px/1.2 var(--display); letter-spacing: .1em; color: var(--muted); text-transform: uppercase; }
+.trk .tbar .spacer { flex: 1; }
+.trk .tb { all: unset; cursor: pointer; padding: 12px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel-2); font: 800 18px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--text); }
+.trk .tb.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+.trk .tb:disabled { opacity: .4; cursor: default; }
+.trk .tb:focus-visible, .trk button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.trk-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "ctrl ctrl" "stage side" "list side"; gap: 12px 14px; padding: 12px 16px 40px; align-items: start; }
+.trk .ctrl { grid-area: ctrl; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.trk .ctrl[hidden] { display: none; }
+.trk .field { display: grid; gap: 6px; }
+.trk .field > span { font: 700 13px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.trk .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.trk .seg button { all: unset; cursor: pointer; padding: 11px 14px; font: 700 15px/1 'Archivo', sans-serif; color: var(--muted); background: var(--panel-2); }
+.trk .seg button[aria-pressed="true"] { background: var(--accent); color: #000; }
+.trk input[type="range"] { accent-color: var(--accent); width: 170px; }
+.trk select { font: 600 15px 'Archivo', sans-serif; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; max-width: 260px; }
+.trk .stage { grid-area: stage; position: relative; background: #050505; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; height: calc(100vh - 150px); min-height: 380px; touch-action: none; }
+.trk.editing .stage { height: calc(100vh - 290px); }
+.trk .stage canvas { display: block; width: 100%; height: 100%; }
+.trk .hud { position: absolute; left: 12px; right: 12px; top: 12px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; pointer-events: none; }
+.trk .hud > * { pointer-events: auto; }
+.trk .hud .chips { flex: 0 0 100%; min-height: 31px; }
+.trk .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.trk .chip { display: inline-flex; gap: .35em; align-items: baseline; background: rgba(0, 0, 0, .7); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.trk .chip b { color: var(--text); }
+.trk .views { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.trk .views button { all: unset; cursor: pointer; background: rgba(0, 0, 0, .75); border: 1px solid var(--line); border-radius: 8px; padding: 11px 15px; font: 800 17px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--text); }
+.trk .views button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.trk .levels > span { font: 800 14px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-right: 2px; }
+.trk .levels button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #000; }
+.trk .help { position: absolute; left: 12px; bottom: 10px; right: 12px; font-size: 14px; color: var(--muted); pointer-events: none; }
+.trk .help span { background: rgba(0, 0, 0, .6); padding: 4px 10px; border-radius: 6px; }
+.trk .nogl, .trk .empty { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 16px; text-align: center; color: var(--muted); padding: 20px; font-size: 18px; }
+.trk .empty b { display: block; font: 900 34px/1.1 var(--stencil); color: var(--text); text-transform: uppercase; }
+.trk .side { grid-area: side; display: grid; gap: 8px; position: sticky; top: 12px; }
+.trk h3 { margin: 0; font: 800 18px/1.1 var(--display); text-transform: uppercase; letter-spacing: .05em; }
+.trk .page { background: #050505; border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+.trk .page svg { display: block; height: calc(100vh - 190px); min-height: 420px; width: auto; max-width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+.trk.editing .page svg { cursor: grab; }
+.trk .sel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.trk .sel .name { font: 800 18px/1 var(--display); text-transform: uppercase; letter-spacing: .05em; min-width: 9em; }
+.trk .sel .muted { color: var(--muted); font-size: 14px; }
+.trk .issues { grid-area: list; }
+.trk .issues ul { margin: 0 0 10px; padding: 10px 14px 10px 32px; background: rgba(255, 59, 48, .08); border: 1px solid rgba(255, 59, 48, .5); border-radius: 8px; color: #ffb3ad; font-size: 15px; }
+.trk .issues .ok { color: var(--timing); font-size: 15px; margin: 0 0 10px; }
+.trk .list { grid-area: list; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; overflow-x: auto; }
+.trk.editing .list { margin-top: var(--issues-h, 0); }
+.trk table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 15px; }
+.trk th, .trk td { text-align: left; padding: 8px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.trk th { font: 700 13px/1.2 var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.trk td.num { text-align: right; }
+.trk tr.picked td { background: rgba(255, 107, 0, .12); }
+.trk .passno { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #000; font: 800 15px/1 var(--display); }
+.trk .passno.t { background: var(--timing); }
+.trk .toast2 { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #111; border: 1px solid var(--accent); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 9; }
+.trk .toast2.on { opacity: 1; }
+@media (max-width: 900px) {
+  .trk-grid { grid-template-columns: 1fr; grid-template-areas: "ctrl" "stage" "side" "list"; }
+  .trk .stage, .trk.editing .stage { height: 62vh; }
+  .trk .side { position: static; }
+  .trk .page svg { height: auto; width: 100%; min-height: 0; }
+}
+</style>
+</head>
+<body class="trk">
+<header class="tbar">
+  <div class="logo"><img src="/assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <h1 id="title">Today's track</h1>
+  <span class="code" id="code"></span>
+  <span class="spacer"></span>
+  <button type="button" class="tb primary" id="editBtn">Edit track</button>
+  <button type="button" class="tb primary" id="saveBtn" hidden>Save as today's track</button>
+  <button type="button" class="tb" id="cancelBtn" hidden>Cancel</button>
+  <span id="lang"></span>
+  <button type="button" class="tb" id="backBtn" hidden>← Back</button>
+</header>
+
+<main class="trk-grid">
+  <section class="ctrl" id="ctrl" hidden aria-label="Track settings">
+    <div class="field"><span>Style</span>
+      <div class="seg" id="style">
+        <button type="button" data-v="flowing" aria-pressed="true">Flowing</button>
+        <button type="button" data-v="technical" aria-pressed="false">Technical</button>
+      </div>
+    </div>
+    <div class="field"><span id="piecesLabel">Pieces to set up: 15</span>
+      <input type="range" id="pieces" min="6" max="15" value="15" aria-label="Pieces to set up">
+    </div>
+    <div class="field"><span>Ceiling rings</span>
+      <div class="seg" id="ceiling">
+        <button type="button" data-v="yes" aria-pressed="true">Use</button>
+        <button type="button" data-v="no" aria-pressed="false">Leave up</button>
+      </div>
+    </div>
+    <div class="field"><span>Flags</span>
+      <div class="seg" id="flags">
+        <button type="button" data-v="yes" aria-pressed="true">Use</button>
+        <button type="button" data-v="no" aria-pressed="false">Leave out</button>
+      </div>
+    </div>
+    <button type="button" class="tb primary" id="genBtn">Generate track</button>
+    <div class="field" id="historyField" hidden><span>Earlier tracks</span><select id="history"></select></div>
+    <div class="field"><span>Hand tuning</span>
+      <div class="sel" id="sel"></div>
+    </div>
+  </section>
+
+  <div class="stage" id="stage">
+    <div class="hud">
+      <div class="chips" id="chips"></div>
+      <div class="views" role="group" aria-label="View">
+        <button type="button" id="viewOrbit" aria-pressed="true">Explore</button>
+        <button type="button" id="viewRide" aria-pressed="false">Ride the line</button>
+        <button type="button" id="viewTop" aria-pressed="false">From above</button>
+      </div>
+      <div class="views levels" role="group" aria-label="Fly it as" id="level">
+        <span>Fly it as</span>
+        <button type="button" data-v="easy" aria-pressed="false">Beginner</button>
+        <button type="button" data-v="full" aria-pressed="true">Pro</button>
+      </div>
+    </div>
+    <div class="help"><span id="help">Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move</span></div>
+  </div>
+
+  <aside class="side">
+    <h3 id="planTitle">Floor plan</h3>
+    <div class="page" id="plan"></div>
+  </aside>
+
+  <section class="list" aria-label="Set-up list">
+    <div class="issues" id="issues" hidden></div>
+    <h3>Set-up list</h3>
+    <table>
+      <thead><tr><th>#</th><th>Piece</th><th>From right wall</th><th>From bottom wall</th><th>Faces</th><th>Fly through</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+</main>
+<div class="toast2" id="toast2" role="status"></div>
+
+<script type="module">
+import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
+import { HALL, RAILS, START, TIMING, TYPES, code, generate, rebuild, relayout, makeTrack, cleanEdits } from '/assets/trackgen.js';
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const FROM_KIOSK = params.get('from') === 'kiosk';
+$('lang').innerHTML = langSwitch();
+if (FROM_KIOSK) $('backBtn').hidden = false;
+$('backBtn').onclick = () => { location.href = '/kiosk'; };
+
+// ---------- state ----------
+let saved = { today: null, history: [] };     // from this PC
+let track = null;                             // what's shown: a built track
+let editing = false, picked = -1, undo = [];
+let level = 'full', mode = 'orbit', rideT = 0;
+const opts = { style: 'flowing', pieces: 15, rings: true, flags: true };
+const bases = new Map();                       // seed+opts → generated track (edits go on top)
+const baseOf = (seed, o) => {
+  const k = seed + JSON.stringify(o);
+  if (!bases.has(k)) bases.set(k, makeTrack(seed >>> 0, o));
+  return bases.get(k);
+};
+const toast = (msg) => { const t = $('toast2'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 3500); };
+
+// ---------- the kiosk gets itself back after a while untouched ----------
+if (FROM_KIOSK) {
+  let idle;
+  const arm = () => { clearTimeout(idle); idle = setTimeout(() => { location.href = '/kiosk'; }, editing ? 6 * 60_000 : 3 * 60_000); };
+  for (const ev of ['pointerdown', 'keydown', 'wheel']) addEventListener(ev, arm, { capture: true, passive: true });
+  arm();
+}
+
+// ---------- 3D ----------
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Hall (x across, y up the page, z up) to three.js (y up). The page's bottom wall faces the camera.
+const V = (x, y, z) => new THREE.Vector3(x - HALL.w / 2, z, HALL.l / 2 - y);
+let three = null;
+
+function setup3d() {
+  const stage = $('stage');
+  if (!window.THREE || !THREE.OrbitControls) { stage.insertAdjacentHTML('beforeend', `<div class="nogl">${tr('The 3D view could not start. The floor plan and set-up list still work.')}</div>`); return null; }
+  let renderer;
+  try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch { stage.insertAdjacentHTML('beforeend', `<div class="nogl">${tr('This browser can\'t show 3D. The floor plan and set-up list still work.')}</div>`); return null; }
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  stage.prepend(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050505);
+  scene.fog = new THREE.Fog(0x050505, 30, 60);
+  const camera = new THREE.PerspectiveCamera(50, 1, 0.03, 200);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true; controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 2; controls.maxDistance = 45;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 0.9));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(6, 12, 8); scene.add(sun);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALL.w, HALL.l), new THREE.MeshLambertMaterial({ color: 0x141414 }));
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  const grid = new THREE.GridHelper(HALL.l, HALL.l, 0x333333, 0x1f1f1f);
+  grid.scale.set(HALL.w / HALL.l, 1, 1); grid.position.y = 0.002; scene.add(grid);
+  const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(HALL.w, HALL.h, HALL.l)), new THREE.LineBasicMaterial({ color: 0x555555 }));
+  box.position.y = HALL.h / 2; scene.add(box);
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(HALL.w, HALL.h, HALL.l), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.025, side: THREE.BackSide }));
+  walls.position.y = HALL.h / 2; scene.add(walls);
+  const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  pad.rotation.x = -Math.PI / 2; pad.position.copy(V(START.x, START.y, 0.004)); scene.add(pad);
+  const padIn = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+  padIn.rotation.x = -Math.PI / 2; padIn.position.copy(V(START.x, START.y, 0.006)); scene.add(padIn);
+  { // the pilots stand outside the box, below the bottom wall, looking up the hall
+    const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+    const x = c.getContext('2d'); x.fillStyle = '#9a9a9a'; x.font = '800 64px "Big Shoulders", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(tr('▲ PILOTS ▲'), 256, 50);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.75), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true }));
+    sign.rotation.x = -Math.PI / 2; sign.position.copy(V(HALL.w / 2, -0.9, 0.01)); scene.add(sign);
+  }
+  // the three rails under the ceiling: pairs of cables the rings clip onto
+  const cableMat = new THREE.LineBasicMaterial({ color: 0x7fc8ff, transparent: true, opacity: 0.55 });
+  for (const x of RAILS) for (const dx of [-0.06, 0.06]) scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([V(x + dx, 0, HALL.h - 0.03), V(x + dx, HALL.l, HALL.h - 0.03)]), cableMat));
+  const group = new THREE.Group(); scene.add(group);
+  const whoop = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  scene.add(whoop);
+  // the next piece lights up: green from the side you fly in from, red from the wrong side
+  const gIn = new THREE.MeshBasicMaterial({ color: 0x4ade80 }), gOut = new THREE.MeshBasicMaterial({ color: 0xff3b30 });
+  const fillIn = new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.32, side: THREE.BackSide, depthWrite: false });
+  const fillOut = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.32, side: THREE.FrontSide, depthWrite: false });
+  const two = (outline, fill) => { // local +z = the way through
+    const g = new THREE.Group(), a = outline(gIn), b = outline(gOut);
+    a.position.z = -0.025; b.position.z = 0.025;
+    g.add(a, b, new THREE.Mesh(fill, fillIn), new THREE.Mesh(fill, fillOut));
+    return g;
+  };
+  const glow = new THREE.Group();
+  const glowSq = two((m) => frameMesh(0.5, 0.5, 0.04, m), new THREE.PlaneGeometry(0.5, 0.5));
+  const glowRing = two((m) => new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.03, 8, 40), m), new THREE.CircleGeometry(0.26, 40));
+  glow.add(glowSq, glowRing); glow.visible = false; scene.add(glow);
+  // the piece picked in the editor: an orange ring on the floor round it
+  const pick = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.6, 40), new THREE.MeshBasicMaterial({ color: 0xff6b00, side: THREE.DoubleSide }));
+  pick.rotation.x = -Math.PI / 2; pick.visible = false; scene.add(pick);
+  function resize() { const r = stage.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix(); }
+  new ResizeObserver(resize).observe(stage); resize();
+  let last = performance.now();
+  renderer.setAnimationLoop(() => {
+    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (track && track.curve) {
+      const speed = 4.5;                                      // m/s, a calm whoop
+      if (!reduceMotion || mode === 'ride') rideT = (rideT + (dt * speed) / track.cur.facts.length) % 1;
+      const p = track.curve.getPointAt(rideT);
+      whoop.position.copy(p);
+      const seq = track.seq || [];
+      if (seq.length) {
+        const sNow = rideT * track.cur.facts.length;
+        const e = seq.find((q) => q.s > sNow + 0.05) || seq[0];
+        glow.visible = true;
+        glow.position.copy(V(e.x, e.y, e.h));
+        glow.rotation.y = e.yaw;
+        glowRing.visible = e.type === 'ring'; glowSq.visible = !glowRing.visible;
+        glow.scale.setScalar((e.type === 'cube' ? 1.5 : 1.08) * (1 + 0.05 * Math.sin(now / 140)));
+      } else glow.visible = false;
+      if (mode === 'ride') {
+        const ahead = track.curve.getPointAt((rideT + 0.6 / track.cur.facts.length) % 1);
+        camera.position.copy(p).add(new THREE.Vector3(0, 0.14, 0));   // a little above the line, so it shows ahead
+        camera.lookAt(ahead.x, ahead.y + 0.08, ahead.z);
+        whoop.visible = false;
+      } else { whoop.visible = true; controls.update(); }
+      const pc = editing && picked >= 0 ? track.pieces[picked] : null;
+      pick.visible = !!pc && mode !== 'ride';
+      if (pc) pick.position.copy(V(pc.x, pc.y, 0.01));
+    } else { controls.update(); glow.visible = false; whoop.visible = false; pick.visible = false; }
+    renderer.render(scene, camera);
+  });
+  return { renderer, scene, camera, controls, group };
+}
+
+function frameMesh(w, h, t, mat) { // a square opening w × h, tube t thick, centred on the origin, facing +z
+  const g = new THREE.Group();
+  const add = (sx, sy, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, t), mat); m.position.set(x, y, 0); g.add(m); };
+  add(w + 2 * t, t, 0, h / 2 + t / 2); add(w + 2 * t, t, 0, -h / 2 - t / 2);
+  add(t, h, -w / 2 - t / 2, 0); add(t, h, w / 2 + t / 2, 0);
+  return g;
+}
+function draw3d(tr0) {
+  if (!three) return;
+  const { group } = three;
+  while (group.children.length) group.remove(group.children[0]);
+  if (!tr0) return;
+  const white = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const orange = new THREE.MeshLambertMaterial({ color: 0xff6b00 });
+  const green = new THREE.MeshLambertMaterial({ color: 0x22c55e });
+  const blue = new THREE.MeshLambertMaterial({ color: 0x7fc8ff });
+  const T = 0.03;
+  tr0.pieces.forEach((pc, i) => {
+    const pass = tr0.passes[i], obj = new THREE.Group();
+    const yaw = Math.atan2(pass.dx, -pass.dy); // turns the piece's +z to the way it is flown
+    if (pc.type === 'gate' || pc.type === 'timing') {
+      const f = frameMesh(0.5, 0.5, T, pc.type === 'timing' ? green : white); f.position.y = 0.25 + T; obj.add(f);
+    } else if (pc.type.startsWith('ladder')) {
+      const k = pc.type === 'ladder3' ? 3 : 5;
+      const flown = tr0.levels[level].passes[i].map((ps) => (ps.info && ps.info.stage != null ? ps.info.stage : -1));
+      for (let s = 0; s < k; s++) { const f = frameMesh(0.5, 0.5, T, flown.includes(s) ? orange : white); f.position.y = 0.25 + T + s * (0.5 + T); obj.add(f); }
+    } else if (pc.type === 'cube') {
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.7, 0.7, 0.7)), new THREE.LineBasicMaterial({ color: 0xffffff }));
+      e.position.y = 0.35; obj.add(e);
+      for (const [x, z] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]]) { const post2 = new THREE.Mesh(new THREE.BoxGeometry(T, 0.7, T), white); post2.position.set(x, 0.35, z); obj.add(post2); }
+    } else if (pc.type === 'flag') {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.9, 8), white); pole.position.y = 0.95; obj.add(pole);
+      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.9), new THREE.MeshLambertMaterial({ color: 0xff6b00, side: THREE.DoubleSide })); cloth.position.set(0.17, 1.4, 0); obj.add(cloth);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.04, 16), white); foot.position.y = 0.02; obj.add(foot);
+    } else if (pc.type === 'ring') {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.25 + 0.015, 0.018, 8, 40), blue); ring.position.y = pc.z; obj.add(ring);
+      const rope = new THREE.Mesh(new THREE.BoxGeometry(0.008, HALL.h - pc.z - 0.27, 0.008), new THREE.MeshBasicMaterial({ color: 0x888888 }));
+      rope.position.y = (HALL.h + pc.z + 0.27) / 2; obj.add(rope);
+    }
+    obj.position.copy(V(pc.x, pc.y, 0));
+    obj.rotation.y = yaw;
+    group.add(obj);
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const x = c.getContext('2d'); x.fillStyle = pc.type === 'timing' ? '#22c55e' : '#ff6b00'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill();
+    x.fillStyle = '#000'; x.font = '800 34px "Big Shoulders", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 34);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+    sp.scale.set(0.32, 0.32, 1);
+    sp.position.copy(V(pc.x, pc.y, Math.min(HALL.h - 0.05, TYPES[pc.type].zmax + 0.3)));
+    if (pc.type === 'ring') sp.position.y = pc.z - 0.45;
+    sp.userData.label = true; group.add(sp);
+  });
+  // the racing line, coloured low (orange) to high (light)
+  tr0.cur = tr0.levels[level];
+  const curve = new THREE.CatmullRomCurve3(tr0.cur.line.pts.filter((_, i) => i % 2 === 0).map((p) => V(p.x, p.y, p.z)), true, 'centripetal');
+  tr0.curve = curve;
+  const segs = Math.ceil(tr0.cur.facts.length * 8);
+  const tube = new THREE.TubeGeometry(curve, segs, 0.025, 6, true);
+  const cols = [], pos = tube.attributes.position, lo = new THREE.Color(0xff6b00), hi = new THREE.Color(0xffd6a8);
+  for (let i = 0; i < pos.count; i++) { const c = lo.clone().lerp(hi, Math.max(0, Math.min(1, pos.getY(i) / 3))); cols.push(c.r, c.g, c.b); }
+  tube.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  const tubeMesh = new THREE.Mesh(tube, new THREE.MeshBasicMaterial({ vertexColors: true })); tubeMesh.userData.line = true; group.add(tubeMesh);
+  // riding the line: a thinner line, half see-through
+  const thin = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, 0.011, 6, true), new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5, depthWrite: false }));
+  thin.geometry.setAttribute('color', tube.getAttribute('color').clone()); thin.userData.rideLine = true; thin.visible = mode === 'ride'; group.add(thin);
+  // the way in from the start to the timing gate (first lap only)
+  const lead = new THREE.CatmullRomCurve3([V(START.x, START.y, 0.05), V(START.x, START.y + 1.5, 0.35), V(TIMING.x, TIMING.y - 3, 0.3), V(TIMING.x, TIMING.y, 0.25)]);
+  const leadLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(lead.getPoints(60)), new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.25, gapSize: 0.18 }));
+  leadLine.computeLineDistances(); group.add(leadLine);
+  // every pass in flying order, for the light on the next piece
+  tr0.seq = [];
+  tr0.pieces.forEach((pc, i) => (tr0.cur.passes[i] || []).forEach((ps) => {
+    const st = ps.info && ps.info.stage != null ? ps.info.stage : pc.level || 0;
+    const h = pc.type === 'ring' ? pc.z : pc.type === 'cube' ? 0.35 : pc.type.startsWith('ladder') ? 0.25 + T + st * (0.5 + T) : 0.25 + T;
+    tr0.seq.push({ s: ps.s, type: pc.type, x: pc.x, y: pc.y, h, yaw: Math.atan2(ps.dx, -ps.dy) });
+  }));
+  tr0.seq.sort((a, b) => a.s - b.s);
+  setView(mode, true);
+}
+function setView(m, keepCamera) {
+  const changed = m !== mode;
+  mode = m;
+  if (three) three.group.children.forEach((o) => { if (o.userData.line || o.userData.label) o.visible = m !== 'ride'; if (o.userData.rideLine) o.visible = m === 'ride'; });
+  if (three) { three.camera.fov = m === 'ride' ? 78 : 50; three.camera.updateProjectionMatrix(); }
+  for (const [id, v] of [['viewOrbit', 'orbit'], ['viewRide', 'ride'], ['viewTop', 'top']]) $(id).setAttribute('aria-pressed', String(m === v));
+  $('help').textContent = m === 'ride' ? tr('Riding the racing line · the next piece lights up: green on the side you fly in, red on the wrong side') : tr('Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move');
+  if (!three) return;
+  const { camera, controls } = three;
+  controls.enabled = m !== 'ride';
+  if (keepCamera && !changed) return;
+  if (m === 'orbit') { camera.position.set(11, 10, 23); controls.target.set(0, 0.6, 1.5); }
+  if (m === 'top') { camera.position.set(0, 30, 0.01); controls.target.set(0, 0, 0); }
+  camera.up.set(0, 1, 0);
+  controls.update();
+}
+
+// ---------- floor plan (portrait, like an A4 page) ----------
+const S = 22, P = 18;
+const px = (p) => P + p.x * S, py = (p) => P + (HALL.l - p.y) * S;
+function planSvg(t) {
+  const W = P * 2 + HALL.w * S, H = P * 2 + HALL.l * S + 22;
+  let g = `<rect x="${P}" y="${P}" width="${HALL.w * S}" height="${HALL.l * S}" fill="#0b0b0b" stroke="#555" stroke-width="2"/>`;
+  for (let x = 1; x < HALL.w; x++) g += `<line x1="${px({ x })}" x2="${px({ x })}" y1="${P}" y2="${P + HALL.l * S}" stroke="${x % 5 ? '#161616' : '#262626'}"/>`;
+  for (let y = 1; y < HALL.l; y++) g += `<line y1="${py({ y })}" y2="${py({ y })}" x1="${P}" x2="${P + HALL.w * S}" stroke="${y % 5 ? '#161616' : '#262626'}"/>`;
+  for (const x of RAILS) g += `<line x1="${px({ x })}" x2="${px({ x })}" y1="${P}" y2="${P + HALL.l * S}" stroke="#7fc8ff" stroke-opacity=".35" stroke-dasharray="2 5"/>`;
+  if (t) {
+    let d = '';
+    t.levels[level].line.pts.forEach((p, i) => { d += `${i ? 'L' : 'M'}${px(p).toFixed(1)},${py(p).toFixed(1)}`; });
+    g += `<path d="${d}Z" fill="none" stroke="#ff6b00" stroke-width="2.4" stroke-linejoin="round"/>`;
+  }
+  g += `<path d="M${px(START)},${py(START)} L${px(START)},${py({ y: START.y + 1.5 })} L${px(TIMING)},${py({ y: TIMING.y - 3 })} L${px(TIMING)},${py(TIMING)}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+  g += `<rect x="${px(START) - 8}" y="${py(START) - 8}" width="16" height="16" fill="none" stroke="#fff" stroke-width="2"/><text x="${px(START) - 12}" y="${py(START) + 4}" text-anchor="end" fill="#fff" font-size="11" font-family="var(--display)" font-weight="800">START</text>`;
+  if (t) {
+    for (const is of editing ? t.issues : []) g += `<circle cx="${px(is)}" cy="${py(is)}" r="11" fill="none" stroke="#ff3b30" stroke-width="2.5" stroke-dasharray="4 3"/>`;
+    t.pieces.forEach((pc, i) => {
+      const pass = t.passes[i], ang = Math.atan2(pass.dx, pass.dy) * 180 / Math.PI;
+      const col = pc.type === 'timing' ? '#22c55e' : pc.type === 'ring' ? '#7fc8ff' : '#fff';
+      const w = (pc.type === 'cube' ? 0.7 : 0.55) * S;
+      const shape = pc.type === 'flag' ? `<g transform="rotate(${-ang})"><line x1="0" y1="0" x2="0" y2="-14" stroke="#fff" stroke-width="1.6"/><path d="M0,-14 L9,-11 L0,-8 Z" fill="#ff6b00"/><circle r="2.2" fill="#fff"/></g>`
+        : pc.type === 'cube' ? `<rect x="${-w / 2}" y="${-w / 2}" width="${w}" height="${w}" fill="none" stroke="${col}" stroke-width="2"/>`
+        : pc.type === 'ring' ? `<ellipse rx="${w / 2}" ry="3" fill="none" stroke="${col}" stroke-width="2"/>`
+        : `<line x1="${-w / 2}" x2="${w / 2}" y1="0" y2="0" stroke="${col}" stroke-width="${pc.type.startsWith('ladder') ? 6 : 4}" stroke-linecap="round"/>`;
+      if (editing && i === picked) g += `<circle cx="${px(pc)}" cy="${py(pc)}" r="15" fill="rgba(255,107,0,.18)" stroke="#ff6b00" stroke-width="2"/>`;
+      g += `<g transform="translate(${px(pc)},${py(pc)}) rotate(${ang})">${shape}</g>`;
+      g += `<g transform="translate(${px(pc) + 12},${py(pc) - 12})"><circle r="8.5" fill="${pc.type === 'timing' ? '#22c55e' : '#ff6b00'}"/><text text-anchor="middle" dy="4" font-size="11" font-weight="800" font-family="var(--display)" fill="#000">${i + 1}</text></g>`;
+    });
+  }
+  g += `<text x="${P + HALL.w * S / 2}" y="${P + HALL.l * S + 26}" text-anchor="middle" fill="#9a9a9a" font-size="12" letter-spacing="2" font-family="var(--display)" font-weight="800">▲ PILOTS ▲</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Floor plan">${g}</svg>`;
+}
+
+// ---------- set-up list ----------
+const LABEL = { timing: 'Timing gate', gate: 'Gate', cube: 'Cube', ring: 'Ring', ladder3: 'Ladder ×3', ladder5: 'Ladder ×5', flag: 'Flag' };
+// directions in the set-up list ('left' alone means something else elsewhere in the Estonian texts)
+const FACES_ET = { up: 'üles', down: 'alla', left: 'vasakule', right: 'paremale', 'up-right': 'üles paremale', 'up-left': 'üles vasakule', 'down-right': 'alla paremale', 'down-left': 'alla vasakule' };
+const faceWord = (w) => (LANG === 'et' ? FACES_ET[w] : w);
+function faces(pass) {
+  const deg = Math.round(Math.atan2(pass.dx, pass.dy) * 180 / Math.PI); // 0 = up the page, + = toward the right wall
+  const w = Math.abs(deg) <= 22 ? 'up' : Math.abs(deg) >= 158 ? 'down' : deg > 0 ? (deg < 68 ? 'up-right' : deg > 112 ? 'down-right' : 'right') : (deg > -68 ? 'up-left' : deg < -112 ? 'down-left' : 'left');
+  return { deg, w };
+}
+function through(pc, ps) {
+  const n = ps.length;
+  if (pc.type === 'flag') return tr('turn round it');
+  if (!n) return pc.type === 'ring' ? tr('left out at this level') : tr('fly past it at this level');
+  if (pc.type.startsWith('ladder')) {
+    const st = ps.map((p) => p.info.stage + 1), of = pc.type === 'ladder3' ? 3 : 5;
+    return n > 1 ? tr(st[1] > st[0] ? 'climb: stages {a} → {b}, each one' : 'down: stages {a} → {b}, each one', { a: st[0], b: st[n - 1] }) : tr('stage {a} of {b}', { a: st[0], b: of });
+  }
+  if (pc.type === 'cube') return pc.trick === 'up' && ps.length ? tr('through it, then up to the ring') : tr('straight through');
+  if (pc.type === 'ring') return pc.trick === 'loop' ? tr('up from the cube') : tr('ceiling hairpin');
+  if (pc.type === 'timing') return tr('start and finish of every lap');
+  return tr('floor gate');
+}
+function trickChip(t) {
+  const Ps = t.levels[level].passes, c = (f) => t.pieces.filter((p, i) => f(p, Ps[i].length)).length;
+  const parts = [];
+  const up = c((p, n) => p.trick === 'loop' && n), cl = c((p, n) => p.type.startsWith('ladder') && n > 1), hp = c((p, n) => p.trick === 'hairpin' && n) ? 1 : 0, fl = c((p) => p.type === 'flag');
+  if (up) parts.push(tr('{n} cube to ceiling', { n: up }));
+  if (cl) parts.push(tr(cl > 1 ? '{n} ladder climbs' : '{n} ladder climb', { n: cl }));
+  if (hp) parts.push(tr('ceiling hairpin'));
+  if (fl) parts.push(tr(fl > 1 ? '{n} flag turns' : '{n} flag turn', { n: fl }));
+  return parts.length ? `<span class="chip"><span>${tr('Tricks')}</span><b>${parts.join(' · ')}</b></span>` : '';
+}
+function renderSheet() {
+  $('plan').innerHTML = planSvg(track);
+  if (!track) { $('rows').innerHTML = ''; $('chips').innerHTML = ''; $('code').textContent = ''; return; }
+  const t = track;
+  $('code').textContent = `${code(t.seed)} · ${tr(t.opts.style === 'technical' ? 'Technical' : 'Flowing')}${Object.keys(t.edits || {}).length ? ' · ' + tr('tuned by hand') : ''}`;
+  $('rows').innerHTML = t.pieces.map((pc, i) => {
+    const f = faces(t.passes[i]);
+    return `<tr data-row="${i}" class="${editing && i === picked ? 'picked' : ''}"><td><span class="passno${pc.type === 'timing' ? ' t' : ''}">${i + 1}</span></td><td>${tr(LABEL[pc.type])}</td>
+      <td class="num">${(HALL.w - pc.x).toFixed(1)} m</td><td class="num">${pc.y.toFixed(1)} m</td>
+      <td data-no-i18n>${pc.type === 'flag' ? '—' : `<span style="display:inline-block;color:var(--accent);transform:rotate(${f.deg}deg)">↑</span> ${faceWord(f.w)}${pc.type === 'cube' ? ' ' + tr('(corner first)') : ''}`}</td><td>${through(pc, t.levels[level].passes[i])}</td></tr>`;
+  }).join('');
+  const cur = t.levels[level], zs = cur.line.pts.map((p) => p.z);
+  const pieces = t.pieces.filter((p) => p.type !== 'timing' && p.type !== 'flag').length;
+  $('chips').innerHTML = `<span class="chip"><span>${tr('Lap length')}</span><b>${cur.facts.length.toFixed(0)} m</b></span>`
+    + `<span class="chip"><span>${tr('Pieces')}</span><b>${pieces}</b><span>${tr(t.pieces.some((p) => p.type === 'flag') ? '+ timing gate + flags' : '+ timing gate')}</span></span>`
+    + `<span class="chip"><span>${tr('Height')}</span><b>${Math.min(...zs).toFixed(1)}–${Math.max(...zs).toFixed(1)} m</b></span>${trickChip(t)}`;
+  // what breaks a rule (edited by hand only: generated tracks keep every rule)
+  const box = $('issues');
+  box.hidden = !editing;
+  if (editing) box.innerHTML = t.issues.length
+    ? `<ul>${t.issues.map((i) => `<li>${esc(tr(i.text))}${i.level === 'easy' ? ' ' + esc(tr('(Beginner line)')) : ''}</li>`).join('')}</ul>`
+    : `<p class="ok">${tr('The track keeps every rule.')}</p>`;
+}
+function renderSel() {
+  if (!editing) return;
+  const pc = track && picked >= 0 ? track.pieces[picked] : null;
+  if (!pc || pc.type === 'timing') {
+    $('sel').innerHTML = `<span class="muted">${tr(pc ? 'The timing gate stays where it is.' : 'Drag a piece on the floor plan to move it, tap it to turn it.')}</span>`
+      + `<button type="button" class="tb" data-undo ${undo.length ? '' : 'disabled'}>${tr('Undo')}</button>`;
+    return;
+  }
+  const step = pc.type === 'ring' ? 90 : 15;
+  $('sel').innerHTML = `<span class="name">${picked + 1} · ${tr(LABEL[pc.type])}</span>`
+    + `<button type="button" class="tb" data-rot="${-step}" aria-label="Turn left">⟲ ${step}°</button><button type="button" class="tb" data-rot="${step}" aria-label="Turn right">⟳ ${step}°</button>`
+    + `<button type="button" class="tb" data-nudge="-0.1,0" aria-label="Left 10 cm">←</button><button type="button" class="tb" data-nudge="0,0.1" aria-label="Up 10 cm">↑</button><button type="button" class="tb" data-nudge="0,-0.1" aria-label="Down 10 cm">↓</button><button type="button" class="tb" data-nudge="0.1,0" aria-label="Right 10 cm">→</button>`
+    + `<button type="button" class="tb" data-reset>${tr('Put back')}</button>`
+    + `<button type="button" class="tb" data-undo ${undo.length ? '' : 'disabled'}>${tr('Undo')}</button>`;
+}
+function show(t, { keep3d = false } = {}) {
+  track = t;
+  renderSheet();
+  renderSel();
+  if (!keep3d) draw3d(track);
+  $('stage').querySelector('.empty')?.remove();
+  if (!track && !editing) $('stage').insertAdjacentHTML('beforeend', `<div class="empty"><div><b>${tr('No track set up yet')}</b>${tr('Press Edit track to make one.')}</div></div>`);
+}
+
+// ---------- today's track from this PC ----------
+async function loadSaved() {
+  try { saved = await (await fetch('/api/track', { cache: 'no-store' })).json(); } catch { saved = { today: null, history: [] }; }
+  const h = saved.history || [];
+  $('historyField').hidden = !h.length;
+  const when = (s) => { const d = new Date(s.savedAt); return `${d.getDate()}.${d.getMonth() + 1}. ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  $('history').innerHTML = `<option value="">${tr('Pick one…')}</option>` + h.map((s, i) => `<option value="${i}">${esc(when(s))} · ${esc(s.code || code(s.seed))}</option>`).join('');
+}
+function showToday() {
+  const t = saved.today ? rebuild(saved.today) : null;
+  if (saved.today && !t) toast(tr('Today\'s track could not be built again.'));
+  show(t);
+}
+
+// ---------- editing ----------
+function current() { return track ? { seed: track.seed, opts: { ...track.opts }, edits: { ...(track.edits || {}) } } : null; }
+function remember() { const c = current(); if (c) { undo.push(c); if (undo.length > 60) undo.shift(); } }
+function apply(c, o = {}) {
+  const base = baseOf(c.seed, c.opts);
+  show(base ? relayout(base, c.edits) : null, o);
+}
+function setEditing(on) {
+  editing = on;
+  document.body.classList.toggle('editing', on);
+  $('ctrl').hidden = !on;
+  $('editBtn').hidden = on;
+  $('saveBtn').hidden = !on;
+  $('cancelBtn').hidden = !on;
+  $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
+  $('planTitle').textContent = tr(on ? 'Floor plan · drag to move, tap to turn' : 'Floor plan');
+  picked = -1; undo = [];
+  if (on && track) { Object.assign(opts, track.opts); syncControls(); }
+  if (on && !track) runGenerate();
+  else show(track, { keep3d: true });
+}
+function syncControls() {
+  for (const [id, v] of [['style', opts.style], ['ceiling', opts.rings ? 'yes' : 'no'], ['flags', opts.flags ? 'yes' : 'no']]) $(id).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  $('pieces').max = opts.rings ? 15 : 10;
+  $('pieces').value = Math.min(opts.pieces, Number($('pieces').max));
+  opts.pieces = Number($('pieces').value);
+  $('piecesLabel').textContent = tr('Pieces to set up: {n}', { n: opts.pieces });
+}
+function runGenerate() {
+  $('genBtn').disabled = true; $('genBtn').textContent = tr('Making a track…');
+  setTimeout(() => {
+    const r = generate({ ...opts }, { ms: 4000 });
+    $('genBtn').disabled = false; $('genBtn').textContent = tr('Generate track');
+    if (!r.best) { toast(tr('No track passed every rule. Try fewer pieces or the Technical style.')); return; }
+    remember();
+    bases.set(r.best.seed + JSON.stringify(r.best.opts), r.best);
+    picked = -1;
+    show(relayout(r.best, {}));
+  }, 30);
+}
+function changeEdit(i, f) {
+  if (!track || i < 0) return;
+  remember();
+  const c = current(), e = { dx: 0, dy: 0, rot: 0, ...(c.edits[i] || {}) };
+  f(e);
+  c.edits[i] = e;
+  c.edits = cleanEdits(c.edits, baseOf(c.seed, c.opts).pieces);
+  apply(c);
+}
+
+$('editBtn').onclick = () => setEditing(true);
+$('cancelBtn').onclick = () => { setEditing(false); showToday(); };
+$('saveBtn').onclick = async () => {
+  if (!track) return;
+  const c = current();
+  try {
+    await post('/api/track/save', { track: { ...c, code: code(c.seed) }, from: FROM_KIOSK ? 'kiosk' : 'page' });
+    await loadSaved();
+    setEditing(false);
+    showToday();
+    toast(tr('Saved. This is today\'s track now.'));
+  } catch (err) { toast(err.message); }
+};
+$('genBtn').onclick = runGenerate;
+$('history').onchange = () => {
+  const s = saved.history[Number($('history').value)];
+  $('history').value = '';
+  if (!s) return;
+  remember(); picked = -1;
+  Object.assign(opts, s.opts); syncControls();
+  apply({ seed: s.seed, opts: s.opts, edits: s.edits || {} });
+};
+for (const id of ['style', 'ceiling', 'flags']) $(id).addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (id === 'style') opts.style = b.dataset.v; else if (id === 'flags') opts.flags = b.dataset.v === 'yes'; else opts.rings = b.dataset.v === 'yes';
+  syncControls();
+});
+$('pieces').addEventListener('input', () => { opts.pieces = Number($('pieces').value); syncControls(); });
+$('sel').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.undo != null) { const c = undo.pop(); if (c) { Object.assign(opts, c.opts); syncControls(); apply(c); } return; }
+  if (b.dataset.rot) return changeEdit(picked, (x) => { x.rot = (((x.rot + Number(b.dataset.rot)) % 360) + 360) % 360; });
+  if (b.dataset.nudge) { const [dx, dy] = b.dataset.nudge.split(',').map(Number); return changeEdit(picked, (x) => { x.dx += dx; x.dy += dy; }); }
+  if (b.dataset.reset != null) return changeEdit(picked, (x) => { x.dx = 0; x.dy = 0; x.rot = 0; });
+});
+$('rows').addEventListener('click', (e) => {
+  const r = e.target.closest('[data-row]'); if (!r || !editing) return;
+  picked = Number(r.dataset.row); renderSheet(); renderSel();
+});
+
+// drag on the floor plan (finger or mouse); a tap without moving turns the piece
+let drag = null;
+const toHall = (ev) => {
+  const svg = $('plan').querySelector('svg'), pt = svg.createSVGPoint();
+  pt.x = ev.clientX; pt.y = ev.clientY;
+  const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+  return { x: (q.x - P) / S, y: HALL.l - (q.y - P) / S };
+};
+$('plan').addEventListener('pointerdown', (ev) => {
+  if (!editing || !track) return;
+  const h = toHall(ev);
+  let best = -1, bd = 0.9;
+  track.pieces.forEach((pc, i) => { const d = Math.hypot(pc.x - h.x, pc.y - h.y); if (d < bd) { bd = d; best = i; } });
+  if (best < 0) { picked = -1; renderSheet(); renderSel(); return; }
+  const wasPicked = picked === best;
+  picked = best;
+  ev.preventDefault();
+  $('plan').setPointerCapture(ev.pointerId);
+  const c = current();
+  drag = { i: best, start: h, from: { dx: 0, dy: 0, rot: 0, ...(c.edits[best] || {}) }, moved: false, wasPicked, before: c };
+  renderSheet(); renderSel();
+});
+let dragFrame = 0;
+$('plan').addEventListener('pointermove', (ev) => {
+  if (!drag || track.pieces[drag.i].type === 'timing') return;
+  const h = toHall(ev), dx = Math.round((h.x - drag.start.x) * 10) / 10, dy = Math.round((h.y - drag.start.y) * 10) / 10;
+  if (!drag.moved && Math.hypot(dx, dy) < 0.15) return;
+  drag.moved = true;
+  if (dragFrame) return;
+  dragFrame = requestAnimationFrame(() => {
+    dragFrame = 0;
+    if (!drag) return;
+    const c = { ...drag.before, edits: { ...drag.before.edits, [drag.i]: { ...drag.from, dx: drag.from.dx + dx, dy: drag.from.dy + dy } } };
+    c.edits = cleanEdits(c.edits, baseOf(c.seed, c.opts).pieces);
+    apply(c, { keep3d: true });                              // the plan follows the finger; 3D on letting go
+  });
+});
+const endDrag = () => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved) { undo.push(d.before); draw3d(track); renderSel(); return; }
+  if (d.wasPicked && track.pieces[d.i].type !== 'timing') changeEdit(d.i, (x) => { x.rot = (x.rot + (track.pieces[d.i].type === 'ring' ? 90 : 15)) % 360; });
+};
+$('plan').addEventListener('pointerup', endDrag);
+$('plan').addEventListener('pointercancel', endDrag);
+
+// ---------- views ----------
+$('viewOrbit').onclick = () => setView('orbit');
+$('viewTop').onclick = () => setView('top');
+$('viewRide').onclick = () => setView('ride');
+$('level').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
+  level = b.dataset.v;
+  for (const x of $('level').querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+  show(track);
+});
+
+three = setup3d();
+setView('orbit');
+await loadSaved();
+showToday();
+if (params.get('edit') != null) setEditing(true);
+</script>
+</body>
+</html>

@@ -15,6 +15,7 @@ import { closeOldWindows, firewallAllow, firewallStatus, keepAwake, openBigScree
 import { install, latest, tidy, why } from './update.ts';
 import { VERSION } from './version.ts';
 import { Engine, EngineError } from './engine.ts';
+import { TrackStore } from './tracks.ts';
 import { load, saver } from './store.ts';
 import { RotorHazardLink } from './rotorhazard.ts';
 import { Outbox } from './outbox.ts';
@@ -63,6 +64,9 @@ function rememberPhoto(id: string) {
  * Each pilot's usual channel, remembered by name (data/known.json), so the kiosk can offer
  * it first next time: most pilots fly the same channel every week.
  */
+/** Today's track for the hall (web/track.html, server/tracks.ts): data/track.json. */
+const tracks = new TrackStore(join(resolve(DATA_FILE, '..'), 'track.json'));
+
 const KNOWN_FILE = join(resolve(DATA_FILE, '..'), 'known.json');
 const known: Record<string, { channel?: string; club?: boolean }> = (() => {
   try { return JSON.parse(readFileSync(KNOWN_FILE, 'utf8')); } catch { return {}; }
@@ -287,6 +291,7 @@ const PAGES: Record<string, string> = {
   '/screen': 'screen.html',
   '/mobile': 'mobile.html',
   '/me': 'me.html',
+  '/track': 'track.html',
 };
 
 const TYPES: Record<string, string> = {
@@ -321,6 +326,7 @@ function json(res: ServerResponse, status: number, body: unknown) {
 type Handler = (body: any) => unknown;
 
 const API: Record<string, Handler> = {
+  '/api/track/save': (b) => tracks.save(b),
   '/api/action': (b) => engine.action(String(b.type), Date.now()),
   '/api/join': (b) => {
     const pilot = engine.join(b.name, Number(b.heat), Number(b.slot));
@@ -490,6 +496,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     }
     return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
+  // Today's track and the ten before it (the track page builds them with web/assets/trackgen.js).
+  if (path === '/api/track' && req.method === 'GET') return json(res, 200, tracks.data);
   if (path === '/api/kiosk/restart' && req.method === 'POST') {
     kioskRestartAt = Date.now();
     stateDirty = true;

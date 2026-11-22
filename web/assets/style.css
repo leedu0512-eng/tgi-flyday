@@ -987,7 +987,9 @@ body.dragging .slot, body.dragging .club-row:not(.broken), body.dragging .club-o
 .lang-sw button, .kiosk .lang-sw button, .me .lang-sw button, .m .lang-sw button { all: unset; box-sizing: border-box; display: inline-block; min-height: 0; width: auto; background: transparent; color: var(--muted); border: 0; padding: 5px 9px; font: 600 13px/1 'Big Shoulders Display', sans-serif; letter-spacing: .06em; cursor: pointer; }
 .lang-sw button.on, .kiosk .lang-sw button.on, .me .lang-sw button.on, .m .lang-sw button.on { background: #FF6B00; color: #000; }
 .kiosk .lang-sw.lg button { padding: 12px 20px; font-size: 22px; }
-.kiosk-lang { display: flex; justify-content: center; margin-top: 4vh; }
+.kiosk-lang { display: flex; justify-content: center; align-items: center; gap: 24px; margin-top: 4vh; }
+/* Today's track (track.html), under the kiosk's big buttons */
+.kiosk-track { font: 800 22px/1 'Big Shoulders', sans-serif; letter-spacing: .06em; text-transform: uppercase; padding: 14px 22px; text-decoration: none; color: var(--text); border-color: var(--accent); }
 .pb-head .lang-sw button { font-size: calc(1.9 * var(--u)); padding: calc(0.8 * var(--u)) calc(1.2 * var(--u)); }
 
 /* ---- TrackDay screen: clock + week calendar, both QR codes; thank-you screen (screen.html) ---- */

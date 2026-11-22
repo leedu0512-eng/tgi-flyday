@@ -86,7 +86,7 @@ function homeView() {
       <button class="big" data-flow="move">Change channel<small>Move to another channel or heat</small></button>
       <button class="big" data-go="leave">Going home<small>Free up your slot</small></button>
     </div>
-    ${EMBED ? '' : `<div class="kiosk-lang">${langSwitch('lg')}</div><h1 style="margin-top:6vh">Heats</h1>${board(false)}`}`;
+    ${EMBED ? '' : `<div class="kiosk-lang"><a class="btn kiosk-track" href="/track?from=kiosk">Today's track</a>${langSwitch('lg')}</div><h1 style="margin-top:6vh">Heats</h1>${board(false)}`}`;
 }
 
 function nameView() {
