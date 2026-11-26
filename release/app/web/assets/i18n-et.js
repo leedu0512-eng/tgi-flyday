@@ -727,6 +727,7 @@ export const ET = {
   'Track settings': 'Raja seaded',
   'Add from the kit': 'Lisa komplektist',
   'Our kit': 'Meie komplekt',
+  '{n} pieces fit in this hall with these settings, not {m}.': 'Nende sätetega mahub sellesse saali {n} elementi, mitte {m}.',
   'Save our kit': 'Salvesta komplekt',
   'Saved. New tracks are made from this kit.': 'Salvestatud. Uued rajad tehakse sellest komplektist.',
   'Fewer': 'Vähem',

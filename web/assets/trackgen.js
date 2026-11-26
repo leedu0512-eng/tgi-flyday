@@ -21,9 +21,12 @@ export const HEX_PITCH = HEX_H + 2 * HEX.tube;               // stage to stage: 
 // per ladder: its stages' shape, inside width and height, stage to stage
 export const LADDER = {
   ladder3: { shape: 'ring', w: OPEN, h: OPEN, tube: 0.03, pitch: OPEN + 2 * 0.03 },
-  ladder5: { shape: 'hex', w: HEX.inside, h: HEX_H, tube: HEX.tube, pitch: HEX_PITCH },
+  // the tall one hangs from the ceiling cables like the rings (Janno 26.11.2026): its top 20 cm under the ribs
+  ladder5: { shape: 'hex', w: HEX.inside, h: HEX_H, tube: HEX.tube, pitch: HEX_PITCH, hang: true },
 };
-const stages = (type, n) => { const L = LADDER[type]; return Array.from({ length: n }, (_, i) => Math.round((L.tube + L.h / 2 + i * L.pitch) * 1000) / 1000); };
+const HANG_TOP = HALL.h - 0.2;
+const stages = (type, n) => { const L = LADDER[type]; return Array.from({ length: n }, (_, i) => Math.round((L.hang ? HANG_TOP - (n - 1 - i) * L.pitch - L.tube - L.h / 2 : L.tube + L.h / 2 + i * L.pitch) * 1000) / 1000); };
+export const onRail = (type) => type === 'ring' || !!LADDER[type]?.hang;   // hangs from a ceiling cable
 export const RING_Z = HALL.h - 0.2 - OPEN / 2;            // ring centre: 20 cm below the ceiling
 // Rings clip onto three rails under the ceiling (pairs of cables), hung along a rail or across it
 // (Janno 22.11.2026). Assumed: running the length of the hall, evenly across it.
@@ -36,7 +39,7 @@ export const TYPES = {
   cube:    { label: 'Cube',        zmin: 0, zmax: 0.74, r: 0.55, levels: [0.35] },
   ring:    { label: 'Ring',        zmin: RING_Z - OPEN / 2 - 0.05, zmax: HALL.h, r: OPEN / 2 + 0.06, levels: [RING_Z] },
   ladder3: { label: 'Ladder ×3',   zmin: 0, zmax: 3 * (OPEN + 0.06), r: OPEN / 2 + 0.12, levels: stages('ladder3', 3) },
-  ladder5: { label: 'Ladder ×5',   zmin: 0, zmax: 5 * HEX_PITCH, r: HEX.inside / 2 + 0.12, levels: stages('ladder5', 5) },
+  ladder5: { label: 'Ladder ×5',   zmin: HANG_TOP - 5 * HEX_PITCH, zmax: HALL.h, r: HEX.inside / 2 + 0.12, levels: stages('ladder5', 5) },
   flag:    { label: 'Flag',        zmin: 0, zmax: 1.9,  r: 0.3,  levels: [0] },
 };
 // The club's kit (Janno 26.11.2026: editable). A track's opts.kit says what it was made from; none =
@@ -96,14 +99,16 @@ function trickLadder(type, st, rand, wantUp, once) {
   let stages = type === 'ladder3' ? [0, 1, 2] : st.climb5 === 5 ? [0, 1, 2, 3, 4] : (() => { const a = Math.floor(rand() * 3); return [a, a + 1, a + 2]; })();
   if (once === true || once === type) stages = [type === 'ladder5' ? 2 + Math.floor(rand() * 3) : 1 + Math.floor(rand() * 2)];
   if (!wantUp) stages = stages.slice().reverse();
-  const zone = 'L' + type;
-  const route = (sts) => [{ f: -0.6, l: 0, z: lv[sts[0]], zone }, ...sts.map((sIdx, j) => ({ f: 0, l: 0, z: lv[sIdx], zone,
-    pass: { local: 0, stage: sIdx, dir: { f: 1, l: 0 }, orbit: j < sts.length - 1 ? st.orbit : 0 } })), { f: 0.6, l: 0, z: lv[sts[sts.length - 1]], zone }];
+  const zone = 'L' + type, hang = LADDER[type].hang;
+  // a hanging ladder: on the nearest cable (along it on the long sides, across it at the ends)
+  const at = (f) => (hang ? { f, railK: 0, dl: 0, hangRail: true } : { f, l: 0 });
+  const route = (sts) => [{ ...at(-0.6), z: lv[sts[0]], zone }, ...sts.map((sIdx, j) => ({ ...at(0), z: lv[sIdx], zone,
+    pass: { local: 0, stage: sIdx, dir: { f: 1, l: 0 }, orbit: j < sts.length - 1 ? st.orbit : 0 } })), { ...at(0.6), z: lv[sts[sts.length - 1]], zone }];
   const anchors = route(stages);
   // easier ways round the same ladder: three stages instead of five, or straight through the bottom stage
   const levels = stages.length > 1 ? { mid: stages.length > 3 ? route(stages.slice(0, 3)) : undefined, easy: route([0]) } : {};
-  return { anchors, before: 1.1, after: 1.1, inward: 2 * st.orbit + 0.2, entryZ: lv[stages[0]], exitZ: lv[stages[stages.length - 1]],
-    pieces: [{ type, stages, trick: stages.length > 1 ? (wantUp ? 'climb' : 'descend') : 'once', at: { f: 0, l: 0 }, z: lv[stages[0]] }], levels };
+  return { anchors, before: hang ? 1.4 : 1.1, after: hang ? 1.4 : 1.1, inward: (hang ? 1.5 : 0) + 2 * st.orbit + 0.2, entryZ: lv[stages[0]], exitZ: lv[stages[stages.length - 1]],
+    pieces: [{ type, stages, trick: stages.length > 1 ? (wantUp ? 'climb' : 'descend') : 'once', at: at(0), z: lv[stages[0]] }], levels, railSnap: hang };
 }
 // The line never crosses itself (Janno 22.11.2026: a midair collision waiting to happen), so a
 // cube is flown through once: on its own, or as the way up to a ring on the far rail, carrying on
@@ -224,6 +229,11 @@ function makeTrack1(seed, opts, once) {
         // the last stretch before the timing gate stays clear and straight
         if (leg.i === LEGS.length - 1 && want + it.after > leg.u1 - 1.6) return null;
         ok = true;
+        if (it.railSnap && leg.hx) { // across the hall: slide along to where a cable crosses the line
+          const w = RAILS.map((r) => leg.u0 + (r - leg.ax) / leg.hx).filter((v) => v >= want && v - it.before >= leg.u0 + 0.7 && v + it.after <= leg.u1 - 0.7).sort((a, b) => a - b)[0];
+          if (w != null) want = w;
+          else { ok = false; const next = LEGS.find((l) => l.kind === 'straight' && l.u0 > leg.u0); if (!next) return null; want = next.u0 + 0.7 + it.before; }
+        }
       } else {
         const next = LEGS.find((l) => l.kind === 'straight' && l.u0 > want - (leg ? 0 : 0) && l !== leg && l.u0 >= (leg ? leg.u0 : 0));
         if (!next) return null;
@@ -252,7 +262,7 @@ function makeTrack1(seed, opts, once) {
     if (pi < placed.length && uu >= placed[pi].u - placed[pi].before - 0.3) {
       const p = placed[pi], B = basePoint(p.u), nx = -B.hy, ny = B.hx;
       const railL = (k) => RAILS.map((x) => Math.abs(x - B.x)).sort((p, q) => p - q)[k];
-      const map = (a) => { const l = a.railK != null ? railL(a.railK) + (a.dl || 0) : a.l; return { x: B.x + a.f * B.hx + l * nx, y: B.y + a.f * B.hy + l * ny }; };
+      const map = (a) => { const l = a.railK != null && !(a.hangRail && B.hx) ? railL(a.railK) + (a.dl || 0) : (a.l || 0); return { x: B.x + a.f * B.hx + l * nx, y: B.y + a.f * B.hy + l * ny }; };
       const base = pieces.length;
       for (const pc of p.pieces || []) { const c = map(pc.at); pieces.push({ ...pc, x: c.x, y: c.y, passes: [], level: pc.stages ? pc.stages[0] : 0 }); }
       if (p.flag) { const c = map(p.flag); flagsOut.push({ type: 'flag', x: c.x, y: c.y, z: 0, passes: [], trick: 'around' }); }
@@ -443,7 +453,7 @@ function check(pieces, line, st) {
   }
   for (let i = 0; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n], h = Math.hypot(b.x - a.x, b.y - a.y); if (h > 1e-6 && Math.abs(b.z - a.z) / h > 1.0) return null; }
   // every ring hangs on a rail, flown along it or across it
-  for (const pc of pieces) if (pc.type === 'ring') {
+  for (const pc of pieces) if (onRail(pc.type)) {
     if (!RAILS.some((x) => Math.abs(pc.x - x) < 0.06)) return null;
     for (const ps of pc.passes) if (Math.min(Math.abs(ps.dx), Math.abs(ps.dy)) > Math.sin(12 * Math.PI / 180)) return null;
   }
@@ -487,13 +497,17 @@ function score(f, pieces, line, st) {
 /** Look for a good track: up to `ms` milliseconds, the best of the first `want` that pass every rule. */
 export function generate(opts, { ms = 4000, want = 30, start = (Math.random() * 2 ** 31) >>> 0, now = () => Date.now() } = {}) {
   const t0 = now();
-  let tried = 0, ok = 0, best = null;
+  let tried = 0, ok = 0, best = null, o = { ...opts };
+  // When the asked number of pieces won't fit (the hall is long but narrow), one piece fewer is
+  // tried after a share of the time, down to 6; the track says how many it has.
   while (tried < 60000 && now() - t0 < ms) {
-    const tr = makeTrack(start + tried, opts); tried++;
+    const share = Math.max((now() - t0) / ms, tried / 60000) > 0.3 + 0.1 * (opts.pieces - o.pieces);
+    if (!best && share && o.pieces > 6) o = { ...o, pieces: o.pieces - 1 };
+    const tr = makeTrack(start + tried, o); tried++;
     if (tr) { ok++; if (!best || tr.score > best.score) best = tr; }
     if (ok >= want) break;
   }
-  return { best, tried, ok };
+  return { best, tried, ok, pieces: best ? best.opts.pieces : null };
 }
 
 // ---------- fine-tuning by hand ----------
@@ -509,7 +523,7 @@ export function cleanEdits(edits, pieces) {
     if (!pc || pc.type === 'timing' || !e) continue;
     let dx = clampN(Number(e.dx) || 0, -HALL.w, HALL.w), dy = clampN(Number(e.dy) || 0, -HALL.l, HALL.l), rot = ((Math.round(Number(e.rot) || 0) % 360) + 360) % 360;
     dx = clampN(pc.x + dx, 0.3, HALL.w - 0.3) - pc.x; dy = clampN(pc.y + dy, 0.3, HALL.l - 0.3) - pc.y;
-    if (pc.type === 'ring') { dx = RAILS.reduce((b, x) => (Math.abs(x - (pc.x + dx)) < Math.abs(b - (pc.x + dx)) ? x : b), RAILS[0]) - pc.x; rot = Math.round(rot / 90) * 90 % 360; }
+    if (onRail(pc.type)) { dx = RAILS.reduce((b, x) => (Math.abs(x - (pc.x + dx)) < Math.abs(b - (pc.x + dx)) ? x : b), RAILS[0]) - pc.x; rot = Math.round(rot / 90) * 90 % 360; }
     if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6 && !rot) continue;
     out[i] = { dx: Math.round(dx * 100) / 100, dy: Math.round(dy * 100) / 100, rot };
   }
@@ -535,7 +549,7 @@ export function cleanChanges(changes, base) {
     have[a.type] = (have[a.type] || 0) + 1;
     let x = clampN(Number(a.x) || HALL.w / 2, 0.3, HALL.w - 0.3), rot = ((Math.round(Number(a.rot) || 0) % 360) + 360) % 360;
     const y = clampN(Number(a.y) || HALL.l / 2, 0.3, HALL.l - 0.3);
-    if (a.type === 'ring') { x = nearRail(x); rot = Math.round(rot / 90) * 90 % 360; }
+    if (onRail(a.type)) { x = nearRail(x); rot = Math.round(rot / 90) * 90 % 360; }
     added.push({ type: a.type, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, rot });
   }
   const ladders = {};
@@ -750,7 +764,7 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
     if (pc.type === 'gate') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
     // the timing gate stands out in the sim too: WebFPV's flagged gate, a pennant on each side of its header
     else if (pc.type === 'timing') pieceEls.set(i, { el: el('flaggedGate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: 'Timing gate', flagSide: 'both' }), yaw });
-    else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: LADDER[pc.type].tube, clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });
+    else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: r6(TYPES[pc.type].levels[0] - LADDER[pc.type].h / 2), clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });
     else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring' }), yaw });
     else if (pc.type === 'flag') pieceEls.set(i, { el: el('flag', pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: 'Flag' }) });
     else if (pc.type === 'cube') {

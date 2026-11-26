@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.26-1839" : "dev";
+var VERSION = true ? "2026.11.26-1852" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {

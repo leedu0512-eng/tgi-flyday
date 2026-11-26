@@ -221,7 +221,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
 import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL } from '/assets/hall.js';
-import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
+import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, onRail, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
 import { qrSvg } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -547,6 +547,7 @@ function draw3d(tr0) {
       // the ×5 hexagons, flat sides joined, tips to the sides; the ×3 rings (Janno 26.11.2026)
       const L = LADDER[pc.type];
       for (let s = 0; s < k; s++) { const m = flown.includes(s) ? orange : white, f = L.shape === 'hex' ? hexMesh(m) : new THREE.Mesh(new THREE.TorusGeometry(L.w / 2 + L.tube / 2, L.tube / 2, 8, 40), m); f.position.y = TYPES[pc.type].levels[s]; obj.add(f); }
+      if (L.hang) { const top = TYPES[pc.type].levels[k - 1] + L.h / 2 + L.tube, rope = new THREE.Mesh(new THREE.BoxGeometry(0.008, HALL.h - top, 0.008), new THREE.MeshBasicMaterial({ color: 0x888888 })); rope.position.y = (HALL.h + top) / 2; obj.add(rope); }
     } else if (pc.type === 'cube') {
       const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.7, 0.7, 0.7)), new THREE.LineBasicMaterial({ color: 0xffffff }));
       e.position.y = 0.35; obj.add(e);
@@ -729,7 +730,7 @@ function renderSel() {
     $('sel').innerHTML = `<span class="muted">${tr(pc ? 'The timing gate stays where it is.' : 'Drag a piece on the floor plan to move it, tap it to turn it.')}</span>` + undoBtn;
     return;
   }
-  const step = pc.type === 'ring' ? 90 : 15;
+  const step = onRail(pc.type) ? 90 : 15;
   let html = `<span class="name">${picked + 1} · ${tr(LABEL[pc.type])}</span>`
     + `<button type="button" class="tb" data-rot="${-step}" aria-label="Turn left">⟲ ${step}°</button><button type="button" class="tb" data-rot="${step}" aria-label="Turn right">⟳ ${step}°</button>`
     + `<button type="button" class="tb" data-nudge="-0.1,0" aria-label="Left 10 cm">←</button><button type="button" class="tb" data-nudge="0,0.1" aria-label="Up 10 cm">↑</button><button type="button" class="tb" data-nudge="0,-0.1" aria-label="Down 10 cm">↓</button><button type="button" class="tb" data-nudge="0.1,0" aria-label="Right 10 cm">→</button>`;
@@ -870,6 +871,7 @@ function runGenerate() {
     const r = generate({ ...opts, kit: { ...kit } }, { ms: 4000 });
     $('genBtn').disabled = false; $('genBtn').textContent = tr('Generate track');
     if (!r.best) { toast(tr('No track passed every rule. Try fewer pieces or the Technical style.')); return; }
+    if (r.pieces < opts.pieces) toast(tr('{n} pieces fit in this hall with these settings, not {m}.', { n: r.pieces, m: opts.pieces }));
     remember();
     bases.set(r.best.seed + JSON.stringify(r.best.opts), r.best);
     picked = -1;
@@ -1023,7 +1025,7 @@ const endDrag = () => {
   if (!drag) return;
   const d = drag; drag = null;
   if (d.moved) { undo.push(d.before); draw3d(track); renderSel(); return; }
-  if (d.wasPicked && track.pieces[d.i].type !== 'timing') change((c) => moveBy(c, d.key, 0, 0, track.pieces[d.i].type === 'ring' ? 90 : 15));
+  if (d.wasPicked && track.pieces[d.i].type !== 'timing') change((c) => moveBy(c, d.key, 0, 0, onRail(track.pieces[d.i].type) ? 90 : 15));
 };
 $('plan').addEventListener('pointerup', endDrag);
 $('plan').addEventListener('pointercancel', endDrag);
