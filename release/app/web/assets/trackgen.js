@@ -3,6 +3,7 @@
 // A track is fully described by { seed, opts, edits }: the same seed and settings always give the
 // same track, and edits are the pieces moved or turned by hand afterwards (relayout()).
 
+import { floorAt } from './hall.js';
 // ---------- the hall and the kit ----------
 // Hall frame: x across (0 = the white wall's side, w = the orange wall's side), y up the page (0 = the
 // pilots' rail, l = the black end wall), z up. Metres. The frame is the grey carpet, 9.5 × 25.6 m (Janno
@@ -27,6 +28,8 @@ export const LADDER = {
 const HANG_TOP = HALL.h - 0.2;
 const stages = (type, n) => { const L = LADDER[type]; return Array.from({ length: n }, (_, i) => Math.round((L.hang ? HANG_TOP - (n - 1 - i) * L.pitch - L.tube - L.h / 2 : L.tube + L.h / 2 + i * L.pitch) * 1000) / 1000); };
 export const onRail = (type) => type === 'ring' || !!LADDER[type]?.hang;   // hangs from a ceiling cable
+// how much higher a piece standing on the floor sits here (on the RC hump, a table, the mats)
+export const liftOf = (pc) => (pc.type === 'flag' || onRail(pc.type) ? 0 : floorAt(pc.x, pc.y));
 export const RING_Z = HALL.h - 0.2 - OPEN / 2;            // ring centre: 20 cm below the ceiling
 // Rings clip onto three rails under the ceiling (pairs of cables), hung along a rail or across it
 // (Janno 22.11.2026). Assumed: running the length of the hall, evenly across it.
@@ -425,8 +428,11 @@ export function buildLine(anchors, nPieces, st) {
 export const LEVELS = ['easy', 'mid', 'full'];
 function finish(seed, opts, st, AL, pieces) {
   const levels = {};
+  const lifts = pieces.map((pc) => liftOf(pc));
   for (const k of ['full', 'easy']) { // Beginner and Pro (Janno 22.11.2026: no Club line)
-    const b = buildLine(AL[k], pieces.length, st);
+    // a piece standing on a jump sits on it (the same as relayout does)
+    const b = buildLine(AL[k].map((q) => (q.pass && lifts[q.pass.piece] && q.z != null ? { ...q, z: q.z + lifts[q.pass.piece] } : q)), pieces.length, st);
+    for (const p of b.line.pts) if (p.z != null) { const f = floorAt(p.x, p.y); if (f && p.z < f + 0.25) p.z = f + 0.25; }
     const pcs = pieces.map((pc, i) => ({ ...pc, passes: b.passes[i] }));
     for (const pc of pcs) if (pc.passes.length) { pc.dx = pc.passes[0].dx; pc.dy = pc.passes[0].dy; }
     const facts = check(pcs, b.line, st);
@@ -567,7 +573,7 @@ export function relayout(base, edits, changes) {
   edits = cleanEdits(edits, base.pieces);
   const ch = cleanChanges(changes, base);
   const changed = ch.removed.length || ch.added.length || Object.keys(ch.ladders).length;
-  if (!Object.keys(edits).length && !changed) return { ...base, pieces: base.pieces.map((pc, i) => ({ ...pc, key: String(i) })), edits, changes: ch, issues: issuesOf(base) };
+  if (!Object.keys(edits).length && !changed && !base.pieces.some((pc) => liftOf(pc) > 0.005)) return { ...base, pieces: base.pieces.map((pc, i) => ({ ...pc, key: String(i) })), edits, changes: ch, issues: issuesOf(base) };
   const st = STYLE[base.opts.style];
   const all = base.pieces.map((pc, i) => ({ ...pc, key: String(i) }));
   const moves = new Map();
@@ -635,8 +641,11 @@ export function relayout(base, edits, changes) {
       const ins = pc.type === 'flag' ? [{ x: pc.x, y: pc.y, z: null, round: { r: st.pole }, zone }]
         : pc.type.startsWith('ladder') ? ladderKeys(i, { x: pc.x, y: pc.y, hx, hy, zone: 'L' + pc.key }, k)
         : [{ x: pc.x, y: pc.y, z: pc.z, hx, hy, zone, pass: { piece: i, info: { local: 0 } } }];
-      A.splice(best.at, 0, ...ins);
+      A.splice(best.at, 0, ...ins.map((q) => ({ ...q, who: i })));
     }
+    // pieces standing on a jump sit on it: their ways through go up by as much
+    const lifts = all.map((pc) => liftOf(pc));
+    A = A.map((q) => (q.who != null && lifts[q.who] && q.z != null ? { ...q, z: q.z + lifts[q.who] } : q));
     const b = buildLine(A, all.length, st);
     levels[k] = { line: b.line, allPasses: b.passes, facts: { length: b.line.length, rmin: Math.min(st.turn, st.orbit, st.pole) } };
   }
@@ -646,7 +655,7 @@ export function relayout(base, edits, changes) {
   const keep = all.map((_, i) => i).filter((i) => !removed.has(i)).sort((a, b) => (a === 0 ? -1 : b === 0 ? 1 : firstS(a) - firstS(b) || a - b));
   for (const k in levels) { levels[k].passes = keep.map((i) => levels[k].allPasses[i]); delete levels[k].allPasses; }
   const pieces = keep.map((i, v) => {
-    const pc = { ...all[i], passes: levels.full.passes[v] };
+    const pc = { ...all[i], passes: levels.full.passes[v], lift: liftOf(all[i]) };
     if (pc.passes.length) { pc.dx = pc.passes[0].dx; pc.dy = pc.passes[0].dy; }
     else if (moves.has(i)) { const mv = moves.get(i), dx = pc.dx * mv.c - pc.dy * mv.s, dy = pc.dx * mv.s + pc.dy * mv.c; pc.dx = dx; pc.dy = dy; }
     if (pc.type.startsWith('ladder')) {
@@ -657,6 +666,8 @@ export function relayout(base, edits, changes) {
     }
     return pc;
   });
+  // the line flies over the jumps, never through them
+  for (const k in levels) for (const p of levels[k].line.pts) if (p.z != null) { const f = floorAt(p.x, p.y); if (f && p.z < f + 0.25) p.z = f + 0.25; }
   pieces[0].dx = 0; pieces[0].dy = 1;
   const tr = { ...base, pieces, passes: pieces.map((pc) => ({ x: pc.x, y: pc.y, z: pc.z, dx: pc.dx, dy: pc.dy })), line: levels.full.line, facts: levels.full.facts, levels, edits, changes: ch };
   tr.issues = issuesOf(tr);
@@ -761,7 +772,7 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
   const yawOf = (pc) => Math.atan2(pc.dy, pc.dx);
   tr.pieces.forEach((pc, i) => {
     const yaw = yawOf(pc);
-    if (pc.type === 'gate') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
+    if (pc.type === 'gate') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: r6(SILL + (pc.lift || 0)), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
     // the timing gate stands out in the sim too: WebFPV's flagged gate, a pennant on each side of its header
     else if (pc.type === 'timing') pieceEls.set(i, { el: el('flaggedGate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: 'Timing gate', flagSide: 'both' }), yaw });
     else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: r6(TYPES[pc.type].levels[0] - LADDER[pc.type].h / 2), clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });

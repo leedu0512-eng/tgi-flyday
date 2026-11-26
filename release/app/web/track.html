@@ -598,7 +598,7 @@ function draw3d(tr0) {
       const rope = new THREE.Mesh(new THREE.BoxGeometry(0.008, HALL.h - pc.z - OPEN / 2 - 0.02, 0.008), new THREE.MeshBasicMaterial({ color: 0x888888 }));
       rope.position.y = (HALL.h + pc.z + OPEN / 2 + 0.02) / 2; obj.add(rope);
     }
-    obj.position.copy(V(pc.x, pc.y, 0));
+    obj.position.copy(V(pc.x, pc.y, pc.lift || 0));   // on the hump, if it stands on it
     obj.rotation.y = yaw;
     group.add(obj);
     const c = document.createElement('canvas'); c.width = c.height = 64;
@@ -606,7 +606,7 @@ function draw3d(tr0) {
     x.fillStyle = '#000'; x.font = '800 34px "Big Shoulders", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 34);
     const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
     sp.scale.set(0.32, 0.32, 1);
-    sp.position.copy(V(pc.x, pc.y, Math.min(HALL.h - 0.05, TYPES[pc.type].zmax + 0.3)));
+    sp.position.copy(V(pc.x, pc.y, Math.min(HALL.h - 0.05, TYPES[pc.type].zmax + 0.3 + (pc.lift || 0))));
     if (pc.type === 'ring') sp.position.y = pc.z - 0.45;
     sp.userData.label = true; group.add(sp);
   });
@@ -632,7 +632,7 @@ function draw3d(tr0) {
   tr0.pieces.forEach((pc, i) => (tr0.cur.passes[i] || []).forEach((ps) => {
     const st = ps.info && ps.info.stage != null ? ps.info.stage : pc.level || 0;
     const h = pc.type === 'ring' ? pc.z : pc.type === 'cube' ? 0.35 : pc.type.startsWith('ladder') ? TYPES[pc.type].levels[st] : GATE_Z;
-    tr0.seq.push({ s: ps.s, type: pc.type, x: pc.x, y: pc.y, h, yaw: Math.atan2(ps.dx, -ps.dy) });
+    tr0.seq.push({ s: ps.s, type: pc.type, x: pc.x, y: pc.y, h: h + (pc.lift || 0), yaw: Math.atan2(ps.dx, -ps.dy) });
   }));
   tr0.seq.sort((a, b) => a.s - b.s);
   setView(mode, true);
@@ -739,7 +739,7 @@ function renderSheet() {
   $('code').textContent = `${code(t.seed)} · ${tr(t.opts.style === 'technical' ? 'Technical' : 'Flowing')}${Object.keys(t.edits || {}).length ? ' · ' + tr('tuned by hand') : ''}`;
   $('rows').innerHTML = t.pieces.map((pc, i) => {
     const f = faces(t.passes[i]);
-    return `<tr data-row="${i}" class="${editing && i === picked ? 'picked' : ''}"><td><span class="passno${pc.type === 'timing' ? ' t' : ''}">${i + 1}</span></td><td>${tr(LABEL[pc.type])}</td>
+    return `<tr data-row="${i}" class="${editing && i === picked ? 'picked' : ''}"><td><span class="passno${pc.type === 'timing' ? ' t' : ''}">${i + 1}</span></td><td>${tr(LABEL[pc.type])}${pc.lift > 0.04 ? ` <span class="muted">${tr('on a jump, {h} m up', { h: pc.lift.toFixed(2) })}</span>` : ''}</td>
       <td class="num">${(HALL.w - pc.x).toFixed(1)} m</td><td class="num">${pc.y.toFixed(1)} m</td>
       <td data-no-i18n>${pc.type === 'flag' ? '—' : `<span style="display:inline-block;color:var(--accent);transform:rotate(${f.deg}deg)">↑</span> ${faceWord(f.w)}${pc.type === 'cube' ? ' ' + tr('(corner first)') : ''}`}</td><td>${through(pc, t.levels[level].passes[i])}</td></tr>`;
   }).join('');

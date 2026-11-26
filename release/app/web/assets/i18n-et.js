@@ -730,6 +730,7 @@ export const ET = {
   '+ Add element': '+ Lisa element',
   'Start from scratch': 'Alusta nullist',
   'Check in 3D': 'Vaata 3D-s',
+  'on a jump, {h} m up': 'hüppel, {h} m kõrgemal',
   'Close 3D': 'Sulge 3D',
   '◀ PILOTS': '◀ PILOODID',
   'Picked piece': 'Valitud element',

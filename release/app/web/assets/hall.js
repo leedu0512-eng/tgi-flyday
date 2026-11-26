@@ -113,3 +113,17 @@ export const TUBES = [
 // The pilots' end: a wooden rail with orange posts and netting just behind y = 0, grass along it,
 // the pit beyond (tables and PCs on a blue floor).
 export const RAIL = { y: -0.35, h: 1.05, postEvery: 1.6, grass: 0.35, banner: { at: 6.4, w: 1.6, text: 'GEMFAN' }, pitDepth: 2.5 };
+
+/** How high the floor is here: the top of a jump or mat a piece would stand on (0 = the carpet).
+    A gate put on the hump goes on the hump (Janno 26.11.2026). */
+export function floorAt(x, y) {
+  let h = 0;
+  for (const pr of PROPS) {
+    if (pr.kind || x < pr.x0 || x > pr.x1 || y < pr.y0 || y > pr.y1) continue;
+    if (pr.profile) {
+      const u = (y - pr.y0) / (pr.y1 - pr.y0), p = pr.profile;
+      for (let i = 1; i < p.length; i++) if (u <= p[i][0]) { const t = (u - p[i - 1][0]) / ((p[i][0] - p[i - 1][0]) || 1); h = Math.max(h, p[i - 1][1] + t * (p[i][1] - p[i - 1][1])); break; }
+    } else if (pr.h) h = Math.max(h, pr.h);
+  }
+  return Math.round(h * 1000) / 1000;
+}
