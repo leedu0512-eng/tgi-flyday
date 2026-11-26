@@ -218,7 +218,9 @@ async function typeKeys(scope, text) {
     await tk.click(`#rows tr[data-row="${row[0]}"]`);
     await tk.click('#sel [data-remove]');
     check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before - 1, 'Track: Remove takes a gate away');
+    await tk.click('#addBtn');
     await tk.click('#addBox [data-add="gate"]');
+    { const bb = await tk.locator('#plan svg').boundingBox(); await tk.mouse.click(bb.x + bb.width * 0.45, bb.y + bb.height * 0.3); }
     check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before, 'Track: + Gate adds one from the kit');
     const lad = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Ladder/.test(t.children[1].textContent)); return r ? r.dataset.row : null; });
     if (lad != null) {
@@ -236,6 +238,7 @@ async function typeKeys(scope, text) {
     await tk.reload();
     await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 8000 });
     await tk.click('#editBtn');
+    await tk.click('#genMore summary');
     await tk.click('#genBtn');
     await tk.waitForFunction(() => !document.querySelector('#genBtn').disabled, null, { timeout: 15000 });
     await tk.click('#saveBtn');

@@ -620,14 +620,14 @@ export function relayout(base, edits, changes) {
     for (let i = base.pieces.length; i < all.length; i++) {
       const pc = all[i];
       if (k === 'easy' && pc.type === 'ring') continue;               // beginners leave the ceiling out
-      const keys = A.map((a, j) => (a.pass || a.round ? j : -1)).filter((j) => j >= 0);
+      // the gap between two anchors where it makes the shortest detour, never inside a trick
       let best = null;
-      keys.forEach((j1, n) => {
-        const j2 = keys[(n + 1) % keys.length], P = A[j1], Q = A[j2];
-        if (P.pass && Q.pass && P.pass.piece === Q.pass.piece) return;   // not inside a ladder's orbit
+      for (let g = 1; g <= A.length; g++) {
+        const P = A[g - 1], Q = A[g % A.length];
+        if (P.zone && P.zone === Q.zone) continue;
         const cost = Math.hypot(pc.x - P.x, pc.y - P.y) + Math.hypot(Q.x - pc.x, Q.y - pc.y) - Math.hypot(Q.x - P.x, Q.y - P.y);
-        if (!best || cost < best.cost) best = { cost, at: j2 === 0 ? A.length : j2, P, Q };
-      });
+        if (!best || cost < best.cost) best = { cost, at: g, P, Q };
+      }
       if (!best) continue;
       let hx = pc.dx, hy = pc.dy;
       if (hx * (best.Q.x - best.P.x) + hy * (best.Q.y - best.P.y) < 0) { hx = -hx; hy = -hy; }

@@ -83,6 +83,28 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 .trk .kit-row b { font: 700 15px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; min-width: 5.5em; }
 .trk .kit-row .num { min-width: 1.6em; text-align: center; font: 800 18px/1 var(--display); }
 .trk .kit-row .tb { padding: 6px 12px; min-width: 0; }
+/* editing (Janno 26.11.2026: the buttons all on top and a big 3D you can't touch was cumbersome): the floor
+   plan is the work surface, full height on the left; tools, the picked piece and a smaller 3D on the right */
+.trk .tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.trk .addwrap { position: relative; }
+.trk .addmenu { position: absolute; z-index: 6; top: calc(100% + 6px); left: 0; display: grid; gap: 4px; min-width: 240px; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 8px; box-shadow: 0 10px 30px rgba(0, 0, 0, .6); }
+.trk .addmenu[hidden] { display: none; }
+.trk .addmenu button { all: unset; cursor: pointer; display: flex; justify-content: space-between; gap: 14px; padding: 11px 12px; border-radius: 7px; font: 800 18px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.trk .addmenu button:hover, .trk .addmenu button:focus-visible { background: var(--panel-2); }
+.trk .addmenu button:disabled { opacity: .35; cursor: default; }
+.trk .addmenu .muted { color: var(--muted); font: 600 14px/1 'Archivo', sans-serif; text-transform: none; letter-spacing: 0; }
+.trk details.more { border-top: 1px solid var(--line); padding-top: 8px; }
+.trk details.more > summary { cursor: pointer; font: 700 14px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 4px 0; }
+.trk .more-body { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; padding-top: 10px; }
+.trk .placing .page svg { cursor: crosshair; }
+.trk .placing .page { border-color: var(--accent); }
+@media (min-width: 901px) {
+  .trk.editing .trk-grid { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "side ctrl" "side stage" "side list"; }
+  .trk.editing .side { grid-row: 1 / span 3; }
+  .trk.editing .page svg { height: calc(100vh - 120px); }
+  .trk.editing .ctrl { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
+  .trk.editing .stage { height: 46vh; min-height: 300px; }
+}
 .trk .pinpad { position: fixed; inset: 0; background: rgba(0, 0, 0, .78); display: grid; place-items: center; z-index: 8; }
 .trk .pinpad[hidden] { display: none; }
 .trk .pp-box { background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; padding: 22px; width: min(92vw, 380px); display: grid; gap: 14px; text-align: center; }
@@ -128,38 +150,48 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 
 <main class="trk-grid">
   <section class="ctrl" id="ctrl" hidden aria-label="Track settings">
-    <div class="field"><span>Style</span>
-      <div class="seg" id="style">
-        <button type="button" data-v="flowing" aria-pressed="true">Flowing</button>
-        <button type="button" data-v="technical" aria-pressed="false">Technical</button>
+    <div class="tools">
+      <div class="addwrap">
+        <button type="button" class="tb primary" id="addBtn" aria-haspopup="true" aria-expanded="false">+ Add element</button>
+        <div class="addmenu" id="addBox" hidden></div>
       </div>
+      <button type="button" class="tb" id="emptyBtn">Start from scratch</button>
     </div>
-    <div class="field"><span id="piecesLabel">Pieces to set up: 15</span>
-      <input type="range" id="pieces" min="6" max="15" value="15" aria-label="Pieces to set up">
-    </div>
-    <div class="field"><span>Ceiling rings</span>
-      <div class="seg" id="ceiling">
-        <button type="button" data-v="yes" aria-pressed="true">Use</button>
-        <button type="button" data-v="no" aria-pressed="false">Leave up</button>
-      </div>
-    </div>
-    <div class="field"><span>Flags</span>
-      <div class="seg" id="flags">
-        <button type="button" data-v="yes" aria-pressed="true">Use</button>
-        <button type="button" data-v="no" aria-pressed="false">Leave out</button>
-      </div>
-    </div>
-    <div class="field"><span>Our kit</span>
-      <div class="sel" id="kitBox"></div>
-    </div>
-    <button type="button" class="tb primary" id="genBtn">Generate track</button>
-    <div class="field" id="historyField" hidden><span>Earlier tracks</span><select id="history"></select></div>
-    <div class="field"><span>Hand tuning</span>
+    <div class="field picked"><span>Picked piece</span>
       <div class="sel" id="sel"></div>
     </div>
-    <div class="field"><span>Add from the kit</span>
-      <div class="sel" id="addBox"></div>
-    </div>
+    <details class="more" id="genMore">
+      <summary>Generate a track</summary>
+      <div class="more-body">
+        <div class="field"><span>Style</span>
+          <div class="seg" id="style">
+            <button type="button" data-v="flowing" aria-pressed="true">Flowing</button>
+            <button type="button" data-v="technical" aria-pressed="false">Technical</button>
+          </div>
+        </div>
+        <div class="field"><span id="piecesLabel">Pieces to set up: 15</span>
+          <input type="range" id="pieces" min="6" max="15" value="15" aria-label="Pieces to set up">
+        </div>
+        <div class="field"><span>Ceiling rings</span>
+          <div class="seg" id="ceiling">
+            <button type="button" data-v="yes" aria-pressed="true">Use</button>
+            <button type="button" data-v="no" aria-pressed="false">Leave up</button>
+          </div>
+        </div>
+        <div class="field"><span>Flags</span>
+          <div class="seg" id="flags">
+            <button type="button" data-v="yes" aria-pressed="true">Use</button>
+            <button type="button" data-v="no" aria-pressed="false">Leave out</button>
+          </div>
+        </div>
+        <button type="button" class="tb primary" id="genBtn">Generate track</button>
+        <div class="field" id="historyField" hidden><span>Earlier tracks</span><select id="history"></select></div>
+      </div>
+    </details>
+    <details class="more">
+      <summary>Our kit</summary>
+      <div class="more-body"><div class="sel" id="kitBox"></div></div>
+    </details>
   </section>
 
   <div class="stage" id="stage">
@@ -750,11 +782,44 @@ function renderAdd() {
   if (!track) { $('addBox').innerHTML = ''; return; }
   const used = {};
   for (const pc of track.pieces) used[pc.type] = (used[pc.type] || 0) + 1;
-  $('addBox').innerHTML = ADDABLE.filter((t) => t !== 'ring' || track.opts.rings).map((t) => {
+  $('addBox').innerHTML = ADDABLE.map((t) => {
     const left = (kit[t] || 0) - (used[t] || 0);
-    return `<button type="button" class="tb" data-add="${t}" ${left > 0 ? '' : 'disabled'}>+ ${tr(LABEL[t])} <span class="muted">${left}</span></button>`;
+    return `<button type="button" data-add="${t}" ${left > 0 ? '' : 'disabled'}>${tr(LABEL[t])} <span class="muted">${tr('{n} left', { n: Math.max(0, left) })}</span></button>`;
   }).join('');
 }
+// one Add element button (Janno 26.11.2026): pick what, then tap the plan where it goes
+let placing = null;
+function setPlacing(t) {
+  placing = t;
+  document.body.classList.toggle('placing', !!t);
+  $('planTitle').textContent = t ? tr('Tap the plan where the {piece} goes', { piece: tr(LABEL[t]).toLowerCase() }) : tr(editing ? 'Floor plan · drag to move, tap to turn' : 'Floor plan');
+}
+function closeAdd() { $('addBox').hidden = true; $('addBtn').setAttribute('aria-expanded', 'false'); }
+$('addBtn').onclick = () => {
+  if (placing) { setPlacing(null); return; }
+  renderAdd();
+  const open = $('addBox').hidden;
+  $('addBox').hidden = !open; $('addBtn').setAttribute('aria-expanded', String(open));
+};
+$('addBox').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-add]'); if (!b || b.disabled || !track) return;
+  closeAdd();
+  setPlacing(b.dataset.add);
+});
+addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeAdd(); setPlacing(null); } });
+addEventListener('pointerdown', (e) => { if (!$('addBox').hidden && !e.target.closest('.addwrap')) closeAdd(); });
+// start from scratch: an empty hall with only the timing gate, then add pieces one by one
+$('emptyBtn').onclick = () => {
+  const o = { style: opts.style, pieces: 6, rings: true, flags: false, kit: { gate: 0, cube: 0, ring: 0, ladder3: 0, ladder5: 0, flag: 0 } };
+  let base = null, seed = 1;
+  for (; seed < 50 && !base; seed++) base = makeTrack(seed, o);
+  if (!base) return;
+  remember();
+  bases.set(base.seed + JSON.stringify(base.opts), base);
+  picked = -1;
+  show(build({ seed: base.seed, opts: base.opts, edits: {}, removed: [], added: [], ladders: {} }));
+  toast(tr('An empty hall: + Add element, then tap the plan where it goes.'));
+};
 function show(t, { keep3d = false } = {}) {
   track = t;
   renderSheet();
@@ -853,7 +918,7 @@ function setEditing(on) {
   $('saveBtn').hidden = !on;
   $('cancelBtn').hidden = !on;
   $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
-  $('planTitle').textContent = tr(on ? 'Floor plan · drag to move, tap to turn' : 'Floor plan');
+  closeAdd(); setPlacing(null);
   picked = -1; undo = [];
   if (on && track) { Object.assign(opts, track.opts); syncControls(); }
   if (on && !track) runGenerate();
@@ -975,12 +1040,6 @@ $('sel').addEventListener('click', (e) => {
   if (b.dataset.ln) return change((c) => { const l = ladderNow(pc); c.ladders[key] = { ...l, n: l.n + Number(b.dataset.ln) }; });
   if (b.dataset.lat) return change((c) => { const l = ladderNow(pc); c.ladders[key] = { ...l, at: l.at + Number(b.dataset.lat) }; });
 });
-$('addBox').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-add]'); if (!b || b.disabled || !track) return;
-  const spot = freeSpot();
-  change((c) => { c.added.push({ type: b.dataset.add, x: spot.x, y: spot.y, rot: 0 }); }, false);
-  picked = track.pieces.length - 1; renderSheet(); renderSel();
-});
 $('rows').addEventListener('click', (e) => {
   const r = e.target.closest('[data-row]'); if (!r || !editing) return;
   picked = Number(r.dataset.row); renderSheet(); renderSel();
@@ -997,6 +1056,14 @@ const toHall = (ev) => {
 $('plan').addEventListener('pointerdown', (ev) => {
   if (!editing || !track) return;
   const h = toHall(ev);
+  if (placing) { // put the picked kind of piece where the finger is (on the nearest cable if it hangs)
+    const t = placing, x = Math.round(Math.max(0.3, Math.min(HALL.w - 0.3, h.x)) * 10) / 10, y = Math.round(Math.max(0.3, Math.min(HALL.l - 0.3, h.y)) * 10) / 10;
+    setPlacing(null);
+    const n = (track.changes?.added || []).length;
+    change((c) => { c.added.push({ type: t, x, y, rot: 0 }); }, false);
+    picked = track.pieces.findIndex((pc) => pc.key === 'a' + n); renderSheet(); renderSel();
+    return;
+  }
   let best = -1, bd = 0.9;
   track.pieces.forEach((pc, i) => { const d = Math.hypot(pc.x - h.x, pc.y - h.y); if (d < bd) { bd = d; best = i; } });
   if (best < 0) { picked = -1; renderSheet(); renderSel(); return; }
