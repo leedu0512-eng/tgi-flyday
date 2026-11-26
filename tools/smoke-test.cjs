@@ -248,6 +248,9 @@ async function typeKeys(scope, text) {
     await tk.waitForSelector('#pinpad[hidden]', { state: 'attached', timeout: 5000 });
     const saved2 = await (await fetch(B + '/api/track')).json();
     check(saved2.locked && saved2.today.seed !== saved.today.seed && saved2.history.length === 1, 'Track: with a PIN, the number pad refuses a wrong one and saves with the right one');
+    check(await tk.$eval('#simBtn', (b) => b.hidden), 'Track: no Fly it in the sim on the kiosk');
+    await tk.goto(B + '/track');
+    await tk.waitForFunction(() => !document.querySelector('#simBtn').hidden, null, { timeout: 10000 });
     await tk.click('#simBtn');
     await tk.waitForSelector('#simBox:not([hidden]) #simQr svg', { timeout: 5000 });
     const simUrl = await tk.inputValue('#simLink');

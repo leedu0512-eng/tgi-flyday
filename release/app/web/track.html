@@ -227,6 +227,7 @@ import { qrSvg } from '/assets/common.js';
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const FROM_KIOSK = params.get('from') === 'kiosk';
+if (FROM_KIOSK) $('simBtn').hidden = true;
 $('lang').innerHTML = langSwitch();
 if (FROM_KIOSK) $('backBtn').hidden = false;
 $('backBtn').onclick = () => { location.href = '/kiosk'; };
@@ -848,7 +849,7 @@ function setEditing(on) {
   document.body.classList.toggle('editing', on);
   $('ctrl').hidden = !on;
   $('editBtn').hidden = on;
-  $('simBtn').hidden = on;
+  $('simBtn').hidden = on || FROM_KIOSK;   // never fly on the kiosk (Janno 26.11.2026): the sim PCs and home are for that
   $('saveBtn').hidden = !on;
   $('cancelBtn').hidden = !on;
   $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
