@@ -87,7 +87,7 @@ test('a track goes to WebFPV as its own document: every pass in our order, flags
     const doc = G.toWebFPV(r.best, level, new Date('2026-11-22T20:00:00Z'));
     assert.equal(doc.schemaVersion, 3);
     assert.equal(doc.trackClass, 'micro');
-    assert.deepEqual(doc.field, { width: 10, depth: 26, gridSize: 0.1 });
+    assert.deepEqual(doc.field, { width: 9.5, depth: 25.6, gridSize: 0.1 });
     const ids = new Set(doc.elements.map((e: any) => e.id));
     assert.ok(doc.sequence.every((q: any) => ids.has(q.elementId)), 'every pass names an element');
     const L = r.best.levels[level];

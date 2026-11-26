@@ -4,8 +4,11 @@
 // same track, and edits are the pieces moved or turned by hand afterwards (relayout()).
 
 // ---------- the hall and the kit ----------
-// Hall frame: x across (0 = left wall, 10 = right wall), y up the page (0 = bottom wall, 26 = top), z up. Metres.
-export const HALL = { w: 10, l: 26, h: 3.5 };
+// Hall frame: x across (0 = the white wall's side, w = the orange wall's side), y up the page (0 = the
+// pilots' rail, l = the black end wall), z up. Metres. The frame is the grey carpet, 9.5 × 25.6 m (Janno
+// 26.11.2026); the long walls stand 50 cm beyond its sides (hall.js). h is the clear height: the ceiling
+// rises from 2.92 m at the walls to 3.26 m in the middle, but the ribs across it stay at 2.92 m.
+export const HALL = { w: 9.5, l: 25.6, h: 2.92 };
 // Every gate is 24 in (Janno 22.11.2026: RaceGOW's size, not 50 cm): the opening, the pipe round it,
 // the opening's bottom off the floor. A ladder's stages are one opening and one pipe apart.
 export const OPEN = 0.6096, PIPE = 0.03, SILL = 0.03;
@@ -15,9 +18,9 @@ const stages = (n) => Array.from({ length: n }, (_, i) => Math.round((GATE_Z + i
 export const RING_Z = HALL.h - 0.2 - OPEN / 2;            // ring centre: 20 cm below the ceiling
 // Rings clip onto three rails under the ceiling (pairs of cables), hung along a rail or across it
 // (Janno 22.11.2026). Assumed: running the length of the hall, evenly across it.
-export const RAILS = [2.5, 5.0, 7.5];
-export const START = { x: 9.0, y: 1.0 };                 // lower right corner
-export const TIMING = { x: 9.0, y: 13.0 };               // middle of the right wall, flown upward
+export const RAILS = [HALL.w / 4, HALL.w / 2, HALL.w * 3 / 4];
+export const START = { x: HALL.w - 1, y: 1.0 };          // lower right corner
+export const TIMING = { x: HALL.w - 1, y: HALL.l / 2 };  // middle of the right wall, flown upward
 export const TYPES = {
   timing:  { label: 'Timing gate', zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
   gate:    { label: 'Gate',        zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
@@ -42,7 +45,7 @@ export const code = (seed) => 'HZ-' + seed.toString(36).toUpperCase().padStart(6
 // ---------- the base loop: a rounded rectangle round the hall, anticlockwise ----------
 // Up the right side from the timing gate, across the top, down the left, along the bottom,
 // back up the right. Tricks hang off its straights into the middle of the hall.
-const BASE = { x0: 1.2, x1: 9.0, y0: 1.2, y1: 24.8, rc: 1.6 };
+const BASE = { x0: 1.2, x1: HALL.w - 1, y0: 1.2, y1: HALL.l - 1.2, rc: 1.6 };
 function baseLegs() {
   const { x0, x1, y0, y1, rc } = BASE;
   const S = (ax, ay, bx, by) => ({ kind: 'straight', ax, ay, bx, by, len: Math.hypot(bx - ax, by - ay), hx: Math.sign(bx - ax), hy: Math.sign(by - ay) });
@@ -745,7 +748,7 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
     modifiedUtc: iso,
     trackClass: 'micro',
     field: { width: HALL.w, depth: HALL.l, gridSize: 0.1 },
-    credit: { designer: 'tgiFlyDay track generator', series: 'HOBIzone', source: 'tgiFlyDay', note: 'HOBIzone whoop hall, 10 × 26 × 3.5 m' },
+    credit: { designer: 'tgiFlyDay track generator', series: 'HOBIzone', source: 'tgiFlyDay', note: `HOBIzone whoop hall, ${HALL.w} × ${HALL.l} × ${HALL.h} m` },
     elements,
     sequence,
   };

@@ -1,9 +1,9 @@
 {
- "version": "2026.11.23-0009",
+ "version": "2026.11.26-1754",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "6820ec2e46d0af8f06343c8539867d25d434df3b3cda8f4a961a5443aeae9817"
+   "sha256": "75571a8e956bddc1c8a264cbdb273c84a80567446398bc9cf97016e145b1a566"
   },
   {
    "path": "web/assets/avatars.js",
@@ -56,6 +56,10 @@
   {
    "path": "web/assets/fonts/big-shoulders-stencil-display-latin-ext-900-normal.woff2",
    "sha256": "2a832664d136037daeb00e01fda9e84354a32aa6bd6568c90202137a92ec61e8"
+  },
+  {
+   "path": "web/assets/hall.js",
+   "sha256": "6a1ec0c61d9f0897d6a2c1bf83b212635b0b046d147194b9545bf69f646c9156"
   },
   {
    "path": "web/assets/i18n-et.js",
@@ -151,7 +155,7 @@
   },
   {
    "path": "web/assets/trackgen.js",
-   "sha256": "7d1fbb57907bb01ea44cb6886b9dcb0f3d6aa476364d2b2ea8b3b81cbe38de17"
+   "sha256": "01c49947f877b4084cdebfe8e0f724d50819b16d0b34f2a7dea454d1d1fc3a7c"
   },
   {
    "path": "web/assets/vendor/LICENSE-three.txt",
@@ -211,7 +215,7 @@
   },
   {
    "path": "web/track.html",
-   "sha256": "dac7dc24f0d0ee4b0e8361d2d1f56b278c37d1646e8d909a879f532bc6d28e4c"
+   "sha256": "20c9bc7719b04afe17c0a409390dbe43d3aa594e4311fa40edd7190a5ea34370"
   }
  ]
 }
