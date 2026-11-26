@@ -214,7 +214,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
 import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL } from '/assets/hall.js';
-import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, ADDABLE } from '/assets/trackgen.js';
+import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, ADDABLE } from '/assets/trackgen.js';
 import { qrSvg } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -452,7 +452,8 @@ function setup3d() {
   const glow = new THREE.Group();
   const glowSq = two((m) => frameMesh(OPEN, OPEN, 0.04, m), new THREE.PlaneGeometry(OPEN, OPEN));
   const glowRing = two((m) => new THREE.Mesh(new THREE.TorusGeometry(OPEN / 2 + 0.02, 0.03, 8, 40), m), new THREE.CircleGeometry(OPEN / 2 + 0.01, 40));
-  glow.add(glowSq, glowRing); glow.visible = false; scene.add(glow);
+  const glowHex = two((m) => hexMesh(m, 0.035), new THREE.CircleGeometry(HEX.inside / 2, 6));
+  glow.add(glowSq, glowRing, glowHex); glow.visible = false; scene.add(glow);
   // the piece picked in the editor: an orange ring on the floor round it
   const pick = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.65, 40), new THREE.MeshBasicMaterial({ color: 0xff6b00, side: THREE.DoubleSide }));
   pick.rotation.x = -Math.PI / 2; pick.visible = false; scene.add(pick);
@@ -473,7 +474,7 @@ function setup3d() {
         glow.visible = true;
         glow.position.copy(V(e.x, e.y, e.h));
         glow.rotation.y = e.yaw;
-        glowRing.visible = e.type === 'ring'; glowSq.visible = !glowRing.visible;
+        glowRing.visible = e.type === 'ring'; glowHex.visible = e.type.startsWith('ladder'); glowSq.visible = !glowRing.visible && !glowHex.visible;
         glow.scale.setScalar((e.type === 'cube' ? 1.5 : 1.08) * (1 + 0.05 * Math.sin(now / 140)));
       } else glow.visible = false;
       if (mode === 'ride') {
@@ -491,6 +492,8 @@ function setup3d() {
   return { renderer, scene, camera, controls, group };
 }
 
+// a ladder stage: a hexagon, tips left and right, flat top and bottom, facing +z
+function hexMesh(mat, t = HEX.tube) { return new THREE.Mesh(new THREE.TorusGeometry(HEX.inside / 2 + t / 2, t / 2, 6, 6), mat); }
 function frameMesh(w, h, t, mat) { // a square opening w × h, tube t thick, centred on the origin, facing +z
   const g = new THREE.Group();
   const add = (sx, sy, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, t), mat); m.position.set(x, y, 0); g.add(m); };
@@ -533,7 +536,8 @@ function draw3d(tr0) {
     } else if (pc.type.startsWith('ladder')) {
       const k = pc.type === 'ladder3' ? 3 : 5;
       const flown = tr0.levels[level].passes[i].map((ps) => (ps.info && ps.info.stage != null ? ps.info.stage : -1));
-      for (let s = 0; s < k; s++) { const f = frameMesh(OPEN, OPEN, T, flown.includes(s) ? orange : white); f.position.y = GATE_Z + s * (OPEN + PIPE); obj.add(f); }
+      // hexagons, flat sides joined, tips to the sides (Janno 26.11.2026)
+      for (let s = 0; s < k; s++) { const f = hexMesh(flown.includes(s) ? orange : white); f.position.y = TYPES[pc.type].levels[s]; obj.add(f); }
     } else if (pc.type === 'cube') {
       const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.7, 0.7, 0.7)), new THREE.LineBasicMaterial({ color: 0xffffff }));
       e.position.y = 0.35; obj.add(e);
@@ -580,7 +584,7 @@ function draw3d(tr0) {
   tr0.seq = [];
   tr0.pieces.forEach((pc, i) => (tr0.cur.passes[i] || []).forEach((ps) => {
     const st = ps.info && ps.info.stage != null ? ps.info.stage : pc.level || 0;
-    const h = pc.type === 'ring' ? pc.z : pc.type === 'cube' ? 0.35 : pc.type.startsWith('ladder') ? GATE_Z + st * (OPEN + PIPE) : GATE_Z;
+    const h = pc.type === 'ring' ? pc.z : pc.type === 'cube' ? 0.35 : pc.type.startsWith('ladder') ? TYPES[pc.type].levels[st] : GATE_Z;
     tr0.seq.push({ s: ps.s, type: pc.type, x: pc.x, y: pc.y, h, yaw: Math.atan2(ps.dx, -ps.dy) });
   }));
   tr0.seq.sort((a, b) => a.s - b.s);
@@ -630,7 +634,7 @@ function planSvg(t) {
     t.pieces.forEach((pc, i) => {
       const pass = t.passes[i], ang = Math.atan2(pass.dx, pass.dy) * 180 / Math.PI;
       const col = pc.type === 'timing' ? '#22c55e' : pc.type === 'ring' ? '#7fc8ff' : '#fff';
-      const w = (pc.type === 'cube' ? 0.7 : OPEN + 0.05) * S;
+      const w = (pc.type === 'cube' ? 0.7 : pc.type.startsWith('ladder') ? HEX.inside + 0.06 : OPEN + 0.05) * S;
       const shape = pc.type === 'flag' ? `<g transform="rotate(${-ang})"><line x1="0" y1="0" x2="0" y2="-14" stroke="#fff" stroke-width="1.6"/><path d="M0,-14 L9,-11 L0,-8 Z" fill="#ff6b00"/><circle r="2.2" fill="#fff"/></g>`
         : pc.type === 'cube' ? `<rect x="${-w / 2}" y="${-w / 2}" width="${w}" height="${w}" fill="none" stroke="${col}" stroke-width="2"/>`
         : pc.type === 'ring' ? `<ellipse rx="${w / 2}" ry="3" fill="none" stroke="${col}" stroke-width="2"/>`
