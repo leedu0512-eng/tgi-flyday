@@ -98,13 +98,15 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 .trk .more-body { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; padding-top: 10px; }
 .trk .placing .page svg { cursor: crosshair; }
 .trk .placing .page { border-color: var(--accent); }
-@media (min-width: 901px) {
-  .trk.editing .trk-grid { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "side ctrl" "side stage" "side list"; }
-  .trk.editing .side { grid-row: 1 / span 3; }
-  .trk.editing .page svg { height: calc(100vh - 120px); }
-  .trk.editing .ctrl { flex-direction: column; align-items: stretch; flex-wrap: nowrap; }
-  .trk.editing .stage { height: 46vh; min-height: 300px; }
-}
+/* editing: the turned plan is the big thing; the 3D is behind Check in 3D (Janno 26.11.2026) */
+.trk.editing .trk-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ctrl" "side" "list"; }
+.trk.editing .side { position: static; }
+.trk.editing .page svg { width: 100%; height: auto; max-height: calc(100vh - 210px); min-height: 0; margin: 0 auto; }
+.trk.editing .stage { display: none; }
+.trk.editing.show3d .stage { display: block; position: fixed; inset: 76px 16px 16px; height: auto; z-index: 7; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .6); }
+.trk.editing .ctrl { align-items: center; }
+.trk .close3d { display: none; position: absolute; right: 12px; bottom: 12px; z-index: 2; }
+.trk.editing.show3d .close3d { display: inline-block; }
 .trk .pinpad { position: fixed; inset: 0; background: rgba(0, 0, 0, .78); display: grid; place-items: center; z-index: 8; }
 .trk .pinpad[hidden] { display: none; }
 .trk .pp-box { background: var(--panel); border: 2px solid var(--accent); border-radius: 14px; padding: 22px; width: min(92vw, 380px); display: grid; gap: 14px; text-align: center; }
@@ -156,6 +158,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
         <div class="addmenu" id="addBox" hidden></div>
       </div>
       <button type="button" class="tb" id="emptyBtn">Start from scratch</button>
+      <button type="button" class="tb" id="view3dBtn" aria-pressed="false">Check in 3D</button>
     </div>
     <div class="field picked"><span>Picked piece</span>
       <div class="sel" id="sel"></div>
@@ -208,6 +211,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
         <button type="button" data-v="full" aria-pressed="true">Pro</button>
       </div>
     </div>
+    <button type="button" class="tb close3d" id="close3d">Close 3D</button>
     <div class="help"><span id="help">Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move</span></div>
   </div>
 
@@ -671,7 +675,7 @@ function planSvg(t) {
     g += `<path d="${d}Z" fill="none" stroke="#ff6b00" stroke-width="2.4" stroke-linejoin="round"/>`;
   }
   g += `<path d="M${px(START)},${py(START)} L${px(START)},${py({ y: START.y + 1.5 })} L${px(TIMING)},${py({ y: TIMING.y - 3 })} L${px(TIMING)},${py(TIMING)}" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="5 4"/>`;
-  g += `<rect x="${px(START) - 8}" y="${py(START) - 8}" width="16" height="16" fill="none" stroke="#fff" stroke-width="2"/><text x="${px(START) - 12}" y="${py(START) + 4}" text-anchor="end" fill="#fff" font-size="11" font-family="var(--display)" font-weight="800">START</text>`;
+  g += `<rect x="${px(START) - 8}" y="${py(START) - 8}" width="16" height="16" fill="none" stroke="#fff" stroke-width="2"/><text x="${px(START) - 12}" y="${py(START) + 4}" text-anchor="end" fill="#fff" font-size="11" font-family="var(--display)" font-weight="800"${editing ? ` transform="rotate(-90 ${px(START)} ${py(START)})"` : ''}>START</text>`;
   if (t) {
     for (const is of editing ? t.issues : []) g += `<circle cx="${px(is)}" cy="${py(is)}" r="11" fill="none" stroke="#ff3b30" stroke-width="2.5" stroke-dasharray="4 3"/>`;
     t.pieces.forEach((pc, i) => {
@@ -685,10 +689,13 @@ function planSvg(t) {
         : `<line x1="${-w / 2}" x2="${w / 2}" y1="0" y2="0" stroke="${col}" stroke-width="${pc.type.startsWith('ladder') ? 6 : 4}" stroke-linecap="round"/>`;
       if (editing && i === picked) g += `<circle cx="${px(pc)}" cy="${py(pc)}" r="15" fill="rgba(255,107,0,.18)" stroke="#ff6b00" stroke-width="2"/>`;
       g += `<g transform="translate(${px(pc)},${py(pc)}) rotate(${ang})">${shape}</g>`;
-      g += `<g transform="translate(${px(pc) + 12},${py(pc) - 12})"><circle r="8.5" fill="${pc.type === 'timing' ? '#22c55e' : '#ff6b00'}"/><text text-anchor="middle" dy="4" font-size="11" font-weight="800" font-family="var(--display)" fill="#000">${i + 1}</text></g>`;
+      g += `<g transform="translate(${px(pc) + 12},${py(pc) - 12})${editing ? ' rotate(-90)' : ''}"><circle r="8.5" fill="${pc.type === 'timing' ? '#22c55e' : '#ff6b00'}"/><text text-anchor="middle" dy="4" font-size="11" font-weight="800" font-family="var(--display)" fill="#000">${i + 1}</text></g>`;
     });
   }
-  g += `<text x="${P + HALL.w * S / 2}" y="${P + HALL.l * S + 26}" text-anchor="middle" fill="#9a9a9a" font-size="12" letter-spacing="2" font-family="var(--display)" font-weight="800">▲ PILOTS ▲</text>`;
+  g += `<text x="${P + HALL.w * S / 2}" y="${P + HALL.l * S + 26}" text-anchor="middle" fill="#9a9a9a" font-size="12" letter-spacing="2" font-family="var(--display)" font-weight="800"${editing ? ` transform="rotate(-90 ${P + HALL.w * S / 2} ${P + HALL.l * S + 22})"` : ''}>${editing ? '◀ PILOTS' : '▲ PILOTS ▲'}</text>`;
+  // editing (Janno 26.11.2026): the plan turned a quarter, the hall's length across the screen,
+  // pilots on the left, the orange wall at the bottom; numbers and words stay upright
+  if (editing) return `<svg viewBox="0 0 ${H} ${W}" role="img" aria-label="Floor plan"><g id="planRot" transform="translate(${H},0) rotate(90)">${g}</g></svg>`;
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Floor plan">${g}</svg>`;
 }
 
@@ -808,6 +815,15 @@ $('addBox').addEventListener('click', (e) => {
 });
 addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeAdd(); setPlacing(null); } });
 addEventListener('pointerdown', (e) => { if (!$('addBox').hidden && !e.target.closest('.addwrap')) closeAdd(); });
+// the 3D, for checking, behind a button while editing
+function show3d(on) {
+  document.body.classList.toggle('show3d', on);
+  $('view3dBtn').setAttribute('aria-pressed', String(on));
+  if (on && track) draw3d(track);
+}
+$('view3dBtn').onclick = () => show3d(!document.body.classList.contains('show3d'));
+$('close3d').onclick = () => show3d(false);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') show3d(false); });
 // start from scratch: an empty hall with only the timing gate, then add pieces one by one
 $('emptyBtn').onclick = () => {
   const o = { style: opts.style, pieces: 6, rings: true, flags: false, kit: { gate: 0, cube: 0, ring: 0, ladder3: 0, ladder5: 0, flag: 0 } };
@@ -918,7 +934,7 @@ function setEditing(on) {
   $('saveBtn').hidden = !on;
   $('cancelBtn').hidden = !on;
   $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
-  closeAdd(); setPlacing(null);
+  closeAdd(); setPlacing(null); show3d(false);
   picked = -1; undo = [];
   if (on && track) { Object.assign(opts, track.opts); syncControls(); }
   if (on && !track) runGenerate();
@@ -1048,9 +1064,9 @@ $('rows').addEventListener('click', (e) => {
 // drag on the floor plan (finger or mouse); a tap without moving turns the piece
 let drag = null;
 const toHall = (ev) => {
-  const svg = $('plan').querySelector('svg'), pt = svg.createSVGPoint();
+  const svg = $('plan').querySelector('svg'), pt = svg.createSVGPoint(), frame = svg.querySelector('#planRot') || svg;
   pt.x = ev.clientX; pt.y = ev.clientY;
-  const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+  const q = pt.matrixTransform(frame.getScreenCTM().inverse());
   return { x: (q.x - P) / S, y: HALL.l - (q.y - P) / S };
 };
 $('plan').addEventListener('pointerdown', (ev) => {

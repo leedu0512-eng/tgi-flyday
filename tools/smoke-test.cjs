@@ -206,10 +206,10 @@ async function typeKeys(scope, text) {
     await tk.click('#editBtn');
     await tk.waitForSelector('#rows tr[data-row]', { timeout: 15000 });
     const row = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Gate/.test(t.children[1].textContent)); return r && [Number(r.dataset.row), parseFloat(r.children[2].textContent), parseFloat(r.children[3].textContent)]; });
-    const box = await tk.evaluate(() => { const s = document.querySelector('#plan svg'), r = s.getBoundingClientRect(); return { k: r.width / s.viewBox.baseVal.width, left: r.left, top: r.top }; });
-    const at = (fromRight, up) => [box.left + (18 + (10 - fromRight) * 22) * box.k, box.top + (18 + (26 - up) * 22) * box.k];
-    const [ax, ay] = at(row[1], row[2]), [bx] = at(row[1] + 1, row[2]);
-    await tk.mouse.move(ax, ay); await tk.mouse.down(); await tk.mouse.move(bx, ay, { steps: 8 }); await tk.mouse.up();
+    // the plan's own frame (it is turned a quarter while editing): hall metres → screen pixels
+    const at = (fromRight, up) => tk.evaluate(([fr, u]) => { const s = document.querySelector('#plan svg'), f = s.querySelector('#planRot') || s, pt = s.createSVGPoint(); pt.x = 18 + (9.5 - fr) * 22; pt.y = 18 + (25.6 - u) * 22; const q = pt.matrixTransform(f.getScreenCTM()); return [q.x, q.y]; }, [fromRight, up]);
+    const [ax, ay] = await at(row[1], row[2]), [bx, by] = await at(row[1] + 1, row[2]);
+    await tk.mouse.move(ax, ay); await tk.mouse.down(); await tk.mouse.move(bx, by, { steps: 8 }); await tk.mouse.up();
     await tk.waitForTimeout(300);
     const moved = await tk.evaluate((i) => parseFloat(document.querySelector(`#rows tr[data-row="${i}"]`).children[2].textContent), row[0]);
     check(Math.abs(moved - row[1] - 1) < 0.15, 'Track: a gate dragged on the floor plan moves 1 m');
