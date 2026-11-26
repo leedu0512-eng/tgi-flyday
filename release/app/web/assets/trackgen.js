@@ -566,13 +566,19 @@ export function cleanChanges(changes, base) {
     const levels = TYPES[t].levels.length, mode = ['up', 'down', 'once'].includes(l.mode) ? l.mode : 'once';
     ladders[key] = { mode, n: clampN(Math.round(Number(l.n) || levels), 2, levels), at: clampN(Math.round(Number(l.at) || 0), 0, levels - 1) };
   }
-  return { removed, added, ladders };
+  // places in the flying order set by hand (Janno 27.11.2026): {key: number}, 2 up (1 is the timing gate)
+  const order = {};
+  for (const [key, v] of Object.entries(c.order || {})) {
+    const t = /^(\d{1,2}|a\d{1,2})$/.test(key) && key !== '0' ? typeOf(key) : null, n = Math.round(Number(v));
+    if (t && Number.isInteger(n) && n >= 2 && n <= 99) order[key] = n;
+  }
+  return { removed, added, ladders, order };
 }
 const ladderStages = (l, levels) => (l.mode === 'up' ? Array.from({ length: l.n }, (_, i) => i) : l.mode === 'down' ? Array.from({ length: l.n }, (_, i) => l.n - 1 - i) : [Math.min(l.at, levels - 1)]);
 export function relayout(base, edits, changes) {
   edits = cleanEdits(edits, base.pieces);
   const ch = cleanChanges(changes, base);
-  const changed = ch.removed.length || ch.added.length || Object.keys(ch.ladders).length;
+  const changed = ch.removed.length || ch.added.length || Object.keys(ch.ladders).length || Object.keys(ch.order).length;
   if (!Object.keys(edits).length && !changed && !base.pieces.some((pc) => liftOf(pc) > 0.005)) return { ...base, pieces: base.pieces.map((pc, i) => ({ ...pc, key: String(i) })), edits, changes: ch, issues: issuesOf(base) };
   const st = STYLE[base.opts.style];
   const all = base.pieces.map((pc, i) => ({ ...pc, key: String(i) }));
@@ -643,6 +649,7 @@ export function relayout(base, edits, changes) {
         : [{ x: pc.x, y: pc.y, z: pc.z, hx, hy, zone, pass: { piece: i, info: { local: 0 } } }];
       A.splice(best.at, 0, ...ins.map((q) => ({ ...q, who: i })));
     }
+    A = placeInOrder(A, ch.order, all);
     // pieces standing on a jump sit on it: their ways through go up by as much
     const lifts = all.map((pc) => liftOf(pc));
     A = A.map((q) => (q.who != null && lifts[q.who] && q.z != null ? { ...q, z: q.z + lifts[q.who] } : q));
@@ -710,11 +717,42 @@ function resequence(A, moves, removed) {
   }
   return A;
 }
+// Places in the flying order set by hand (Janno 27.11.2026: "I need to change the order of the gates"):
+// the lap is read as units, one piece (or one trick shared by several) each, in flying order; a piece
+// given place n is taken out with its unit and put in just before the unit that holds place n now.
+// The timing gate stays first; a piece inside a shared trick keeps its place.
+function placeInOrder(A, order, all) {
+  const want = Object.entries(order || {}).map(([key, n]) => ({ who: all.findIndex((pc) => pc.key === key), n })).filter((o) => o.who > 0).sort((a, b) => a.n - b.n);
+  for (const { who, n } of want) {
+    // units: runs of anchors belonging to one piece, or to one trick (same zone)
+    const units = [];
+    A.forEach((q, j) => {
+      const id = q.zone ? 'z' + q.zone : q.who != null ? 'w' + q.who : null;
+      if (!id) return;
+      const u = units[units.length - 1];
+      if (u && u.id === id && u.end === j - 1) { u.end = j; if (q.who != null) u.whos.add(q.who); }
+      else units.push({ id, start: j, end: j, whos: new Set(q.who != null ? [q.who] : []) });
+    });
+    const flown = units.filter((u) => u.whos.size);               // a unit with nobody in it isn't a place
+    const mine = flown.find((u) => u.whos.has(who));
+    if (!mine || mine.whos.size > 1 || mine.whos.has(0)) continue;
+    const others = flown.filter((u) => u !== mine);
+    // numbers go in flying order: 1 = the first unit (the timing gate's)
+    const target = others[Math.min(n - 1, others.length)];
+    const seg = A.slice(mine.start, mine.end + 1), rest = A.slice(0, mine.start).concat(A.slice(mine.end + 1));
+    let at;
+    if (!target) at = rest.length;
+    else at = target.start > mine.end ? target.start - seg.length : target.start;
+    if (n - 1 >= others.length) { const last = others[others.length - 1]; at = (last.end > mine.end ? last.end - seg.length : last.end) + 1; }
+    A = rest.slice(0, at).concat(seg, rest.slice(at));
+  }
+  return A;
+}
 /** A saved track ({ seed, opts, edits, removed, added, ladders }) as a whole track again, or null. */
 export function rebuild(saved) {
   if (!saved || !Number.isFinite(saved.seed) || !saved.opts || !STYLE[saved.opts.style]) return null;
   const base = makeTrack(saved.seed >>> 0, saved.opts);
-  return base ? relayout(base, saved.edits, { removed: saved.removed, added: saved.added, ladders: saved.ladders }) : null;
+  return base ? relayout(base, saved.edits, { removed: saved.removed, added: saved.added, ladders: saved.ladders, order: saved.order }) : null;
 }
 /** What breaks a rule, for the editor: [{ text, x, y, level }] (x, y where on the plan). */
 export function issuesOf(tr) {

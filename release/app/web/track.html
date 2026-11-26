@@ -98,13 +98,28 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 .trk .more-body { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; padding-top: 10px; }
 .trk .placing .page svg { cursor: crosshair; }
 .trk .placing .page { border-color: var(--accent); }
-/* editing: the turned plan is the big thing; the 3D is behind Check in 3D (Janno 26.11.2026) */
-.trk.editing .trk-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ctrl" "side" "list"; }
-.trk.editing .side { position: static; }
-.trk.editing .page svg { width: 100%; height: auto; max-height: calc(100vh - 210px); min-height: 0; margin: 0 auto; }
-.trk.editing .stage { display: none; }
-.trk.editing.show3d .stage { display: block; position: fixed; inset: 76px 16px 16px; height: auto; z-index: 7; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .6); }
+/* editing (Janno 27.11.2026): the 3D hall is the editor, as in WebFPV's whoop builder; the plan is
+   for viewing and the printed sheet */
+.trk.editing .trk-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ctrl" "stage" "list"; }
+.trk.editing .side, .trk.editing .addwrap, .trk.editing #view3dBtn { display: none; }
+.trk.editing .stage { display: block; height: calc(100vh - 190px); min-height: 440px; }
 .trk.editing .ctrl { align-items: center; }
+.trk .palette { display: none; }
+/* the picked piece's buttons sit over the 3D, top left, so nothing on the page moves while you work */
+.trk .selpanel { display: none; }
+.trk.editing .selpanel { display: grid; gap: 6px; position: absolute; left: 12px; top: 112px; z-index: 3; max-width: min(640px, calc(100% - 24px)); background: rgba(10, 10, 10, .85); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.trk .selpanel .lbl { font: 700 12px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.trk .selpanel .sel { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.trk.editing .palette { display: flex; gap: 8px; position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 3; background: rgba(10, 10, 10, .82); border: 1px solid var(--line); border-radius: 14px; padding: 8px; max-width: calc(100% - 24px); overflow-x: auto; }
+.trk .palette button { all: unset; cursor: pointer; display: grid; gap: 3px; min-width: 84px; padding: 9px 12px; border-radius: 10px; background: var(--panel-2); border: 2px solid transparent; text-align: center; }
+.trk .palette button b { font: 800 17px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.trk .palette button span { font: 600 12px/1 'Archivo', sans-serif; color: var(--muted); }
+.trk .palette button[aria-pressed="true"] { border-color: var(--accent); background: #2a1606; }
+.trk .palette button:disabled { opacity: .35; cursor: default; }
+.trk.editing.placing .stage canvas { cursor: crosshair; }
+.trk .sel .order { display: inline-flex; align-items: center; gap: 6px; }
+.trk .sel .order b { font: 800 20px/1 var(--display); min-width: 1.4em; text-align: center; }
+.trk.editing .help { bottom: 92px; }
 .trk .close3d { display: none; position: absolute; right: 12px; bottom: 12px; z-index: 2; }
 .trk.editing.show3d .close3d { display: inline-block; }
 .trk .pinpad { position: fixed; inset: 0; background: rgba(0, 0, 0, .78); display: grid; place-items: center; z-index: 8; }
@@ -160,9 +175,6 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
       <button type="button" class="tb" id="emptyBtn">Start from scratch</button>
       <button type="button" class="tb" id="view3dBtn" aria-pressed="false">Check in 3D</button>
     </div>
-    <div class="field picked"><span>Picked piece</span>
-      <div class="sel" id="sel"></div>
-    </div>
     <details class="more" id="genMore">
       <summary>Generate a track</summary>
       <div class="more-body">
@@ -198,6 +210,8 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
   </section>
 
   <div class="stage" id="stage">
+    <div class="palette" id="palette" aria-label="The kit"></div>
+    <div class="selpanel" id="selPanel"><span class="lbl">Picked piece</span><div class="sel" id="sel"></div></div>
     <div class="hud">
       <div class="chips" id="chips"></div>
       <div class="views" role="group" aria-label="View">
@@ -256,7 +270,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
-import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL } from '/assets/hall.js';
+import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, floorAt } from '/assets/hall.js';
 import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, onRail, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
 import { qrSvg } from '/assets/common.js';
 
@@ -529,12 +543,138 @@ function setup3d() {
         whoop.visible = false;
       } else { whoop.visible = true; controls.update(); }
       const pc = editing && picked >= 0 ? track.pieces[picked] : null;
-      pick.visible = !!pc && mode !== 'ride';
-      if (pc) pick.position.copy(V(pc.x, pc.y, 0.01));
+      pick.visible = !!pc && mode !== 'ride' && pc.type !== 'timing';
+      if (pc) { const at = ed.dragAt || pc; pick.position.copy(V(at.x, at.y, (at.lift ?? pc.lift ?? 0) + 0.012)); }
+      ed.ghost.visible = !!placing && ed.ghostOn && mode !== 'ride';
     } else { controls.update(); glow.visible = false; whoop.visible = false; pick.visible = false; }
     renderer.render(scene, camera);
   });
-  return { renderer, scene, camera, controls, group };
+  pick.material = new THREE.MeshBasicMaterial({ color: 0xff6b00, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+  pick.geometry = new THREE.RingGeometry(0.5, 0.68, 48);    // the ring round a picked piece's foot: drag it to turn the piece
+  ed.ghost = new THREE.Group(); scene.add(ed.ghost);
+  hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+  ray = new THREE.Raycaster(); floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  return { renderer, scene, camera, controls, group, pick, objs: [], hits: [] };
+}
+// ---------- building in 3D (Janno 27.11.2026: "use the 3D space to pick and place the gates") ----------
+// Like WebFPV's whoop builder: the room is the tool. A piece armed from the kit below follows the pointer
+// as a ghost and a click on the floor places it (the tool stays armed; Escape or a right click puts it
+// away). A click anywhere in a piece picks it, a drag moves it across the floor, a drag on the orange ring
+// round its foot turns it. A drag on empty floor turns the camera, as before.
+const ed = { ghost: null, ghostOn: false, ghostAt: null, dragAt: null, drag: null, down: null };
+let hitMat = null, ray = null, floorPlane = null;   // made once THREE is there (setup3d)
+function hitBox(pc) {
+  let g, y;
+  if (pc.type === 'gate' || pc.type === 'timing') { g = new THREE.BoxGeometry(OPEN + 0.12, OPEN + 0.12, 0.3); y = GATE_Z; }
+  else if (pc.type === 'cube') { g = new THREE.BoxGeometry(0.8, 0.8, 0.8); y = 0.35; }
+  else if (pc.type === 'flag') { g = new THREE.BoxGeometry(0.45, 1.9, 0.45); y = 0.95; }
+  else if (pc.type === 'ring') { g = new THREE.BoxGeometry(OPEN + 0.1, OPEN + 0.1, 0.25); y = pc.z; }
+  else { const L = LADDER[pc.type], lv = TYPES[pc.type].levels, lo = lv[0] - L.h / 2 - L.tube, hi = lv[lv.length - 1] + L.h / 2 + L.tube; g = new THREE.BoxGeometry(L.w + 0.12, hi - lo, 0.3); y = (lo + hi) / 2; }
+  const m = new THREE.Mesh(g, hitMat); m.position.y = y; return m;
+}
+function ghostOf(type) { // what follows the pointer while a piece is armed
+  const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xff9a4d, transparent: true, opacity: 0.6, depthWrite: false });
+  if (type === 'gate') { const f = frameMesh(OPEN, OPEN, 0.03, m); f.position.y = GATE_Z; g.add(f); }
+  else if (type === 'cube') { const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.7, 0.7, 0.7)), new THREE.LineBasicMaterial({ color: 0xff9a4d })); e.position.y = 0.35; g.add(e); }
+  else if (type === 'ring') { const r = new THREE.Mesh(new THREE.TorusGeometry(OPEN / 2 + 0.015, 0.02, 8, 40), m); r.position.y = RING_Z; g.add(r); }
+  else if (type === 'flag') { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.9, 8), m); p.position.y = 0.95; g.add(p); const c = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.9), m); c.position.set(0.17, 1.4, 0); g.add(c); }
+  else if (LADDER[type]) { const L = LADDER[type]; for (const z of TYPES[type].levels) { const f = L.shape === 'hex' ? hexMesh(m) : new THREE.Mesh(new THREE.TorusGeometry(L.w / 2 + L.tube / 2, L.tube / 2, 8, 40), m); f.position.y = z; g.add(f); } }
+  const foot = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.5, 40), new THREE.MeshBasicMaterial({ color: 0xff9a4d, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }));
+  foot.rotation.x = -Math.PI / 2; foot.position.y = 0.012; g.add(foot);
+  return g;
+}
+function rayAt(e) {
+  const r = three.renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), three.camera);
+}
+function floorAt3d(e, h = 0) { // where the pointer meets the floor (or a level h metres up), in hall metres
+  rayAt(e);
+  const p = new THREE.Vector3();
+  floorPlane.constant = -h;
+  if (!ray.ray.intersectPlane(floorPlane, p)) return null;
+  return { x: p.x + HALL.w / 2, y: HALL.l / 2 - p.z };
+}
+const snap10 = (v) => Math.round(v * 10) / 10;
+function spotFor(type, x, y) { // snapped to 10 cm, kept on the carpet, on the nearest cable if it hangs
+  x = Math.max(0.3, Math.min(HALL.w - 0.3, snap10(x))); y = Math.max(0.3, Math.min(HALL.l - 0.3, snap10(y)));
+  if (onRail(type)) x = RAILS.reduce((b, r) => (Math.abs(r - x) < Math.abs(b - x) ? r : b), RAILS[0]);
+  const lift = type === 'flag' || onRail(type) ? 0 : floorAt(x, y);
+  return { x, y, lift };
+}
+function armPiece(t) {
+  if (!three) return;
+  while (ed.ghost.children.length) ed.ghost.remove(ed.ghost.children[0]);
+  if (t) ed.ghost.add(ghostOf(t));
+  ed.ghostOn = false;
+}
+function edDown(e) {
+  if (!editing || !three || !track || mode === 'ride' || e.target !== three.renderer.domElement) return;
+  if (e.button === 2) { if (placing) { setPlacing(null); e.preventDefault(); } return; }
+  if (e.button !== 0) return;
+  ed.down = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  if (placing) return;                                     // a drag while armed turns the camera; a click places
+  rayAt(e);
+  const pc = picked >= 0 ? track.pieces[picked] : null;
+  if (pc && pc.type !== 'timing' && ray.intersectObject(three.pick).length) { // the ring round its foot: turn
+    const f = floorAt3d(e); if (!f) return;
+    ed.drag = { kind: 'turn', i: picked, key: pc.key, a0: Math.atan2(f.x - pc.x, f.y - pc.y), yaw0: three.objs[picked].rotation.y, d: 0, step: onRail(pc.type) ? 90 : 15 };
+  } else {
+    const hit = ray.intersectObjects(three.hits, false)[0];
+    if (!hit) return;                                      // empty floor: the camera turns
+    // dragged at the height it was grabbed, so the piece stays under the pointer
+    const i = hit.object.userData.piece, p = track.pieces[i], h = hit.point.y, f = floorAt3d(e, h);
+    picked = i; renderSheet(); renderSel();
+    if (p.type === 'timing' || !f) return;
+    ed.drag = { kind: 'move', i, key: p.key, type: p.type, h, f0: f, p0: { x: p.x, y: p.y }, at: null };
+  }
+  three.controls.enabled = false;
+  three.renderer.domElement.setPointerCapture(e.pointerId);
+  e.stopPropagation(); e.preventDefault();
+}
+function edMove(e) {
+  if (!editing || !three || !track) return;
+  if (placing && !ed.drag) {
+    const f = floorAt3d(e);
+    if (!f) { ed.ghostOn = false; return; }
+    const at = spotFor(placing, f.x, f.y);
+    ed.ghost.position.copy(V(at.x, at.y, at.lift)); ed.ghostOn = true; ed.ghostAt = at;
+    return;
+  }
+  const d = ed.drag; if (!d) return;
+  const f = floorAt3d(e, d.kind === 'move' ? d.h : 0); if (!f) return;
+  const o = three.objs[d.i];
+  if (d.kind === 'move') {
+    d.at = spotFor(d.type, d.p0.x + f.x - d.f0.x, d.p0.y + f.y - d.f0.y);
+    o.position.copy(V(d.at.x, d.at.y, d.at.lift)); ed.dragAt = d.at;
+  } else {
+    const pc = track.pieces[d.i], a = Math.atan2(f.x - pc.x, f.y - pc.y);
+    let deg = ((a - d.a0) * 180) / Math.PI; deg = ((deg + 540) % 360) - 180;
+    d.d = Math.round(deg / d.step) * d.step;
+    o.rotation.y = d.yaw0 - (d.d * Math.PI) / 180;
+  }
+}
+function edUp(e) {
+  if (!editing || !three) return;
+  const moved = ed.down ? Math.hypot(e.clientX - ed.down.x, e.clientY - ed.down.y) : 99;
+  const d = ed.drag; ed.drag = null; ed.dragAt = null;
+  three.controls.enabled = mode !== 'ride';
+  if (d) {
+    const pc = track.pieces[d.i];
+    if (d.kind === 'move' && d.at && (Math.abs(d.at.x - pc.x) > 0.04 || Math.abs(d.at.y - pc.y) > 0.04)) change((c) => moveBy(c, d.key, d.at.x - pc.x, d.at.y - pc.y, 0));
+    else if (d.kind === 'turn' && d.d) change((c) => moveBy(c, d.key, 0, 0, d.d));
+    else if (d.kind === 'move') draw3d(track);              // only picked: put it back exactly
+  } else if (placing && ed.down && moved < 6 && e.target === three.renderer.domElement) {
+    const f = floorAt3d(e);
+    if (f) placePiece(placing, spotFor(placing, f.x, f.y));
+  } else if (!placing && ed.down && moved < 6 && e.target === three.renderer.domElement && picked >= 0) { picked = -1; renderSheet(); renderSel(); }
+  ed.down = null;
+}
+function placePiece(t, at) {
+  const n = (track.changes?.added || []).length;
+  change((c) => { c.added.push({ type: t, x: at.x, y: at.y, rot: 0 }); }, false);
+  picked = track.pieces.findIndex((pc) => pc.key === 'a' + n); renderSheet(); renderSel();
+  const used = track.pieces.filter((pc) => pc.type === t).length;
+  if (used >= (kit[t] || 0)) setPlacing(null);             // none of that kind left in the kit
 }
 
 // a ladder stage: a hexagon, tips left and right, flat top and bottom, facing +z
@@ -550,6 +690,7 @@ function draw3d(tr0) {
   if (!three) return;
   const { group } = three;
   while (group.children.length) group.remove(group.children[0]);
+  three.objs = []; three.hits = [];
   if (!tr0) return;
   const white = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const orange = new THREE.MeshLambertMaterial({ color: 0xff6b00 });
@@ -601,6 +742,9 @@ function draw3d(tr0) {
     obj.position.copy(V(pc.x, pc.y, pc.lift || 0));   // on the hump, if it stands on it
     obj.rotation.y = yaw;
     group.add(obj);
+    // a see-through box round the piece, so a click anywhere in it picks it (not only its thin pipes)
+    const hb = hitBox(pc); hb.userData.piece = i; obj.add(hb);
+    three.objs[i] = obj; three.hits.push(hb);
     const c = document.createElement('canvas'); c.width = c.height = 64;
     const x = c.getContext('2d'); x.fillStyle = pc.type === 'timing' ? '#22c55e' : '#ff6b00'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill();
     x.fillStyle = '#000'; x.font = '800 34px "Big Shoulders", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 34);
@@ -608,7 +752,7 @@ function draw3d(tr0) {
     sp.scale.set(0.32, 0.32, 1);
     sp.position.copy(V(pc.x, pc.y, Math.min(HALL.h - 0.05, TYPES[pc.type].zmax + 0.3 + (pc.lift || 0))));
     if (pc.type === 'ring') sp.position.y = pc.z - 0.45;
-    sp.userData.label = true; group.add(sp);
+    sp.userData.label = true; sp.userData.piece = i; group.add(sp); three.hits.push(sp);
   });
   // the racing line, coloured low (orange) to high (light)
   tr0.cur = tr0.levels[level];
@@ -643,7 +787,7 @@ function setView(m, keepCamera) {
   if (three) three.group.children.forEach((o) => { if (o.userData.line || o.userData.label) o.visible = m !== 'ride'; if (o.userData.rideLine) o.visible = m === 'ride'; });
   if (three) { three.camera.fov = m === 'ride' ? 78 : 50; three.camera.updateProjectionMatrix(); }
   for (const [id, v] of [['viewOrbit', 'orbit'], ['viewRide', 'ride'], ['viewTop', 'top']]) $(id).setAttribute('aria-pressed', String(m === v));
-  $('help').textContent = m === 'ride' ? tr('Riding the racing line · the next piece lights up: green on the side you fly in, red on the wrong side') : tr('Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move');
+  $('help').textContent = m === 'ride' ? tr('Riding the racing line · the next piece lights up: green on the side you fly in, red on the wrong side') : editing ? (placing ? tr('Click the floor where the {piece} goes · it stays picked for the next · Escape or right click to stop', { piece: tr(LABEL[placing]).toLowerCase() }) : tr('Click a piece to pick it · drag it to move · drag the orange ring to turn · drag the floor to look round')) : tr('Drag to turn · pinch or scroll to zoom · two fingers or right-drag to move');
   if (!three) return;
   const { camera, controls } = three;
   controls.enabled = m !== 'ride';
@@ -763,15 +907,17 @@ function ladderNow(pc) {
 }
 function renderSel() {
   if (!editing) return;
-  renderAdd();
+  renderAdd(); renderPalette();
   const pc = track && picked >= 0 ? track.pieces[picked] : null;
   const undoBtn = `<button type="button" class="tb" data-undo ${undo.length ? '' : 'disabled'}>${tr('Undo')}</button>`;
   if (!pc || pc.type === 'timing') {
-    $('sel').innerHTML = `<span class="muted">${tr(pc ? 'The timing gate stays where it is.' : 'Drag a piece on the floor plan to move it, tap it to turn it.')}</span>` + undoBtn;
+    $('sel').innerHTML = `<span class="muted">${tr(pc ? 'The timing gate stays where it is.' : 'Pick a piece from the kit below and click the floor to place it. Click a piece to pick it, drag it to move it, drag the ring round its foot to turn it.')}</span>` + undoBtn;
     return;
   }
   const step = onRail(pc.type) ? 90 : 15;
+  const last = track.pieces.filter((p) => p.passes && p.passes.length).length;
   let html = `<span class="name">${picked + 1} · ${tr(LABEL[pc.type])}</span>`
+    + `<span class="order"><span class="muted">${tr('Place in the lap')}</span><button type="button" class="tb" data-order="-1" ${picked <= 1 ? 'disabled' : ''} aria-label="${tr('Fly it earlier')}">◀</button><b>${picked + 1}</b><button type="button" class="tb" data-order="1" ${picked >= last - 1 ? 'disabled' : ''} aria-label="${tr('Fly it later')}">▶</button></span>`
     + `<button type="button" class="tb" data-rot="${-step}" aria-label="Turn left">⟲ ${step}°</button><button type="button" class="tb" data-rot="${step}" aria-label="Turn right">⟳ ${step}°</button>`
     + `<button type="button" class="tb" data-nudge="-0.1,0" aria-label="Left 10 cm">←</button><button type="button" class="tb" data-nudge="0,0.1" aria-label="Up 10 cm">↑</button><button type="button" class="tb" data-nudge="0,-0.1" aria-label="Down 10 cm">↓</button><button type="button" class="tb" data-nudge="0.1,0" aria-label="Right 10 cm">→</button>`;
   if (pc.type.startsWith('ladder')) { // how the ladder is flown (Janno 23.11.2026)
@@ -799,8 +945,25 @@ let placing = null;
 function setPlacing(t) {
   placing = t;
   document.body.classList.toggle('placing', !!t);
-  $('planTitle').textContent = t ? tr('Tap the plan where the {piece} goes', { piece: tr(LABEL[t]).toLowerCase() }) : tr(editing ? 'Floor plan · drag to move, tap to turn' : 'Floor plan');
+  $('planTitle').textContent = tr('Floor plan');
+  if (three) armPiece(t);
+  if (editing) $('help').textContent = t ? tr('Click the floor where the {piece} goes · it stays picked for the next · Escape or right click to stop', { piece: tr(LABEL[t]).toLowerCase() }) : tr('Click a piece to pick it · drag it to move · drag the orange ring to turn · drag the floor to look round');
+  renderPalette();
 }
+function renderPalette() { // the kit along the bottom of the 3D: pick one, then click the floor
+  if (!$('palette')) return;
+  if (!editing || !track) { $('palette').innerHTML = ''; return; }
+  const used = {};
+  for (const pc of track.pieces) used[pc.type] = (used[pc.type] || 0) + 1;
+  $('palette').innerHTML = ADDABLE.map((t) => {
+    const left = Math.max(0, (kit[t] || 0) - (used[t] || 0));
+    return `<button type="button" data-arm="${t}" aria-pressed="${placing === t}" ${left > 0 ? '' : 'disabled'}><b>${tr(LABEL[t])}</b><span>${tr('{n} left', { n: left })}</span></button>`;
+  }).join('');
+}
+$('palette').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-arm]'); if (!b || b.disabled || !track) return;
+  setPlacing(placing === b.dataset.arm ? null : b.dataset.arm);
+});
 function closeAdd() { $('addBox').hidden = true; $('addBtn').setAttribute('aria-expanded', 'false'); }
 $('addBtn').onclick = () => {
   if (placing) { setPlacing(null); return; }
@@ -866,16 +1029,17 @@ function showToday() {
 function current() {
   if (!track) return null;
   const ch = track.changes || {};
-  return JSON.parse(JSON.stringify({ seed: track.seed, opts: track.opts, edits: track.edits || {}, removed: ch.removed || [], added: ch.added || [], ladders: ch.ladders || {} }));
+  return JSON.parse(JSON.stringify({ seed: track.seed, opts: track.opts, edits: track.edits || {}, removed: ch.removed || [], added: ch.added || [], ladders: ch.ladders || {}, order: ch.order || {} }));
 }
 function remember() { const c = current(); if (c) { undo.push(c); if (undo.length > 60) undo.shift(); } }
 function build(c) {
   const base = baseOf(c.seed, c.opts);
-  return base ? relayout(base, c.edits, { removed: c.removed, added: c.added, ladders: c.ladders }) : null;
+  return base ? relayout(base, c.edits, { removed: c.removed, added: c.added, ladders: c.ladders, order: c.order }) : null;
 }
 function apply(c, o = {}) { show(build(c), o); }
 /** Move or turn the piece with this key: a generated one through its edit, an added one where it stands. */
 function moveBy(c, key, dx, dy, drot) {
+  if ((dx || dy) && c.order) delete c.order[key];   // moved: it finds its place in the lap by itself again
   if (key[0] === 'a') {
     const a = c.added[Number(key.slice(1))]; if (!a) return;
     a.x += dx; a.y += dy; a.rot = (((a.rot + drot) % 360) + 360) % 360;
@@ -908,10 +1072,14 @@ function removePiece(key) {
         if (j < k) lad[kk] = v; else if (j > k) lad['a' + (j - 1)] = v;
       }
       c.ladders = lad;
+      const ord = {};
+      for (const [kk, v] of Object.entries(c.order || {})) { if (kk[0] !== 'a') { ord[kk] = v; continue; } const j = Number(kk.slice(1)); if (j < k) ord[kk] = v; else if (j > k) ord['a' + (j - 1)] = v; }
+      c.order = ord;
     } else {
       c.removed.push(Number(key));
       delete c.edits[key];
       delete c.ladders[key];
+      if (c.order) delete c.order[key];
     }
   }, false);
   picked = -1; renderSheet(); renderSel();
@@ -1050,7 +1218,16 @@ $('sel').addEventListener('click', (e) => {
   const key = pc.key;
   if (b.dataset.rot) return change((c) => moveBy(c, key, 0, 0, Number(b.dataset.rot)));
   if (b.dataset.nudge) { const [dx, dy] = b.dataset.nudge.split(',').map(Number); return change((c) => moveBy(c, key, dx, dy, 0)); }
-  if (b.dataset.reset != null) return change((c) => { delete c.edits[key]; delete c.ladders[key]; });
+  if (b.dataset.order) {
+    const was = picked, n = picked + 1 + Number(b.dataset.order);
+    change((c) => { c.order = { ...(c.order || {}), [key]: n }; });
+    if (picked === was) { // flown together with other pieces (a trick), or the timing gate: it keeps its place
+      const c = undo.pop(); if (c) { apply(c); picked = was; renderSheet(); renderSel(); }
+      toast(tr('This piece is flown together with others in one trick, so it keeps its place.'));
+    }
+    return;
+  }
+  if (b.dataset.reset != null) return change((c) => { delete c.edits[key]; delete c.ladders[key]; if (c.order) delete c.order[key]; });
   if (b.dataset.remove != null) return removePiece(key);
   if (b.dataset.lmode) return change((c) => { c.ladders[key] = { ...ladderNow(pc), mode: b.dataset.lmode }; });
   if (b.dataset.ln) return change((c) => { const l = ladderNow(pc); c.ladders[key] = { ...l, n: l.n + Number(b.dataset.ln) }; });
@@ -1126,6 +1303,25 @@ $('level').addEventListener('click', (e) => {
 });
 
 three = setup3d();
+if (three) {
+  $('stage').addEventListener('pointerdown', edDown, true);   // before the camera's own handler: a piece takes the press
+  addEventListener('pointermove', edMove);
+  addEventListener('pointerup', edUp);
+  addEventListener('pointercancel', edUp);
+  $('stage').addEventListener('contextmenu', (e) => { if (editing) e.preventDefault(); });
+  // test hook: where a point of the hall is on the screen
+  window.__trk = { floorAt: (cx, cy, h) => floorAt3d({ clientX: cx, clientY: cy }, h), cam: () => three.camera.position.toArray().map((v) => +v.toFixed(2)), hitAt: (cx, cy) => { rayAt({ clientX: cx, clientY: cy }); const h = ray.intersectObjects(three.hits, false)[0]; return h ? h.object.userData.piece : null; }, hits: () => three.hits.length, screenOf: (x, y, z = 0) => { const v = V(x, y, z).project(three.camera), r = three.renderer.domElement.getBoundingClientRect(); return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]; } };
+}
+// keys while editing: Delete removes the picked piece, Q / E turn it, arrows nudge it 10 cm
+addEventListener('keydown', (e) => {
+  if (!editing || !track || picked < 0 || e.target.closest('input, select, textarea')) return;
+  const pc = track.pieces[picked]; if (!pc || pc.type === 'timing') return;
+  const step = onRail(pc.type) ? 90 : 15, k = e.key;
+  if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); removePiece(pc.key); }
+  else if (k === 'q' || k === 'Q') change((c) => moveBy(c, pc.key, 0, 0, -step));
+  else if (k === 'e' || k === 'E') change((c) => moveBy(c, pc.key, 0, 0, step));
+  else if (k.startsWith('Arrow')) { e.preventDefault(); const d = { ArrowLeft: [-0.1, 0], ArrowRight: [0.1, 0], ArrowUp: [0, 0.1], ArrowDown: [0, -0.1] }[k]; change((c) => moveBy(c, pc.key, d[0], d[1], 0)); }
+});
 setView('orbit');
 await loadSaved();
 showToday();

@@ -10,7 +10,7 @@ export type TrackOpts = { style: 'flowing' | 'technical'; pieces: number; rings:
 export type TrackEdit = { dx: number; dy: number; rot: number };
 export type TrackAdded = { type: string; x: number; y: number; rot: number };
 export type TrackLadder = { mode: 'up' | 'down' | 'once'; n: number; at: number };
-export type SavedTrack = { seed: number; opts: TrackOpts; edits: Record<string, TrackEdit>; removed?: number[]; added?: TrackAdded[]; ladders?: Record<string, TrackLadder>; code: string; savedAt: string; from: string };
+export type SavedTrack = { seed: number; opts: TrackOpts; edits: Record<string, TrackEdit>; removed?: number[]; added?: TrackAdded[]; ladders?: Record<string, TrackLadder>; order?: Record<string, number>; code: string; savedAt: string; from: string };
 export type TrackData = { today: SavedTrack | null; history: SavedTrack[]; kit?: Record<string, number> | null };
 
 // the club's kit (Janno 26.11.2026: editable on the track page); the limits match trackgen.js KIT_MAX
@@ -55,7 +55,10 @@ export function cleanTrack(b: any, now = new Date()): SavedTrack {
   }
   const code = String(t?.code ?? '').replace(/[^A-Z0-9-]/gi, '').slice(0, 12);
   const from = String(b?.from ?? '').replace(/[^a-z]/g, '').slice(0, 12) || 'page';
-  return { seed, opts, edits, ...(removed.length ? { removed } : {}), ...(added.length ? { added } : {}), ...(Object.keys(ladders).length ? { ladders } : {}), code, savedAt: now.toISOString(), from };
+  // places in the flying order set by hand: {key: number}
+  const order: Record<string, number> = {};
+  for (const [k, v] of Object.entries(t?.order ?? {}).slice(0, 40)) if (/^(\d{1,2}|a\d{1,2})$/.test(k) && k !== '0') order[k] = Math.round(num(v, 2, 99));
+  return { seed, opts, edits, ...(removed.length ? { removed } : {}), ...(added.length ? { added } : {}), ...(Object.keys(ladders).length ? { ladders } : {}), ...(Object.keys(order).length ? { order } : {}), code, savedAt: now.toISOString(), from };
 }
 
 /**

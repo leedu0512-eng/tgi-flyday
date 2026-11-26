@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.26-2103" : "dev";
+var VERSION = true ? "2026.11.27-0107" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2690,7 +2690,9 @@ function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
   }
   const code = String(t?.code ?? "").replace(/[^A-Z0-9-]/gi, "").slice(0, 12);
   const from = String(b?.from ?? "").replace(/[^a-z]/g, "").slice(0, 12) || "page";
-  return { seed, opts, edits, ...removed.length ? { removed } : {}, ...added.length ? { added } : {}, ...Object.keys(ladders).length ? { ladders } : {}, code, savedAt: now.toISOString(), from };
+  const order = {};
+  for (const [k, v] of Object.entries(t?.order ?? {}).slice(0, 40)) if (/^(\d{1,2}|a\d{1,2})$/.test(k) && k !== "0") order[k] = Math.round(num(v, 2, 99));
+  return { seed, opts, edits, ...removed.length ? { removed } : {}, ...added.length ? { added } : {}, ...Object.keys(ladders).length ? { ladders } : {}, ...Object.keys(order).length ? { order } : {}, code, savedAt: now.toISOString(), from };
 }
 var PIN_TRIES = 5;
 var PIN_WAIT_MS = 6e4;

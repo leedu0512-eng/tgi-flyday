@@ -205,23 +205,43 @@ async function typeKeys(scope, text) {
     await tk.waitForSelector('#editBtn', { timeout: 8000 });
     await tk.click('#editBtn');
     await tk.waitForSelector('#rows tr[data-row]', { timeout: 15000 });
-    const row = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Gate/.test(t.children[1].textContent)); return r && [Number(r.dataset.row), parseFloat(r.children[2].textContent), parseFloat(r.children[3].textContent)]; });
-    // the plan's own frame (it is turned a quarter while editing): hall metres → screen pixels
-    const at = (fromRight, up) => tk.evaluate(([fr, u]) => { const s = document.querySelector('#plan svg'), f = s.querySelector('#planRot') || s, pt = s.createSVGPoint(); pt.x = 18 + (9.5 - fr) * 22; pt.y = 18 + (25.6 - u) * 22; const q = pt.matrixTransform(f.getScreenCTM()); return [q.x, q.y]; }, [fromRight, up]);
-    const [ax, ay] = await at(row[1], row[2]), [bx, by] = await at(row[1] + 1, row[2]);
-    await tk.mouse.move(ax, ay); await tk.mouse.down(); await tk.mouse.move(bx, by, { steps: 8 }); await tk.mouse.up();
-    await tk.waitForTimeout(300);
-    const moved = await tk.evaluate((i) => parseFloat(document.querySelector(`#rows tr[data-row="${i}"]`).children[2].textContent), row[0]);
-    check(Math.abs(moved - row[1] - 1) < 0.15, 'Track: a gate dragged on the floor plan moves 1 m');
+    // the 3D hall is the editor (Janno 27.11.2026): grab a gate the pointer really hits, drag it 1 m
+    const row = await tk.evaluate(() => {
+      for (const r of document.querySelectorAll('#rows tr[data-row]')) {
+        if (!/^Gate/.test(r.children[1].textContent.trim())) continue;
+        const i = Number(r.dataset.row), fr = parseFloat(r.children[2].textContent), up = parseFloat(r.children[3].textContent);
+        const [x, y] = window.__trk.screenOf(9.5 - fr, up, 0.33);
+        if (window.__trk.hitAt(x, y) === i) return [i, fr, up, x, y];
+      }
+      return null;
+    });
+    check(!!row, 'Track: a gate can be picked in the 3D hall');
+    if (row) {
+      const [bx, by] = await tk.evaluate(([fr, up]) => window.__trk.screenOf(9.5 - fr - 1, up, 0.33), [row[1], row[2]]);
+      await tk.mouse.move(row[3], row[4]); await tk.mouse.down(); await tk.mouse.move(bx, by, { steps: 8 }); await tk.mouse.up();
+      await tk.waitForTimeout(400);
+      const movedTo = await tk.$$eval('#rows tr[data-row]', (rs) => rs.map((r) => [parseFloat(r.children[2].textContent), parseFloat(r.children[3].textContent)]));
+      check(movedTo.some(([fr, up]) => Math.abs(fr - row[1] - 1) < 0.15 && Math.abs(up - row[2]) < 0.15), 'Track: a gate dragged in the 3D hall moves 1 m');
+    }
     // take a gate away, add one from the kit, fly a ladder another way
     const before = await tk.$$eval('#rows tr[data-row]', (r) => r.length);
-    await tk.click(`#rows tr[data-row="${row[0]}"]`);
+    const gateRow = await tk.evaluate(() => [...document.querySelectorAll('#rows tr[data-row]')].find((r) => /^Gate/.test(r.children[1].textContent.trim())).dataset.row);
+    await tk.click(`#rows tr[data-row="${gateRow}"]`);
     await tk.click('#sel [data-remove]');
     check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before - 1, 'Track: Remove takes a gate away');
-    await tk.click('#addBtn');
-    await tk.click('#addBox [data-add="gate"]');
-    { const bb = await tk.locator('#plan svg').boundingBox(); await tk.mouse.click(bb.x + bb.width * 0.45, bb.y + bb.height * 0.3); }
-    check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before, 'Track: + Gate adds one from the kit');
+    await tk.click('#palette [data-arm="gate"]');
+    { const [gx, gy] = await tk.evaluate(() => window.__trk.screenOf(4.75, 3, 0)); await tk.mouse.move(gx, gy); await tk.mouse.click(gx, gy); }
+    await tk.keyboard.press('Escape');
+    check(await tk.$$eval('#rows tr[data-row]', (r) => r.length) === before, 'Track: a gate from the kit is placed with a click on the floor');
+    // fly a piece one place earlier (pieces flown together in one trick keep their place and say so)
+    { const spot = (i) => tk.evaluate((i) => { const r = document.querySelector(`#rows tr[data-row="${i}"]`); return r ? r.children[1].textContent.trim().split(' ')[0] + r.children[2].textContent + r.children[3].textContent : null; }, i);
+      let ok = false; const n = await tk.$$eval('#rows tr[data-row]', (r) => r.length);
+      for (let i = 2; i < n && !ok; i++) {
+        const was = await spot(i); await tk.click(`#rows tr[data-row="${i}"]`);
+        await tk.click('#sel [data-order="-1"]'); await tk.waitForTimeout(250);
+        ok = (await spot(i - 1)) === was;
+      }
+      check(ok, 'Track: ◀ flies the picked piece one place earlier'); }
     const lad = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Ladder/.test(t.children[1].textContent)); return r ? r.dataset.row : null; });
     if (lad != null) {
       await tk.click(`#rows tr[data-row="${lad}"]`);
@@ -232,7 +252,7 @@ async function typeKeys(scope, text) {
     await tk.click('#saveBtn');
     await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 5000 });
     const saved = await (await fetch(B + '/api/track')).json();
-    check(saved.today && saved.today.removed?.length === 1 && saved.today.added?.length === 1, 'Track: saved as today\'s track, with the hand tuning, the removed and the added gate');
+    check(saved.today && saved.today.removed?.length === 1 && saved.today.added?.length === 1 && saved.today.order && Object.keys(saved.today.order).length === 1, 'Track: saved as today\'s track, with the hand tuning, the removed and the added gate and the order');
     // with a PIN set (RD console), saving asks for it on the number pad
     await fetch(B + '/api/track/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: '2580' }) });
     await tk.reload();
