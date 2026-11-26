@@ -118,11 +118,37 @@ test('pieces can be taken away, added from the kit and ladders flown another way
   assert.equal(L.trick, 'descend');
   assert.equal(L.passes.length, 2);
   assert.ok(t.levels.easy.passes.every((ps: any, i: number) => !t.pieces[i].type.startsWith('ladder') || ps.length <= 1), 'beginners fly a ladder once');
-  // never more than the club has
-  const many = G.cleanChanges({ added: Array.from({ length: 8 }, () => ({ type: 'gate', x: 5, y: 5 })) }, b);
-  assert.ok(many.added.length <= G.KIT_COUNT.gate - b.pieces.filter((p: any) => p.type === 'gate').length);
+  // never more than the most a kit can hold (the page keeps to the club's own kit)
+  const many = G.cleanChanges({ added: Array.from({ length: 30 }, () => ({ type: 'gate', x: 5, y: 5 })) }, b);
+  assert.ok(many.added.length <= G.KIT_MAX.gate - b.pieces.filter((p: any) => p.type === 'gate').length);
   // saved on the RD PC and built again the same
   const saved = cleanTrack({ track: { seed: b.seed, opts: b.opts, edits: {}, ...changes } });
   const again = G.rebuild(saved);
   assert.equal(again.facts.length.toFixed(3), t.facts.length.toFixed(3));
+});
+
+test('a moved piece takes its place in the lap, and the pieces are numbered in flying order', () => {
+  const t = G.makeTrack(1, { style: 'flowing', pieces: 12, rings: false, flags: false });
+  const gi = t.pieces.findIndex((p: any, i: number) => i > 0 && p.type === 'gate'), T = t.pieces[gi + 4];
+  const r = G.relayout(t, { [gi]: { dx: +(T.x + 0.9 - t.pieces[gi].x).toFixed(1), dy: +(T.y - t.pieces[gi].y).toFixed(1), rot: 0 } }, {});
+  const at = r.pieces.findIndex((p: any) => p.key === String(gi)), next = r.pieces.findIndex((p: any) => p.key === String(gi + 4));
+  assert.equal(Math.abs(at - next), 1, 'flown right beside the piece it was moved to');
+  const s = r.pieces.map((p: any) => p.passes[0]?.s ?? Infinity);
+  assert.ok(s.every((v: number, i: number) => i === 0 || v >= s[i - 1]), 'numbers follow the flying order');
+});
+
+test('the kit is editable: tracks are made from it, and it is kept on this PC behind the PIN', () => {
+  const kit = { gate: 3, cube: 0, ring: 0, ladder3: 0, ladder5: 2, flag: 0 };
+  const r = G.generate({ style: 'technical', pieces: 15, rings: false, flags: true, kit }, { ms: 6000, want: 1, start: 1 });
+  assert.ok(r.best, 'a track from a small kit');
+  const n = (t: string) => r.best.pieces.filter((p: any) => p.type === t).length;
+  assert.equal(n('gate'), 3); assert.equal(n('ladder5'), 2); assert.equal(n('cube') + n('ring') + n('flag') + n('ladder3'), 0);
+  assert.deepEqual(cleanTrack({ track: { seed: 1, opts: { style: 'technical', pieces: 15, kit } } }).opts.kit, kit);
+  assert.deepEqual(G.cleanKit(null), G.KIT_DEFAULT, 'no kit = the old counts, so saved tracks keep their shape');
+  const dir = mkdtempSync(join(tmpdir(), 'kit-'));
+  const store = new TrackStore(join(dir, 'track.json'));
+  store.setPin({ pin: '2580' });
+  assert.throws(() => store.setKit({ kit, pin: '1111' }));
+  store.setKit({ kit: { ...kit, gate: 99 }, pin: '2580' });
+  assert.equal(new TrackStore(join(dir, 'track.json')).view().kit.gate, 20, 'kept, and never more than 20');
 });

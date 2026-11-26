@@ -39,8 +39,15 @@ export const TYPES = {
   ladder5: { label: 'Ladder ×5',   zmin: 0, zmax: 5 * HEX_PITCH, r: HEX.inside / 2 + 0.12, levels: stages('ladder5', 5) },
   flag:    { label: 'Flag',        zmin: 0, zmax: 1.9,  r: 0.3,  levels: [0] },
 };
-const KIT = [['gate', 6], ['cube', 2], ['ring', 5], ['ladder3', 1], ['ladder5', 1]];
-const FLAGS = 2;
+// The club's kit (Janno 26.11.2026: editable). A track's opts.kit says what it was made from; none =
+// these counts, so tracks saved before keep their shape.
+export const KIT_DEFAULT = { gate: 6, cube: 2, ring: 5, ladder3: 1, ladder5: 1, flag: 2 };
+export const KIT_MAX = { gate: 20, cube: 6, ring: 10, ladder3: 3, ladder5: 3, flag: 6 };
+export function cleanKit(k) {
+  const out = {};
+  for (const t of Object.keys(KIT_DEFAULT)) { const n = Math.round(Number(k?.[t])); out[t] = k && Number.isFinite(n) ? Math.max(0, Math.min(KIT_MAX[t], n)) : KIT_DEFAULT[t]; }
+  return out;
+}
 export const STYLE = {
   flowing:   { rmin: 0.55, turn: 0.6,  orbit: 0.4,  pole: 0.45, spacing: 2.2, lap: [70, 115], flagR: 0.95, loopR: 1.0, alphas: 1, climb5: 3 },
   technical: { rmin: 0.4,  turn: 0.45, orbit: 0.36, pole: 0.38, spacing: 1.8, lap: [75, 130], flagR: 0.75, loopR: 0.85, alphas: 2, climb5: 5 },
@@ -167,12 +174,13 @@ export function makeTrack(seed, opts) { return makeTrack1(seed, opts, false) || 
 function makeTrack1(seed, opts, once) {
   const rand = rng(seed), st = STYLE[opts.style];
   // what goes in: the pieces asked for, tricks for cubes, ladders and flags
+  const kit = cleanKit(opts.kit);
   let pool = [];
-  for (const [t, c] of KIT) for (let i = 0; i < c; i++) pool.push(t);
+  for (const t of ['gate', 'cube', 'ring', 'ladder3', 'ladder5']) for (let i = 0; i < kit[t]; i++) pool.push(t);
   if (!opts.rings) pool = pool.filter((t) => t !== 'ring');
   for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   pool = pool.slice(0, Math.min(opts.pieces, pool.length));
-  const flags = opts.flags ? FLAGS : 0;
+  const flags = opts.flags ? kit.flag : 0;
   const count = (t) => pool.filter((x) => x === t).length;
   const take = (t) => { const i = pool.indexOf(t); if (i >= 0) { pool.splice(i, 1); return true; } return false; };
   const items = [];
@@ -512,7 +520,7 @@ export function cleanEdits(edits, pieces) {
 // n, at } } }. A piece's key is its index in the generated track, or 'a0', 'a1'… for added ones.
 // An added piece goes into the lap where it makes the shortest detour, flown the way its face
 // points (or the other way, whichever suits the lap). Never more of a kind than the club has.
-export const KIT_COUNT = Object.fromEntries([...KIT, ['flag', FLAGS]]);
+export const KIT_COUNT = KIT_DEFAULT;
 export const ADDABLE = ['gate', 'cube', 'ladder3', 'ladder5', 'ring', 'flag'];
 const yawOfRot = (rot) => ((90 - rot) * Math.PI) / 180;      // rot: degrees clockwise from up the page
 const nearRail = (x) => RAILS.reduce((b, r) => (Math.abs(r - x) < Math.abs(b - x) ? r : b), RAILS[0]);
@@ -523,7 +531,7 @@ export function cleanChanges(changes, base) {
   base.pieces.forEach((pc, i) => { if (pc.type !== 'timing' && !removed.includes(i)) have[pc.type] = (have[pc.type] || 0) + 1; });
   const added = [];
   for (const a of (Array.isArray(c.added) ? c.added : []).slice(0, 20)) {
-    if (!a || !ADDABLE.includes(a.type) || (have[a.type] || 0) >= (KIT_COUNT[a.type] || 0)) continue;
+    if (!a || !ADDABLE.includes(a.type) || (have[a.type] || 0) >= (KIT_MAX[a.type] || 0)) continue;
     have[a.type] = (have[a.type] || 0) + 1;
     let x = clampN(Number(a.x) || HALL.w / 2, 0.3, HALL.w - 0.3), rot = ((Math.round(Number(a.rot) || 0) % 360) + 360) % 360;
     const y = clampN(Number(a.y) || HALL.l / 2, 0.3, HALL.l - 0.3);
@@ -584,14 +592,16 @@ export function relayout(base, edits, changes) {
         q.x = mv.nx + dx * mv.c - dy * mv.s; q.y = mv.ny + dx * mv.s + dy * mv.c;
         if (q.hx != null) { const hx = q.hx * mv.c - q.hy * mv.s, hy = q.hx * mv.s + q.hy * mv.c; q.hx = hx; q.hy = hy; }
       }
+      if (who != null) q.who = who;
       if (q.pass && ladderOf(who) && all[who].type.startsWith('ladder')) { // a ladder flown another way
         if (done.has(who)) return;
         done.add(who);
-        A.push(...ladderKeys(who, q, k));
+        A.push(...ladderKeys(who, q, k).map((x) => ({ ...x, who })));
         return;
       }
       A.push(q);
     });
+    A = resequence(A, moves, removed);
     // added pieces, each where it makes the shortest detour
     for (let i = base.pieces.length; i < all.length; i++) {
       const pc = all[i];
@@ -616,8 +626,10 @@ export function relayout(base, edits, changes) {
     const b = buildLine(A, all.length, st);
     levels[k] = { line: b.line, allPasses: b.passes, facts: { length: b.line.length, rmin: Math.min(st.turn, st.orbit, st.pole) } };
   }
-  // what is left on the floor, numbered again in order (the generated pieces first, then the added ones)
-  const keep = all.map((_, i) => i).filter((i) => !removed.has(i));
+  // what is left on the floor, numbered again in flying order (Janno 26.11.2026: a moved or added piece
+  // takes its number from where it is flown); pieces the lap doesn't fly come last
+  const firstS = (i) => { const p = levels.full.allPasses[i]; return p && p.length ? Math.min(...p.map((x) => x.s)) : Infinity; };
+  const keep = all.map((_, i) => i).filter((i) => !removed.has(i)).sort((a, b) => (a === 0 ? -1 : b === 0 ? 1 : firstS(a) - firstS(b) || a - b));
   for (const k in levels) { levels[k].passes = keep.map((i) => levels[k].allPasses[i]); delete levels[k].allPasses; }
   const pieces = keep.map((i, v) => {
     const pc = { ...all[i], passes: levels.full.passes[v] };
@@ -635,6 +647,43 @@ export function relayout(base, edits, changes) {
   const tr = { ...base, pieces, passes: pieces.map((pc) => ({ x: pc.x, y: pc.y, z: pc.z, dx: pc.dx, dy: pc.dy })), line: levels.full.line, facts: levels.full.facts, levels, edits, changes: ch };
   tr.issues = issuesOf(tr);
   return tr;
+}
+// A moved piece takes its logical place in the lap (Janno 26.11.2026): when the lap is clearly shorter
+// with it flown somewhere else, it moves there in the order too (a gate may be flown the other way
+// round). A trick shared by several pieces (a ring hairpin, the cube to the ceiling) keeps its order;
+// the timing gate stays first.
+function resequence(A, moves, removed) {
+  const d = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+  for (const who of moves.keys()) {
+    if (who === 0 || removed.has(who)) continue;
+    const at = A.findIndex((a) => a.who === who);
+    if (at < 0) continue;
+    const z = A[at].zone;
+    let s = at, e = at;
+    if (z) { while (s > 0 && A[s - 1].zone === z) s--; while (e < A.length - 1 && A[e + 1].zone === z) e++; }
+    else while (e < A.length - 1 && A[e + 1].who === who) e++;
+    const grp = A.slice(s, e + 1);
+    if (grp.some((a) => a.who != null && a.who !== who)) continue;
+    if (A.slice(e + 1).some((a) => a.who === who)) continue;          // its passes are not all together
+    const rest = A.slice(0, s).concat(A.slice(e + 1)), n = rest.length;
+    const flips = grp.length === 1 && grp[0].pass ? [false, true] : [false];
+    const cost = (g, flip) => {
+      const P = rest[(g - 1 + n) % n], Q = rest[g % n];
+      if (P.zone && P.zone === Q.zone) return Infinity;                 // never inside another trick
+      const F = flip ? grp[grp.length - 1] : grp[0], L = flip ? grp[0] : grp[grp.length - 1];
+      let c = d(P, F) + d(L, Q) - d(P, Q);
+      const g0 = grp[0];                                                // flown square: penalise a gate entered backwards
+      if (g0.hx != null && grp.length === 1) { const sgn = flip ? -1 : 1, h = Math.hypot(g0.hx, g0.hy) || 1; if (sgn * (g0.hx * (Q.x - P.x) + g0.hy * (Q.y - P.y)) / h < 0) c += 50; }
+      return c;
+    };
+    const cur = cost(s, false);
+    let best = { c: cur, g: s, flip: false };
+    for (let g = 1; g <= n; g++) for (const f of flips) { const c = cost(g, f); if (c < best.c - 0.3) best = { c, g, flip: f }; }
+    if (best.g === s && !best.flip) continue;
+    const ins = best.flip ? [{ ...grp[0], hx: -grp[0].hx, hy: -grp[0].hy }] : grp;
+    A = rest.slice(0, best.g).concat(ins, rest.slice(best.g));
+  }
+  return A;
 }
 /** A saved track ({ seed, opts, edits, removed, added, ladders }) as a whole track again, or null. */
 export function rebuild(saved) {

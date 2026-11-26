@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.26-1811" : "dev";
+var VERSION = true ? "2026.11.26-1839" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2652,6 +2652,13 @@ function spokenChannel(ch) {
 var import_node_fs4 = require("node:fs");
 var import_node_crypto2 = require("node:crypto");
 var import_node_path4 = require("node:path");
+var KIT_MAX = { gate: 20, cube: 6, ring: 10, ladder3: 3, ladder5: 3, flag: 6 };
+function cleanKit(k) {
+  if (!k || typeof k !== "object") return null;
+  const out = {};
+  for (const t of Object.keys(KIT_MAX)) out[t] = Math.round(num(k[t], 0, KIT_MAX[t]));
+  return out;
+}
 var HISTORY = 10;
 var num = (v, lo, hi) => {
   const n = Number(v);
@@ -2664,6 +2671,8 @@ function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
   const o = t?.opts ?? {};
   if (o.style !== "flowing" && o.style !== "technical") throw new EngineError("Unknown track style.");
   const opts = { style: o.style, pieces: Math.round(num(o.pieces, 6, 15)) || 15, rings: !!o.rings, flags: !!o.flags };
+  const kit = cleanKit(o.kit);
+  if (kit) opts.kit = kit;
   const edits = {};
   for (const [k, e] of Object.entries(t?.edits ?? {}).slice(0, 40)) {
     if (!/^\d{1,2}$/.test(k) || !e || typeof e !== "object") continue;
@@ -2708,7 +2717,7 @@ var TrackStore = class {
     }
     try {
       const d = JSON.parse((0, import_node_fs4.readFileSync)(file, "utf8"));
-      this.data = { today: d.today ?? null, history: Array.isArray(d.history) ? d.history.slice(0, HISTORY) : [] };
+      this.data = { today: d.today ?? null, history: Array.isArray(d.history) ? d.history.slice(0, HISTORY) : [], kit: cleanKit(d.kit) };
     } catch {
     }
   }
@@ -2763,14 +2772,26 @@ var TrackStore = class {
     const prev = this.data.today;
     const same = prev && prev.seed === t.seed && JSON.stringify(prev.opts) === JSON.stringify(t.opts);
     const history = prev && !same ? [prev, ...this.data.history] : this.data.history;
-    this.data = { today: t, history: history.filter((h) => !(h.seed === t.seed && JSON.stringify(h.opts) === JSON.stringify(t.opts))).slice(0, HISTORY) };
+    this.data = { ...this.data, today: t, history: history.filter((h) => !(h.seed === t.seed && JSON.stringify(h.opts) === JSON.stringify(t.opts))).slice(0, HISTORY) };
+    this.write();
+    return this.data;
+  }
+  /** The club's kit, what tracks are made from (behind the same PIN as saving). */
+  setKit(body, now = Date.now()) {
+    this.checkPin(body?.pin, now);
+    const kit = cleanKit(body?.kit);
+    if (!kit) throw new EngineError("That kit list is empty.");
+    this.data = { ...this.data, kit };
+    this.write();
+    return this.data;
+  }
+  write() {
     try {
       (0, import_node_fs4.mkdirSync)((0, import_node_path4.dirname)(this.file), { recursive: true });
       (0, import_node_fs4.writeFileSync)(this.file + ".tmp", JSON.stringify(this.data, null, 1));
       (0, import_node_fs4.renameSync)(this.file + ".tmp", this.file);
     } catch {
     }
-    return this.data;
   }
 };
 
@@ -3769,6 +3790,7 @@ function json(res, status, body) {
 var API2 = {
   "/api/track/save": (b) => tracks.save(b),
   "/api/track/pin": (b) => tracks.setPin(b),
+  "/api/track/kit": (b) => tracks.setKit(b),
   "/api/action": (b) => engine.action(String(b.type), Date.now()),
   "/api/join": (b) => {
     const pilot = engine.join(b.name, Number(b.heat), Number(b.slot));

@@ -6,12 +6,21 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { dirname } from 'node:path';
 import { EngineError } from './engine.ts';
 
-export type TrackOpts = { style: 'flowing' | 'technical'; pieces: number; rings: boolean; flags: boolean };
+export type TrackOpts = { style: 'flowing' | 'technical'; pieces: number; rings: boolean; flags: boolean; kit?: Record<string, number> };
 export type TrackEdit = { dx: number; dy: number; rot: number };
 export type TrackAdded = { type: string; x: number; y: number; rot: number };
 export type TrackLadder = { mode: 'up' | 'down' | 'once'; n: number; at: number };
 export type SavedTrack = { seed: number; opts: TrackOpts; edits: Record<string, TrackEdit>; removed?: number[]; added?: TrackAdded[]; ladders?: Record<string, TrackLadder>; code: string; savedAt: string; from: string };
-export type TrackData = { today: SavedTrack | null; history: SavedTrack[] };
+export type TrackData = { today: SavedTrack | null; history: SavedTrack[]; kit?: Record<string, number> | null };
+
+// the club's kit (Janno 26.11.2026: editable on the track page); the limits match trackgen.js KIT_MAX
+const KIT_MAX: Record<string, number> = { gate: 20, cube: 6, ring: 10, ladder3: 3, ladder5: 3, flag: 6 };
+export function cleanKit(k: any): Record<string, number> | null {
+  if (!k || typeof k !== 'object') return null;
+  const out: Record<string, number> = {};
+  for (const t of Object.keys(KIT_MAX)) out[t] = Math.round(num(k[t], 0, KIT_MAX[t]));
+  return out;
+}
 
 const HISTORY = 10;
 const num = (v: unknown, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : 0; };
@@ -24,6 +33,8 @@ export function cleanTrack(b: any, now = new Date()): SavedTrack {
   const o = t?.opts ?? {};
   if (o.style !== 'flowing' && o.style !== 'technical') throw new EngineError('Unknown track style.');
   const opts: TrackOpts = { style: o.style, pieces: Math.round(num(o.pieces, 6, 15)) || 15, rings: !!o.rings, flags: !!o.flags };
+  const kit = cleanKit(o.kit);
+  if (kit) opts.kit = kit;
   const edits: Record<string, TrackEdit> = {};
   for (const [k, e] of Object.entries(t?.edits ?? {}).slice(0, 40)) {
     if (!/^\d{1,2}$/.test(k) || !e || typeof e !== 'object') continue;
@@ -73,7 +84,7 @@ export class TrackStore {
     try { const p = JSON.parse(readFileSync(pinFile, 'utf8')); if (p?.salt && p?.hash) this.pin = { salt: String(p.salt), hash: String(p.hash) }; } catch {}
     try {
       const d = JSON.parse(readFileSync(file, 'utf8'));
-      this.data = { today: d.today ?? null, history: Array.isArray(d.history) ? d.history.slice(0, HISTORY) : [] };
+      this.data = { today: d.today ?? null, history: Array.isArray(d.history) ? d.history.slice(0, HISTORY) : [], kit: cleanKit(d.kit) };
     } catch {}
   }
   get locked() { return !!this.pin; }
@@ -113,12 +124,24 @@ export class TrackStore {
     // the one it replaces goes into the history, unless it's the same track saved again
     const same = prev && prev.seed === t.seed && JSON.stringify(prev.opts) === JSON.stringify(t.opts);
     const history = prev && !same ? [prev, ...this.data.history] : this.data.history;
-    this.data = { today: t, history: history.filter((h) => !(h.seed === t.seed && JSON.stringify(h.opts) === JSON.stringify(t.opts))).slice(0, HISTORY) };
+    this.data = { ...this.data, today: t, history: history.filter((h) => !(h.seed === t.seed && JSON.stringify(h.opts) === JSON.stringify(t.opts))).slice(0, HISTORY) };
+    this.write();
+    return this.data;
+  }
+  /** The club's kit, what tracks are made from (behind the same PIN as saving). */
+  setKit(body: any, now = Date.now()): TrackData {
+    this.checkPin(body?.pin, now);
+    const kit = cleanKit(body?.kit);
+    if (!kit) throw new EngineError('That kit list is empty.');
+    this.data = { ...this.data, kit };
+    this.write();
+    return this.data;
+  }
+  write() {
     try {
       mkdirSync(dirname(this.file), { recursive: true });
       writeFileSync(this.file + '.tmp', JSON.stringify(this.data, null, 1));
       renameSync(this.file + '.tmp', this.file);
     } catch {}
-    return this.data;
   }
 }

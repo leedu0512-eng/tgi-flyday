@@ -329,6 +329,7 @@ type Handler = (body: any) => unknown;
 const API: Record<string, Handler> = {
   '/api/track/save': (b) => tracks.save(b),
   '/api/track/pin': (b) => tracks.setPin(b),
+  '/api/track/kit': (b) => tracks.setKit(b),
   '/api/action': (b) => engine.action(String(b.type), Date.now()),
   '/api/join': (b) => {
     const pilot = engine.join(b.name, Number(b.heat), Number(b.slot));
