@@ -10,15 +10,20 @@
 // rises from 2.92 m at the walls to 3.26 m in the middle, but the ribs across it stay at 2.92 m.
 export const HALL = { w: 9.5, l: 25.6, h: 2.92 };
 // Every gate is 24 in (Janno 22.11.2026: RaceGOW's size, not 50 cm): the opening, the pipe round it,
-// the opening's bottom off the floor. Ladders are different (Janno 26.11.2026): a stack of plastic
-// hexagons, flat sides joined, tips to the sides, 46 cm tip to tip inside; as many as wanted.
+// the opening's bottom off the floor. Ladders are different (Janno 26.11.2026): the ×5 is a stack of
+// plastic hexagons, flat sides joined, tips to the sides, 46 cm tip to tip inside; the ×3 a stack of
+// rings (assumed the club's 24 in rings). Each stands on the floor; where two meet there are two tubes.
 export const OPEN = 0.6096, PIPE = 0.03, SILL = 0.03;
 export const GATE_Z = SILL + OPEN / 2;                     // the middle of a floor gate's opening
 export const HEX = { inside: 0.46, tube: 0.03 };
 export const HEX_H = HEX.inside * Math.sqrt(3) / 2;        // inside height, flat side to flat side (40 cm)
 export const HEX_PITCH = HEX_H + 2 * HEX.tube;               // stage to stage: two tubes where two hexagons meet
-const HEX_Z = HEX.tube + HEX_H / 2;                          // the bottom stage's middle, standing on the floor
-const stages = (n) => Array.from({ length: n }, (_, i) => Math.round((HEX_Z + i * HEX_PITCH) * 1000) / 1000);
+// per ladder: its stages' shape, inside width and height, stage to stage
+export const LADDER = {
+  ladder3: { shape: 'ring', w: OPEN, h: OPEN, tube: 0.03, pitch: OPEN + 2 * 0.03 },
+  ladder5: { shape: 'hex', w: HEX.inside, h: HEX_H, tube: HEX.tube, pitch: HEX_PITCH },
+};
+const stages = (type, n) => { const L = LADDER[type]; return Array.from({ length: n }, (_, i) => Math.round((L.tube + L.h / 2 + i * L.pitch) * 1000) / 1000); };
 export const RING_Z = HALL.h - 0.2 - OPEN / 2;            // ring centre: 20 cm below the ceiling
 // Rings clip onto three rails under the ceiling (pairs of cables), hung along a rail or across it
 // (Janno 22.11.2026). Assumed: running the length of the hall, evenly across it.
@@ -30,8 +35,8 @@ export const TYPES = {
   gate:    { label: 'Gate',        zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
   cube:    { label: 'Cube',        zmin: 0, zmax: 0.74, r: 0.55, levels: [0.35] },
   ring:    { label: 'Ring',        zmin: RING_Z - OPEN / 2 - 0.05, zmax: HALL.h, r: OPEN / 2 + 0.06, levels: [RING_Z] },
-  ladder3: { label: 'Ladder ×3',   zmin: 0, zmax: 3 * HEX_PITCH, r: HEX.inside / 2 + 0.12, levels: stages(3) },
-  ladder5: { label: 'Ladder ×5',   zmin: 0, zmax: 5 * HEX_PITCH, r: HEX.inside / 2 + 0.12, levels: stages(5) },
+  ladder3: { label: 'Ladder ×3',   zmin: 0, zmax: 3 * (OPEN + 0.06), r: OPEN / 2 + 0.12, levels: stages('ladder3', 3) },
+  ladder5: { label: 'Ladder ×5',   zmin: 0, zmax: 5 * HEX_PITCH, r: HEX.inside / 2 + 0.12, levels: stages('ladder5', 5) },
   flag:    { label: 'Flag',        zmin: 0, zmax: 1.9,  r: 0.3,  levels: [0] },
 };
 const KIT = [['gate', 6], ['cube', 2], ['ring', 5], ['ladder3', 1], ['ladder5', 1]];
@@ -696,7 +701,7 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
     if (pc.type === 'gate') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
     // the timing gate stands out in the sim too: WebFPV's flagged gate, a pennant on each side of its header
     else if (pc.type === 'timing') pieceEls.set(i, { el: el('flaggedGate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: 'Timing gate', flagSide: 'both' }), yaw });
-    else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: HEX.tube, clearW: HEX.inside, clearH: r6(HEX_H), levelPitch: r6(HEX_PITCH) }, { name: TYPES[pc.type].label }), yaw });
+    else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: LADDER[pc.type].tube, clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });
     else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring' }), yaw });
     else if (pc.type === 'flag') pieceEls.set(i, { el: el('flag', pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: 'Flag' }) });
     else if (pc.type === 'cube') {
