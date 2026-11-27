@@ -36,6 +36,9 @@ body.arb { margin: 0; min-height: 100vh; background: var(--bg); color: var(--tex
 .arb .go { min-height: 64px; border-radius: 12px; border: 0; background: var(--accent); color: #000; font: 900 28px/1 'Big Shoulders', sans-serif; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
 .arb .go:disabled { opacity: .4; cursor: default; }
 .arb .why { border-color: #7a3b00; }
+.arb .cp { display: flex; gap: 8px; align-items: center; margin: 6px 0 2px; }
+.arb .cp code { flex: 1; }
+.arb .cp button { flex: none; min-height: 40px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--accent); color: #000; font: 700 15px 'Archivo', sans-serif; }
 .arb .why code { font-size: 13px; background: #000; padding: 2px 6px; border-radius: 4px; color: var(--text); word-break: break-all; }
 .arb table { width: 100%; border-collapse: collapse; font-size: 15px; }
 .arb th, .arb td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
@@ -152,8 +155,12 @@ async function checkAR() {
   let ok = false;
   if (!window.isSecureContext) {
     const origin = location.origin;
+    // Chrome won't open chrome:// addresses from a page, so each step is one tap on Copy, then a paste
+    const copyRow = (text) => `<span class="cp"><code data-no-i18n>${esc(text)}</code><button type="button" data-copy="${esc(text)}">${tr('Copy')}</button></span>`;
     why.innerHTML = `<h2>${tr('One setting in Chrome first')}</h2><p>${tr('AR only works on a secure page, and the race PC\'s pages are plain http. In Chrome on this phone, once:')}</p>
-      <ol><li>${tr('Open {page}', { page: '<code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>' })}</li><li>${tr('Type {origin} in the box and set it to Enabled', { origin: `<code data-no-i18n>${esc(origin)}</code>` })}</li><li>${tr('Tap Relaunch, then open this page again')}</li></ol>`;
+      <ol><li>${tr('Copy this, paste it in Chrome\'s address bar and open it:')}${copyRow('chrome://flags/#unsafely-treat-insecure-origin-as-secure')}</li>
+      <li>${tr('Copy this and paste it in the box under the highlighted setting, then set it to Enabled:')}${copyRow(origin)}</li>
+      <li>${tr('Tap Relaunch at the bottom. Chrome opens this page again by itself.')}</li></ol>`;
   } else if (!navigator.xr) {
     why.innerHTML = `<h2>${tr('This browser has no AR')}</h2><p>${tr('Open this page in Chrome on an Android phone. iPhones can\'t show AR from a web page yet.')}</p>`;
   } else {
@@ -163,6 +170,16 @@ async function checkAR() {
   why.hidden = ok;
   $('start').disabled = !ok || !track;
 }
+// copying works on a plain http page too (the clipboard API doesn't): a selected text box and copy
+$('why').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  const t = document.createElement('textarea'); t.value = b.dataset.copy; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(t); t.select(); t.setSelectionRange(0, t.value.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch {}
+  t.remove();
+  if (!ok && navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).then(() => {}, () => {});
+  b.textContent = tr('Copied'); setTimeout(() => { b.textContent = tr('Copy'); }, 2000);
+});
 $('refs').innerHTML = Object.entries(REFS).map(([k, r], i) => `<label><input type="radio" name="ref" value="${k}"${i === 0 ? ' checked' : ''}><span><b>${esc(tr(r.name))}</b><br>${esc(tr(r.first))}<br><span class="muted">${esc(tr('then:'))} ${esc(tr(r.second))}</span></span></label>`).join('');
 const refNow = () => document.querySelector('input[name="ref"]:checked')?.value || 'rail';
 
