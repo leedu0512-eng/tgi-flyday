@@ -293,6 +293,7 @@ const PAGES: Record<string, string> = {
   '/me': 'me.html',
   '/track': 'track.html',
   '/sim': 'sim.html',
+  '/ar': 'ar.html',
 };
 
 const TYPES: Record<string, string> = {

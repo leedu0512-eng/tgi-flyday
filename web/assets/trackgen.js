@@ -886,3 +886,27 @@ export async function webfpvLink(tr, level = 'full') {
   }
   return `${WEBFPV_BUILDER}#track=j.${b64(bytes)}`;
 }
+
+// ---------- a whole track in a link (the phone's AR builder, ar.html) ----------
+const b64u = (u8) => { let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (ch) => ch.charCodeAt(0));
+const pipe = async (u8, stream) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(stream)).arrayBuffer());
+/** A saved track ({ seed, opts, edits, removed, added, ladders, order }) as a short text for a link:
+    z.<deflate-raw, base64url> (j.<base64url JSON> where the browser can't compress). Only what rebuild needs. */
+export async function packTrack(saved) {
+  const { seed, opts, edits = {}, removed = [], added = [], ladders = {}, order = {} } = saved || {};
+  const bytes = new TextEncoder().encode(JSON.stringify({ seed, opts, edits, removed, added, ladders, order }));
+  if (typeof CompressionStream === 'function') return 'z.' + b64u(await pipe(bytes, new CompressionStream('deflate-raw')));
+  return 'j.' + b64u(bytes);
+}
+/** The saved track back from packTrack's text, or null when it isn't one. */
+export async function unpackTrack(text) {
+  try {
+    const m = /^([zj])\.([A-Za-z0-9_-]+)$/.exec(String(text || '').trim());
+    if (!m) return null;
+    let bytes = unb64u(m[2]);
+    if (m[1] === 'z') bytes = await pipe(bytes, new DecompressionStream('deflate-raw'));
+    const s = JSON.parse(new TextDecoder().decode(bytes));
+    return s && Number.isFinite(s.seed) && s.opts ? s : null;
+  } catch { return null; }
+}

@@ -278,6 +278,28 @@ async function typeKeys(scope, text) {
     await tk.waitForSelector('#simBox:not([hidden]) #simQr svg', { timeout: 5000 });
     const simUrl = await tk.inputValue('#simLink');
     check(/^https:\/\/webfpv\.org\/sim\/src\/trackbuilder\/index\.html#track=[zj]\.[A-Za-z0-9_-]{200,}$/.test(simUrl), 'Track: Fly it in the sim shows a QR code and a WebFPV link carrying the track');
+    // build it with AR: the track page's QR link opens the phone page with the same track
+    await tk.click('#simClose');
+    await tk.click('#arBtn');
+    await tk.waitForSelector('#arBox:not([hidden]) #arQr svg', { timeout: 5000 });
+    const arUrl = await tk.inputValue('#arLink');
+    const rowsHere = await tk.$$eval('#rows tr[data-row]', (r) => r.length);
+    check(/\/ar#t=[zj]\.[A-Za-z0-9_-]{20,}$/.test(arUrl), 'Track: Build it with AR shows a QR code and a link carrying the track');
+    {
+      const ap = await browser.newPage({ viewport: { width: 412, height: 915 } });
+      ap.on('pageerror', (e) => errors.push(`ar: ${e.message}`));
+      await ap.goto(B + '/ar#' + arUrl.split('#')[1]);
+      await ap.waitForSelector('#rows tr', { timeout: 8000 });
+      const n = await ap.$$eval('#rows tr', (r) => r.length);
+      const why = await ap.$eval('#why', (w) => !w.hidden && w.textContent.length > 20);
+      check(n === rowsHere && why && await ap.$eval('#start', (b) => b.disabled), 'AR: the phone page lists the same pieces and says why AR can\'t start in this browser');
+      const pv = await ap.evaluate(() => window.__ar.preview());
+      check(pv.children > n * 3 && /placed/.test(pv.step) && /m /.test(pv.dist || ''), 'AR: the pieces, their floor marks and the way to the next one are drawn');
+      await ap.goto(B + '/ar');
+      await ap.waitForSelector('#rows tr', { timeout: 8000 });
+      check(/HZ-/.test(await ap.textContent('#facts')), 'AR: without a link it shows today\'s track');
+      await ap.close();
+    }
     // the sim PCs' home page: Fly today's track, Pro and Beginner
     const sp = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     sp.on('pageerror', (e) => errors.push(`sim: ${e.message}`));

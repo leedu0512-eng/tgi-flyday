@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>tgiFlyDay · Build the track</title>
+<link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/vendor/three.min.js"></script>
+<style>
+/* The phone's AR builder (Janno 27.11.2026): today's track standing in the real hall, piece by piece,
+   so it can be set up where it belongs. Android Chrome (WebXR immersive-ar with hit-test). Every path
+   is relative, so the page also works copied to an https host. */
+body.arb { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Archivo', system-ui, sans-serif; }
+.arb header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 3px solid var(--accent); }
+.arb header .logo { font-size: 22px; }
+.arb header .spacer { flex: 1; }
+.arb main { padding: 18px 16px 40px; max-width: 720px; margin: 0 auto; display: grid; gap: 16px; }
+.arb h1 { margin: 0; font: 900 clamp(38px, 11vw, 64px)/.9 'Big Shoulders Stencil', 'Big Shoulders', Impact, sans-serif; text-transform: uppercase; }
+.arb .facts { font: 700 18px/1.3 'Big Shoulders', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.arb .facts b { color: var(--text); }
+.arb .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+.arb .card h2 { margin: 0; font: 800 20px/1.1 'Big Shoulders', sans-serif; text-transform: uppercase; letter-spacing: .04em; }
+.arb .card p { margin: 0; color: var(--muted); line-height: 1.4; }
+.arb .card p b { color: var(--text); }
+.arb .card ol { margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.45; display: grid; gap: 4px; }
+.arb .refs { display: grid; gap: 8px; }
+.arb .refs label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.arb .refs label:has(input:checked) { border-color: var(--accent); background: var(--panel-2); }
+.arb .refs input { margin-top: 3px; accent-color: var(--accent); }
+.arb .go { min-height: 64px; border-radius: 12px; border: 0; background: var(--accent); color: #000; font: 900 28px/1 'Big Shoulders', sans-serif; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+.arb .go:disabled { opacity: .4; cursor: default; }
+.arb .why { border-color: #7a3b00; }
+.arb .why code { font-size: 13px; background: #000; padding: 2px 6px; border-radius: 4px; color: var(--text); word-break: break-all; }
+.arb table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.arb th, .arb td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.arb th { color: var(--muted); font-weight: 600; font-size: 13px; }
+.arb td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.arb .no { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #000; font: 800 15px 'Big Shoulders', sans-serif; }
+.arb .no.t { background: #22c55e; }
+
+/* in AR: the camera picture fills the screen, these float over it (WebXR DOM overlay) */
+#overlay { position: fixed; inset: 0; pointer-events: none; font-family: 'Archivo', system-ui, sans-serif; color: #fff; }
+#overlay[hidden] { display: none; }
+#overlay .top, #overlay .bottom { position: absolute; left: 10px; right: 10px; pointer-events: auto; background: rgba(0, 0, 0, .72); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+#overlay .top { top: calc(10px + env(safe-area-inset-top)); }
+#overlay .bottom { bottom: calc(10px + env(safe-area-inset-bottom)); }
+#overlay .step { font: 800 21px/1.2 'Big Shoulders', sans-serif; text-transform: uppercase; letter-spacing: .03em; }
+#overlay .sub { color: #ccc; font-size: 15px; line-height: 1.35; }
+#overlay .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+#overlay button { min-height: 48px; padding: 0 16px; border-radius: 10px; border: 1px solid #555; background: #1a1a1a; color: #fff; font: 700 17px 'Archivo', sans-serif; }
+#overlay button.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+#overlay button.ok { background: #22c55e; border-color: #22c55e; color: #000; }
+#overlay button:disabled { opacity: .4; }
+#overlay .spacer { flex: 1; }
+#overlay .piece { display: flex; gap: 12px; align-items: center; }
+#overlay .piece .no { display: inline-grid; place-items: center; min-width: 44px; height: 44px; border-radius: 50%; background: var(--accent); color: #000; font: 900 26px 'Big Shoulders', sans-serif; }
+#overlay .piece .no.t { background: #22c55e; }
+#overlay .piece .what { font: 800 22px/1.1 'Big Shoulders', sans-serif; text-transform: uppercase; }
+#overlay .piece .where { color: #ccc; font-size: 15px; }
+#overlay .dist { font: 800 20px 'Big Shoulders', sans-serif; color: #22c55e; white-space: nowrap; }
+#overlay .placed { color: #22c55e; font-weight: 700; }
+#overlay .aim { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #000; pointer-events: none; }
+</style>
+</head>
+<body class="arb">
+<header>
+  <div class="logo"><img src="assets/mark-small.svg" alt=""><span class="wm"><small>TGI</small>Fly<b>Day</b></span></div>
+  <span class="spacer"></span>
+  <span id="lang"></span>
+</header>
+<main id="intro">
+  <h1>Build the track</h1>
+  <div class="facts" id="facts">Looking for the track…</div>
+  <div class="card why" id="why" hidden></div>
+  <div class="card">
+    <h2>Line up with the hall</h2>
+    <p>The phone needs two points on the floor to know where the hall is. Stand on the carpet, point the phone at the floor and tap:</p>
+    <div class="refs" id="refs"></div>
+  </div>
+  <button type="button" class="go" id="start" disabled>Start AR</button>
+  <div class="card">
+    <h2>How it works</h2>
+    <ol>
+      <li>Move the phone slowly over the floor until the ring sits on it.</li>
+      <li>Tap the two points. The carpet's outline then shows where the phone thinks it is: check it lies on the real edges.</li>
+      <li>Every piece stands where it goes. The one up next is in bright colours, with a green post. Put it there and tap Placed.</li>
+      <li>Far from where you lined up, if things look off, line up again with nearer points.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h2>Set-up list</h2>
+    <table>
+      <thead><tr><th>#</th><th>Piece</th><th>From the orange side</th><th>From the rail</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<div id="overlay" hidden>
+  <div class="aim" id="aim"></div>
+  <div class="top" id="top">
+    <div class="step" id="step"></div>
+    <div class="sub" id="sub"></div>
+  </div>
+  <div class="bottom" id="bottom">
+    <div id="cardPiece"></div>
+    <div class="row" id="buttons"></div>
+  </div>
+</div>
+
+<script type="module">
+import { tr, langSwitch, esc } from './assets/common.js';
+import { HALL, RAILS, TYPES, OPEN, GATE_Z, rebuild, code, unpackTrack, onRail } from './assets/trackgen.js';
+import { pieceMats, pieceObject, yawOf, numberSprite } from './assets/pieces3d.js';
+import { REFS, frameFrom, toWorld, toHall } from './assets/arframe.js';
+
+const $ = (id) => document.getElementById(id);
+$('lang').innerHTML = langSwitch();
+const LABEL = { timing: 'Timing gate', gate: 'Gate', cube: 'Cube', ring: 'Ring', ladder3: 'Ladder ×3', ladder5: 'Ladder ×5', flag: 'Flag' };
+const LEVEL = 'full';
+let track = null, saved = null, placedKey = '';
+
+// ---------- the track: from the link (#t=…), else today's track from the race PC ----------
+async function load() {
+  const m = /[#&]t=([^&]+)/.exec(location.hash);
+  if (m) saved = await unpackTrack(decodeURIComponent(m[1]));
+  if (!saved) {
+    try { const d = await (await fetch('api/track', { cache: 'no-store' })).json(); saved = d?.today || null; } catch {}
+  }
+  track = saved ? rebuild(saved) : null;
+  if (!track) { $('facts').textContent = tr(m ? 'This link doesn\'t carry a track.' : 'No track set up yet: make one on the kiosk (Today\'s track → Edit track).'); return; }
+  placedKey = 'tgiflyday.arPlaced.' + code(track.seed) + '.' + (m ? m[1].length + m[1].slice(-12) : 'today');
+  const pieces = track.pieces.filter((p) => p.type !== 'timing' && p.type !== 'flag').length;
+  $('facts').innerHTML = `${code(track.seed)} · <b>${pieces}</b> ${tr('pieces')} · ${tr('Lap length')} <b>${track.levels[LEVEL].facts.length.toFixed(0)} m</b>`;
+  $('rows').innerHTML = track.pieces.map((pc, i) => `<tr><td><span class="no${pc.type === 'timing' ? ' t' : ''}">${i + 1}</span></td><td>${tr(LABEL[pc.type])}${onRail(pc.type) ? ' <span class="muted">' + tr('hangs from a cable') + '</span>' : ''}</td><td class="num">${(HALL.w - pc.x).toFixed(1)} m</td><td class="num">${pc.y.toFixed(1)} m</td></tr>`).join('');
+  placed = readPlaced();
+  await checkAR();
+}
+function readPlaced() { try { return new Set(JSON.parse(localStorage.getItem(placedKey) || '[]')); } catch { return new Set(); } }
+function savePlaced() { try { localStorage.setItem(placedKey, JSON.stringify([...placed])); } catch {} }
+let placed = new Set();
+
+// ---------- can this phone do AR here? ----------
+async function checkAR() {
+  const why = $('why');
+  let ok = false;
+  if (!window.isSecureContext) {
+    const origin = location.origin;
+    why.innerHTML = `<h2>${tr('One setting in Chrome first')}</h2><p>${tr('AR only works on a secure page, and the race PC\'s pages are plain http. In Chrome on this phone, once:')}</p>
+      <ol><li>${tr('Open {page}', { page: '<code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code>' })}</li><li>${tr('Type {origin} in the box and set it to Enabled', { origin: `<code data-no-i18n>${esc(origin)}</code>` })}</li><li>${tr('Tap Relaunch, then open this page again')}</li></ol>`;
+  } else if (!navigator.xr) {
+    why.innerHTML = `<h2>${tr('This browser has no AR')}</h2><p>${tr('Open this page in Chrome on an Android phone. iPhones can\'t show AR from a web page yet.')}</p>`;
+  } else {
+    try { ok = await navigator.xr.isSessionSupported('immersive-ar'); } catch {}
+    if (!ok) why.innerHTML = `<h2>${tr('This phone can\'t do AR here')}</h2><p>${tr('It needs Chrome on an Android phone with Google Play Services for AR (most phones from the last few years). Install or update it from the Play Store, then open this page again.')}</p>`;
+  }
+  why.hidden = ok;
+  $('start').disabled = !ok || !track;
+}
+$('refs').innerHTML = Object.entries(REFS).map(([k, r], i) => `<label><input type="radio" name="ref" value="${k}"${i === 0 ? ' checked' : ''}><span><b>${esc(tr(r.name))}</b><br>${esc(tr(r.first))}<br><span class="muted">${esc(tr('then:'))} ${esc(tr(r.second))}</span></span></label>`).join('');
+const refNow = () => document.querySelector('input[name="ref"]:checked')?.value || 'rail';
+
+// ---------- the AR scene ----------
+let renderer, scene, camera, session = null, hitSource = null, reticle, hall, frame = null;
+let phase = 'off', ref = 'rail', tapA = null, cur = 0, showLine = false, lastHit = null, tapAMark = null;
+const objs = [], foots = [];
+function setupScene() {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  renderer.domElement.style.display = 'none';
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.02, 60);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.5); sun.position.set(2, 5, 3); scene.add(sun);
+  // the ring that sits where the phone points at the floor
+  reticle = new THREE.Group();
+  const rm = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const r1 = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.1, 40), rm); r1.rotation.x = -Math.PI / 2; reticle.add(r1);
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(0.012, 16), new THREE.MeshBasicMaterial({ color: 0xff6b00, side: THREE.DoubleSide })); dot.rotation.x = -Math.PI / 2; dot.position.y = 0.002; reticle.add(dot);
+  reticle.visible = false; scene.add(reticle);
+  tapAMark = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.13, 32), new THREE.MeshBasicMaterial({ color: 0xff6b00, side: THREE.DoubleSide }));
+  tapAMark.rotation.x = -Math.PI / 2; tapAMark.visible = false; scene.add(tapAMark);
+  hall = new THREE.Group(); hall.visible = false; scene.add(hall);
+}
+// local hall coordinates inside the group: (x across, z up, -y up the hall)
+const L = (x, y, z = 0) => new THREE.Vector3(x, z, -y);
+function drawHall() {
+  while (hall.children.length) hall.remove(hall.children[0]);
+  objs.length = 0; foots.length = 0;
+  // the carpet's outline and the cables under the ceiling: what the phone thinks the hall is
+  const edge = new THREE.LineBasicMaterial({ color: 0xff6b00 });
+  hall.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([L(0, 0, 0.01), L(HALL.w, 0, 0.01), L(HALL.w, HALL.l, 0.01), L(0, HALL.l, 0.01)]), edge));
+  for (const [x, y] of [[0, 0], [HALL.w, 0], [HALL.w, HALL.l], [0, HALL.l]]) {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), new THREE.MeshBasicMaterial({ color: 0xff6b00 })); c.position.copy(L(x, y, 0.25)); hall.add(c);
+  }
+  const cable = new THREE.LineDashedMaterial({ color: 0xcccccc, dashSize: 0.3, gapSize: 0.2 });
+  for (const x of RAILS) { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([L(x, 0, HALL.h), L(x, HALL.l, HALL.h)]), cable); l.computeLineDistances(); hall.add(l); }
+  const M = pieceMats(), Mdim = pieceMats();
+  for (const m of Object.values(Mdim)) { m.transparent = true; m.opacity = 0.3; m.depthWrite = false; }
+  track.pieces.forEach((pc, i) => {
+    const now = i === cur, done = placed.has(i);
+    const o = pieceObject(pc, i, track, LEVEL, now ? M : done ? Mdim : M);
+    if (!now && !done) o.traverse((n) => { if (n.material && !n.material.transparent) { n.material = n.material.clone(); n.material.transparent = true; n.material.opacity = 0.65; } });
+    o.position.copy(L(pc.x, pc.y, pc.lift || 0));
+    o.rotation.y = yawOf(track.passes[i]);
+    hall.add(o); objs[i] = o;
+    // on the floor: where it stands (a hanging piece: right under it), and an arrow the way it's flown
+    const r = TYPES[pc.type].r, col = now ? 0x22c55e : done ? 0x777777 : 0xff6b00;
+    const foot = new THREE.Group();
+    const ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.04, r, 48), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: !now, opacity: now ? 1 : 0.7 }));
+    ring.rotation.x = -Math.PI / 2; foot.add(ring);
+    const cross = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.02), ring.material); cross.rotation.x = -Math.PI / 2; foot.add(cross);
+    const cross2 = cross.clone(); cross2.rotation.z = Math.PI / 2; foot.add(cross2);
+    if (pc.type !== 'flag') {
+      const sh = new THREE.Shape(); sh.moveTo(-0.07, 0); sh.lineTo(0.07, 0); sh.lineTo(0.07, 0.25); sh.lineTo(0.16, 0.25); sh.lineTo(0, 0.42); sh.lineTo(-0.16, 0.25); sh.lineTo(-0.07, 0.25); sh.closePath();
+      const arrow = new THREE.Mesh(new THREE.ShapeGeometry(sh), ring.material); arrow.rotation.x = -Math.PI / 2; arrow.position.z = r + 0.05; foot.add(arrow);
+    }
+    foot.position.copy(L(pc.x, pc.y, 0.012 + (onRail(pc.type) ? 0 : pc.lift || 0)));
+    foot.rotation.y = yawOf(track.passes[i]);
+    hall.add(foot); foots[i] = foot;
+    if (onRail(pc.type) && now) { // a line from the floor mark up to it
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([L(pc.x, pc.y, 0), L(pc.x, pc.y, HALL.h)]), new THREE.LineDashedMaterial({ color: 0x22c55e, dashSize: 0.12, gapSize: 0.08 }));
+      l.computeLineDistances(); hall.add(l);
+    }
+    const sp = numberSprite(i + 1, pc.type === 'timing', now ? 0.36 : 0.24);
+    sp.position.copy(L(pc.x, pc.y, Math.min(HALL.h - 0.05, TYPES[pc.type].zmax + 0.3 + (pc.lift || 0))));
+    if (pc.type === 'ring') sp.position.y = pc.z - 0.45;
+    if (done && !now) sp.material.opacity = 0.45;
+    hall.add(sp);
+  });
+  // the next piece: a tall green post, to find it from anywhere in the hall
+  const pc = track.pieces[cur];
+  if (pc) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, HALL.h, 10), new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.55 }));
+    post.position.copy(L(pc.x, pc.y, HALL.h / 2)); hall.add(post);
+  }
+  if (showLine) {
+    const pts = track.levels[LEVEL].line.pts.filter((_, i) => i % 2 === 0).map((p) => L(p.x, p.y, p.z));
+    const curve = new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+    hall.add(new THREE.Mesh(new THREE.TubeGeometry(curve, Math.ceil(track.levels[LEVEL].facts.length * 6), 0.012, 5, true), new THREE.MeshBasicMaterial({ color: 0xff6b00, transparent: true, opacity: 0.7 })));
+  }
+}
+function placeHall() {
+  hall.position.set(frame.ox, frame.floor, frame.oz);
+  hall.rotation.y = frame.yaw;
+  hall.visible = true;
+}
+
+// ---------- what the overlay says ----------
+function say() {
+  const r = REFS[ref];
+  if (phase === 'A' || phase === 'B') {
+    $('step').textContent = tr(phase === 'A' ? 'Tap the first point' : 'Tap the second point');
+    $('sub').textContent = tr(phase === 'A' ? r.first : r.second) + (lastHit ? '' : ' · ' + tr('Move the phone slowly over the floor until the ring sits on it.'));
+    $('cardPiece').innerHTML = '';
+    $('buttons').innerHTML = `${phase === 'B' ? `<button type="button" data-a="redoA">${tr('Back')}</button>` : frame ? `<button type="button" data-a="build">${tr('Back')}</button>` : ''}<span class="spacer"></span><button type="button" data-a="exit">${tr('Exit')}</button>`;
+    $('aim').hidden = false;
+    return;
+  }
+  if (phase === 'ref') {
+    $('step').textContent = tr('Line up again with');
+    $('sub').textContent = tr('Line up where you are: the nearer the points, the better the pieces around you sit.');
+    $('cardPiece').innerHTML = '';
+    $('buttons').innerHTML = Object.entries(REFS).map(([k, r]) => `<button type="button" data-a="ref:${k}">${esc(tr(r.name))}</button>`).join('') + `<span class="spacer"></span><button type="button" data-a="${frame ? 'build' : 'exit'}">${tr(frame ? 'Back' : 'Exit')}</button>`;
+    return;
+  }
+  const pc = track.pieces[cur];
+  const left = track.pieces.length - placed.size;
+  $('step').textContent = left ? tr('{n} of {m} placed', { n: placed.size, m: track.pieces.length }) : tr('All placed. Have a good practice!');
+  $('sub').textContent = tr('Tap the floor near a piece to pick it.');
+  $('aim').hidden = false;
+  $('cardPiece').innerHTML = pc ? `<div class="piece"><span class="no${pc.type === 'timing' ? ' t' : ''}">${cur + 1}</span><div style="flex:1"><div class="what">${esc(tr(LABEL[pc.type]))}${placed.has(cur) ? ` <span class="placed">✓</span>` : ''}</div>
+    <div class="where">${esc(tr('{a} m from the orange side · {b} m from the rail', { a: (HALL.w - pc.x).toFixed(1), b: pc.y.toFixed(1) }))}${onRail(pc.type) ? ' · ' + esc(tr('hangs from a cable')) : ''}${pc.lift > 0.04 ? ' · ' + esc(tr('on a jump, {h} m up', { h: pc.lift.toFixed(2) })) : ''}</div></div><span class="dist" id="dist"></span></div>` : '';
+  $('buttons').innerHTML = `<button type="button" data-a="prev" ${cur <= 0 ? 'disabled' : ''} aria-label="${tr('Previous piece')}">◀</button>`
+    + `<button type="button" class="${placed.has(cur) ? '' : 'ok'}" data-a="placed">${tr(placed.has(cur) ? 'Not placed' : 'Placed')}</button>`
+    + `<button type="button" data-a="next" ${cur >= track.pieces.length - 1 ? 'disabled' : ''} aria-label="${tr('Next piece')}">▶</button>`
+    + `<span class="spacer"></span><button type="button" data-a="line">${tr(showLine ? 'Hide the line' : 'Show the line')}</button><button type="button" data-a="realign">${tr('Line up again')}</button><button type="button" data-a="exit">${tr('Exit')}</button>`;
+}
+// where the next piece is from the phone, in words
+function guide(cam) {
+  const d = $('dist'); if (!d || !frame) return;
+  const pc = track.pieces[cur]; if (!pc) return;
+  const p = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(new THREE.Quaternion().setFromRotationMatrix(cam.matrixWorld));
+  const w = toWorld(frame, pc.x, pc.y, 0), dx = w.x - p.x, dz = w.z - p.z, dist = Math.hypot(dx, dz);
+  const ang = Math.atan2(fwd.x * dz - fwd.z * dx, fwd.x * dx + fwd.z * dz) * 180 / Math.PI; // + = to the right
+  const where = dist < 0.5 ? tr('here') : Math.abs(ang) < 25 ? tr('ahead') : Math.abs(ang) > 140 ? tr('behind you') : ang > 0 ? tr('to the right') : tr('to the left');
+  const text = dist < 0.5 ? where : `${dist.toFixed(1)} m ${where}`;
+  if (d.textContent !== text) d.textContent = text;
+}
+
+// ---------- taps ----------
+function onSelect() {
+  if (!lastHit) return;
+  const p = { x: lastHit.x, y: lastHit.y, z: lastHit.z };
+  if (phase === 'A') { tapA = p; tapAMark.position.set(p.x, p.y + 0.003, p.z); tapAMark.visible = true; phase = 'B'; say(); return; }
+  if (phase === 'B') {
+    const f = frameFrom(REFS[ref], tapA, p);
+    if (!f) { $('sub').textContent = tr('The two points are too close together: tap the second one at least a metre away.'); return; }
+    frame = f; tapAMark.visible = false; phase = 'build'; drawHall(); placeHall(); say(); return;
+  }
+  if (phase === 'build' && frame) { // tap the floor near a piece: that one is next
+    const h = toHall(frame, p);
+    let best = -1, bd = 1.2;
+    track.pieces.forEach((pc, i) => { const d = Math.hypot(pc.x - h.x, pc.y - h.y); if (d < bd) { bd = d; best = i; } });
+    if (best >= 0 && best !== cur) { cur = best; drawHall(); say(); }
+  }
+}
+$('overlay').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const a = b.dataset.a;
+  if (a === 'exit') return session && session.end();
+  if (a === 'redoA') { phase = 'A'; tapA = null; tapAMark.visible = false; return say(); }
+  if (a === 'realign') { phase = 'ref'; return say(); }
+  if (a.startsWith('ref:')) { ref = a.slice(4); phase = 'A'; tapA = null; tapAMark.visible = false; return say(); }
+  if (a === 'build') { phase = 'build'; return say(); }
+  if (a === 'prev') cur = Math.max(0, cur - 1);
+  if (a === 'next') cur = Math.min(track.pieces.length - 1, cur + 1);
+  if (a === 'line') showLine = !showLine;
+  if (a === 'placed') {
+    if (placed.has(cur)) placed.delete(cur);
+    else { placed.add(cur); const nxt = track.pieces.findIndex((_, i) => i > cur && !placed.has(i)); if (nxt >= 0) cur = nxt; }
+    savePlaced();
+  }
+  drawHall(); say();
+});
+// a tap on a button isn't a tap on the floor
+for (const id of ['top', 'bottom']) $(id).addEventListener('beforexrselect', (e) => e.preventDefault());
+
+// ---------- start and stop ----------
+$('start').onclick = async () => {
+  if (!renderer) setupScene();
+  ref = refNow();
+  try {
+    session = await navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: $('overlay') } });
+  } catch (e) { alertWhy(e); return; }
+  $('overlay').hidden = false;
+  renderer.xr.setReferenceSpaceType('local');
+  await renderer.xr.setSession(session);
+  const viewer = await session.requestReferenceSpace('viewer');
+  hitSource = await session.requestHitTestSource({ space: viewer });
+  session.addEventListener('select', onSelect);
+  session.addEventListener('end', () => {
+    hitSource = null; session = null; frame = null; phase = 'off';
+    hall.visible = false; tapAMark.visible = false; reticle.visible = false;
+    $('overlay').hidden = true; renderer.setAnimationLoop(null);
+  });
+  phase = 'A'; tapA = null; frame = null; lastHit = null; hall.visible = false;
+  cur = Math.max(0, track.pieces.findIndex((_, i) => !placed.has(i)));
+  say();
+  renderer.setAnimationLoop((t, xrFrame) => {
+    if (xrFrame && hitSource) {
+      const refSpace = renderer.xr.getReferenceSpace();
+      const hits = xrFrame.getHitTestResults(hitSource);
+      const had = !!lastHit;
+      if (hits.length) {
+        const m = new THREE.Matrix4().fromArray(hits[0].getPose(refSpace).transform.matrix);
+        lastHit = new THREE.Vector3().setFromMatrixPosition(m);
+        reticle.position.copy(lastHit); reticle.visible = true;
+      } else { lastHit = null; reticle.visible = false; }
+      if (had !== !!lastHit && phase !== 'build') say();
+    }
+    if (phase === 'build') guide(renderer.xr.getCamera(camera));
+    renderer.render(scene, camera);
+  });
+};
+function alertWhy(e) {
+  const why = $('why');
+  why.innerHTML = `<h2>${tr('AR didn\'t start')}</h2><p>${esc(e && e.message ? e.message : String(e))}</p>`;
+  why.hidden = false;
+}
+// for the smoke test, which has no AR: the scene as it would stand, drawn once from the rail corner
+window.__ar = { frameFrom, toWorld, REFS, get track() { return track; }, preview() {
+  if (!renderer) setupScene();
+  frame = frameFrom(REFS.rail, { x: 0, y: -1.4, z: 0 }, { x: 5, y: -1.4, z: 0 }); phase = 'build'; cur = 1;
+  drawHall(); placeHall(); $('overlay').hidden = false; say();
+  Object.assign(renderer.domElement.style, { display: '', position: 'fixed', inset: '0', background: '#334' }); $('intro').hidden = true; camera.position.set(HALL.w / 2, 0.2, 2); camera.lookAt(HALL.w / 2, -1.4, -10);
+  guide(camera); renderer.render(scene, camera);
+  return { children: hall.children.length, step: $('step').textContent, dist: $('dist')?.textContent };
+} };
+load();
+</script>
+</body>
+</html>

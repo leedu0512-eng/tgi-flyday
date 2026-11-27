@@ -157,6 +157,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
   <h1 id="title">Today's track</h1>
   <span class="code" id="code"></span>
   <span class="spacer"></span>
+  <button type="button" class="tb" id="arBtn">Build it with AR</button>
   <button type="button" class="tb" id="simBtn">Fly it in the sim</button>
   <button type="button" class="tb primary" id="editBtn">Edit track</button>
   <button type="button" class="tb primary" id="saveBtn" hidden>Save as today's track</button>
@@ -253,6 +254,15 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
     <div class="sim-row"><a class="tb primary" id="simOpen" target="_blank" rel="noopener">Open WebFPV</a><button type="button" class="tb" id="simClose">Close</button></div>
   </div>
 </div>
+<div class="pinpad" id="arBox" hidden>
+  <div class="pp-box sim-box" role="dialog" aria-label="Build it with AR">
+    <h3 id="arTitle">Build it with AR</h3>
+    <div class="sim-qr" id="arQr"></div>
+    <p class="sim-help">Scan it with an Android phone and open it in Chrome: every piece stands in the hall where it goes, one after another.</p>
+    <input class="sim-link" id="arLink" readonly data-no-i18n aria-label="Link">
+    <div class="sim-row"><button type="button" class="tb" id="arClose">Close</button></div>
+  </div>
+</div>
 <div class="pinpad" id="pinpad" hidden>
   <div class="pp-box" role="dialog" aria-label="PIN to save">
     <h3>PIN to save</h3>
@@ -271,8 +281,9 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
 import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, floorAt } from '/assets/hall.js';
-import { HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, onRail, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
+import { packTrack, HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, onRail, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
 import { qrSvg } from '/assets/common.js';
+import { pieceMats, pieceObject, yawOf, numberSprite, frameMesh, hexMesh } from '/assets/pieces3d.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -678,78 +689,23 @@ function placePiece(t, at) {
 }
 
 // a ladder stage: a hexagon, tips left and right, flat top and bottom, facing +z
-function hexMesh(mat, t = HEX.tube) { return new THREE.Mesh(new THREE.TorusGeometry(HEX.inside / 2 + t / 2, t / 2, 6, 6), mat); }
-function frameMesh(w, h, t, mat) { // a square opening w × h, tube t thick, centred on the origin, facing +z
-  const g = new THREE.Group();
-  const add = (sx, sy, x, y) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, t), mat); m.position.set(x, y, 0); g.add(m); };
-  add(w + 2 * t, t, 0, h / 2 + t / 2); add(w + 2 * t, t, 0, -h / 2 - t / 2);
-  add(t, h, -w / 2 - t / 2, 0); add(t, h, w / 2 + t / 2, 0);
-  return g;
-}
 function draw3d(tr0) {
   if (!three) return;
   const { group } = three;
   while (group.children.length) group.remove(group.children[0]);
   three.objs = []; three.hits = [];
   if (!tr0) return;
-  const white = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const orange = new THREE.MeshLambertMaterial({ color: 0xff6b00 });
-  const green = new THREE.MeshLambertMaterial({ color: 0x22c55e });
-  const blue = new THREE.MeshLambertMaterial({ color: 0x7fc8ff });
-  const T = 0.03;
-  // black and white squares for the timing gate's board and its line on the floor
-  const chequerTex = (cols, rows) => {
-    const c = document.createElement('canvas'); c.width = cols * 16; c.height = rows * 16;
-    const x = c.getContext('2d');
-    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { x.fillStyle = (i + j) % 2 ? '#111' : '#fff'; x.fillRect(i * 16, j * 16, 16, 16); }
-    const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t;
-  };
-  const chequer = new THREE.MeshBasicMaterial({ map: chequerTex(8, 2) });
-  const chequerFloor = new THREE.MeshBasicMaterial({ map: chequerTex(18, 2) });
+  const M = pieceMats();
   tr0.pieces.forEach((pc, i) => {
-    const pass = tr0.passes[i], obj = new THREE.Group();
-    const yaw = Math.atan2(pass.dx, -pass.dy); // turns the piece's +z to the way it is flown
-    if (pc.type === 'gate') {
-      const f = frameMesh(OPEN, OPEN, T, white); f.position.y = GATE_Z; obj.add(f);
-    } else if (pc.type === 'timing') {
-      // the timing gate stands out (Janno 22.11.2026): a thicker green frame, a chequered board on top
-      // and a chequered line on the floor through it, like a finish line
-      const f = frameMesh(OPEN, OPEN, 0.055, green); f.position.y = GATE_Z; obj.add(f);
-      const board = new THREE.Mesh(new THREE.BoxGeometry(OPEN + 0.11, 0.16, 0.02), [chequer, chequer, chequer, chequer, chequer, chequer]);
-      board.position.y = GATE_Z + OPEN / 2 + 0.055 + 0.08; obj.add(board);
-      const line = new THREE.Mesh(new THREE.PlaneGeometry(OPEN + 0.5, 0.12), chequerFloor);
-      line.rotation.x = -Math.PI / 2; line.position.y = 0.006; obj.add(line);
-    } else if (pc.type.startsWith('ladder')) {
-      const k = pc.type === 'ladder3' ? 3 : 5;
-      const flown = tr0.levels[level].passes[i].map((ps) => (ps.info && ps.info.stage != null ? ps.info.stage : -1));
-      // the ×5 hexagons, flat sides joined, tips to the sides; the ×3 rings (Janno 26.11.2026)
-      const L = LADDER[pc.type];
-      for (let s = 0; s < k; s++) { const m = flown.includes(s) ? orange : white, f = L.shape === 'hex' ? hexMesh(m) : new THREE.Mesh(new THREE.TorusGeometry(L.w / 2 + L.tube / 2, L.tube / 2, 8, 40), m); f.position.y = TYPES[pc.type].levels[s]; obj.add(f); }
-      if (L.hang) { const top = TYPES[pc.type].levels[k - 1] + L.h / 2 + L.tube, rope = new THREE.Mesh(new THREE.BoxGeometry(0.008, HALL.h - top, 0.008), new THREE.MeshBasicMaterial({ color: 0x888888 })); rope.position.y = (HALL.h + top) / 2; obj.add(rope); }
-    } else if (pc.type === 'cube') {
-      const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.7, 0.7, 0.7)), new THREE.LineBasicMaterial({ color: 0xffffff }));
-      e.position.y = 0.35; obj.add(e);
-      for (const [x, z] of [[-0.35, -0.35], [0.35, -0.35], [-0.35, 0.35], [0.35, 0.35]]) { const post2 = new THREE.Mesh(new THREE.BoxGeometry(T, 0.7, T), white); post2.position.set(x, 0.35, z); obj.add(post2); }
-    } else if (pc.type === 'flag') {
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1.9, 8), white); pole.position.y = 0.95; obj.add(pole);
-      const cloth = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.9), new THREE.MeshLambertMaterial({ color: 0xff6b00, side: THREE.DoubleSide })); cloth.position.set(0.17, 1.4, 0); obj.add(cloth);
-      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.04, 16), white); foot.position.y = 0.02; obj.add(foot);
-    } else if (pc.type === 'ring') {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(OPEN / 2 + 0.015, 0.018, 8, 40), blue); ring.position.y = pc.z; obj.add(ring);
-      const rope = new THREE.Mesh(new THREE.BoxGeometry(0.008, HALL.h - pc.z - OPEN / 2 - 0.02, 0.008), new THREE.MeshBasicMaterial({ color: 0x888888 }));
-      rope.position.y = (HALL.h + pc.z + OPEN / 2 + 0.02) / 2; obj.add(rope);
-    }
+    const pass = tr0.passes[i], obj = pieceObject(pc, i, tr0, level, M);
+    const yaw = yawOf(pass);
     obj.position.copy(V(pc.x, pc.y, pc.lift || 0));   // on the hump, if it stands on it
     obj.rotation.y = yaw;
     group.add(obj);
     // a see-through box round the piece, so a click anywhere in it picks it (not only its thin pipes)
     const hb = hitBox(pc); hb.userData.piece = i; obj.add(hb);
     three.objs[i] = obj; three.hits.push(hb);
-    const c = document.createElement('canvas'); c.width = c.height = 64;
-    const x = c.getContext('2d'); x.fillStyle = pc.type === 'timing' ? '#22c55e' : '#ff6b00'; x.beginPath(); x.arc(32, 32, 30, 0, 7); x.fill();
-    x.fillStyle = '#000'; x.font = '800 34px "Big Shoulders", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(i + 1), 32, 34);
-    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
-    sp.scale.set(0.32, 0.32, 1);
+    const sp = numberSprite(i + 1, pc.type === 'timing');
     sp.position.copy(V(pc.x, pc.y, Math.min(HALL.h - 0.05, TYPES[pc.type].zmax + 0.3 + (pc.lift || 0))));
     if (pc.type === 'ring') sp.position.y = pc.z - 0.45;
     sp.userData.label = true; sp.userData.piece = i; group.add(sp); three.hits.push(sp);
@@ -1098,7 +1054,8 @@ function setEditing(on) {
   document.body.classList.toggle('editing', on);
   $('ctrl').hidden = !on;
   $('editBtn').hidden = on;
-  $('simBtn').hidden = on || FROM_KIOSK;   // never fly on the kiosk (Janno 26.11.2026): the sim PCs and home are for that
+  $('simBtn').hidden = on || FROM_KIOSK;
+  $('arBtn').hidden = on;   // never fly on the kiosk (Janno 26.11.2026): the sim PCs and home are for that
   $('saveBtn').hidden = !on;
   $('cancelBtn').hidden = !on;
   $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
@@ -1196,6 +1153,22 @@ $('simBtn').onclick = async () => {
   $('simBox').hidden = false;
 };
 $('simClose').onclick = () => { $('simBox').hidden = true; };
+// ---------- build it with AR on a phone (ar.html): a link that carries the track as it is now ----------
+async function arOrigin() { // a phone can't reach localhost: the PC's own address on the network instead
+  if (!/^(localhost|127\.|\[::1\])/.test(location.hostname)) return location.origin;
+  try { const i = await (await fetch('/api/info')).json(); if (i.addresses?.[0]) return `${location.protocol}//${i.addresses[0]}:${i.port}`; } catch {}
+  return location.origin;
+}
+$('arBtn').onclick = async () => {
+  const c = current(); if (!c) return;
+  const link = `${await arOrigin()}/ar#t=${await packTrack(c)}`;
+  $('arLink').value = link;
+  $('arTitle').textContent = `${tr('Build it with AR')} · ${code(c.seed)}`;
+  $('arQr').innerHTML = await qrSvg(link);
+  $('arBox').hidden = false;
+};
+$('arClose').onclick = () => { $('arBox').hidden = true; };
+$('arBox').addEventListener('click', (e) => { if (e.target === $('arBox')) $('arBox').hidden = true; });
 $('simBox').addEventListener('click', (e) => { if (e.target === $('simBox')) $('simBox').hidden = true; });
 $('history').onchange = () => {
   const s = saved.history[Number($('history').value)];
@@ -1203,7 +1176,7 @@ $('history').onchange = () => {
   if (!s) return;
   remember(); picked = -1;
   Object.assign(opts, s.opts); syncControls();
-  apply({ seed: s.seed, opts: s.opts, edits: s.edits || {}, removed: s.removed || [], added: s.added || [], ladders: s.ladders || {} });
+  apply({ seed: s.seed, opts: s.opts, edits: s.edits || {}, removed: s.removed || [], added: s.added || [], ladders: s.ladders || {}, order: s.order || {} });
 };
 for (const id of ['style', 'ceiling', 'flags']) $(id).addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;

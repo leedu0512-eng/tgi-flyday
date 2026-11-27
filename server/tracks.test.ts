@@ -152,3 +152,36 @@ test('the kit is editable: tracks are made from it, and it is kept on this PC be
   store.setKit({ kit: { ...kit, gate: 99 }, pin: '2580' });
   assert.equal(new TrackStore(join(dir, 'track.json')).view().kit.gate, 20, 'kept, and never more than 20');
 });
+
+// @ts-ignore: a browser module, shared with the AR page
+import * as AR from '../web/assets/arframe.js';
+
+test('a track goes into a link and comes back the same (the phone\'s AR builder)', async () => {
+  const saved = { seed: 12345, opts: OPTS, edits: { 2: { dx: 0.5, dy: -0.3, rot: 15 } }, removed: [4], added: [{ type: 'gate', x: 3, y: 8, rot: 90 }], ladders: {}, order: { 3: 2 } };
+  const text = await G.packTrack(saved);
+  assert.match(text, /^z\.[A-Za-z0-9_-]+$/);
+  assert.ok(text.length < 400, `short enough for a QR code: ${text.length}`);
+  assert.deepEqual(await G.unpackTrack(text), saved);
+  assert.equal(await G.unpackTrack('z.nonsense'), null);
+  assert.equal(await G.unpackTrack(''), null);
+});
+
+test('two taps on the floor line the hall up with the phone, whichever way the phone faces', () => {
+  for (const yaw of [0, 0.7, -2.1, Math.PI]) {
+    const truth = { ox: 3, oz: -2, floor: -1.4, yaw };
+    for (const ref of Object.values(AR.REFS) as any[]) {
+      const A = AR.toWorld(truth, ref.at[0], ref.at[1]);
+      const B = AR.toWorld(truth, ref.at[0] + ref.along[0] * 4, ref.at[1] + ref.along[1] * 4);
+      const f = AR.frameFrom(ref, A, B);
+      const p = AR.toWorld(f, 4, 12, 1), q = AR.toWorld(truth, 4, 12, 1);
+      assert.ok(Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z) < 1e-9);
+      const h = AR.toHall(f, q);
+      assert.ok(Math.abs(h.x - 4) < 1e-9 && Math.abs(h.y - 12) < 1e-9 && Math.abs(h.z - 1) < 1e-9);
+      assert.equal(AR.frameFrom(ref, A, { ...A, x: A.x + 0.5 }), null); // too close to tell the way
+    }
+  }
+  // standing at the rail, white wall on the left: the hall runs away from the phone (three.js: -z)
+  const f = AR.frameFrom(AR.REFS.rail, { x: 0, y: 0, z: 0 }, { x: 5, y: 0, z: 0 });
+  const far = AR.toWorld(f, 0, 10);
+  assert.ok(Math.abs(far.x) < 1e-9 && Math.abs(far.z + 10) < 1e-9);
+});
