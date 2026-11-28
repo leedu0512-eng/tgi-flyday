@@ -120,9 +120,10 @@ export function buildHall(scene, mapV) {
   for (const pr of PROPS) {
     const mat = lam(COL[pr.color] ?? COL.carpet);
     if (pr.kind === 'quarter') {
-      const seg = 14, pos = [], idx = [], r = pr.r, len = pr.y1 - pr.y0;
-      const prof = []; for (let i = 0; i <= seg; i++) { const t = (i / seg) * Math.PI / 2; prof.push([pr.x0 + r - r * Math.sin(t), r - r * Math.cos(t)]); }
-      prof.push([pr.x0, 2.2]);
+      // 1.5 cm off the wall: in the wall's own plane its upright part flickered against it (Janno 28.11.2026)
+      const seg = 14, pos = [], idx = [], r = pr.r, len = pr.y1 - pr.y0, x0 = pr.x0 + 0.015;
+      const prof = []; for (let i = 0; i <= seg; i++) { const t = (i / seg) * Math.PI / 2; prof.push([x0 + r - r * Math.sin(t), r - r * Math.cos(t)]); }
+      prof.push([x0, 2.2]);
       prof.forEach(([x, z]) => { pos.push(...V(x, pr.y0, z).toArray(), ...V(x, pr.y1, z).toArray()); });
       for (let i = 0; i < prof.length - 1; i++) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
       const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();

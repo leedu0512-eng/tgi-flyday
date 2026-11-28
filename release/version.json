@@ -1,9 +1,9 @@
 {
- "version": "2026.11.28-1517",
+ "version": "2026.11.28-1544",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "72c05846d242addde66b433d129a0c01da8ce2700cbc26c08bd021c40ad4183b"
+   "sha256": "6231f9076072ae7e959e55807cb89add3839110886acabf7dc361d138d5dbc52"
   },
   {
    "path": "web/ar.html",
@@ -66,12 +66,16 @@
    "sha256": "2a832664d136037daeb00e01fda9e84354a32aa6bd6568c90202137a92ec61e8"
   },
   {
+   "path": "web/assets/gear3d.js",
+   "sha256": "0ab1a9cbd6ce3d4f80b303ccbfb3d90fefac5286f7ad7675c437b604b148d808"
+  },
+  {
    "path": "web/assets/hall.js",
    "sha256": "7ea7a2d1223cae1c39d3614fe5f423487fbc31d9119000908c6d28c6ea992117"
   },
   {
    "path": "web/assets/hall3d.js",
-   "sha256": "c26810f12818c64c3a9ba9efcbc958f81f8c812529e733d5954879031465da33"
+   "sha256": "0105a33f039886e6a3a3b57981673d3b73d96c1a6a03086e5cca125323e0ad55"
   },
   {
    "path": "web/assets/i18n-et.js",
@@ -159,7 +163,7 @@
   },
   {
    "path": "web/assets/pieces3d.js",
-   "sha256": "f1eac972a8ebf8de6970d7ba4690708ef818ca8703acdb3b245ffa9d149e1137"
+   "sha256": "7f8d7d7384dac120896443c5a66c9058123b0275b9f97004077462c3767f109e"
   },
   {
    "path": "web/assets/spectrum.js",
@@ -171,7 +175,7 @@
   },
   {
    "path": "web/assets/trackgen.js",
-   "sha256": "84147978e570032f8942a103937e2660874cdd13b9264b9666d1044618cf2787"
+   "sha256": "e68e343a5e0efce9046dbc40c38f672072654eccbc63bd93cb151f553874842a"
   },
   {
    "path": "web/assets/usdz.js",
@@ -235,7 +239,7 @@
   },
   {
    "path": "web/track.html",
-   "sha256": "add2a242bd663006665871fd6e1ab1770d8d8754a6cd25cbc3a29e84d251224d"
+   "sha256": "4587a4f5c6aa23db0166d2468ce4991a390fce7b58e4c83bfaa728456f2d9e9f"
   }
  ]
 }

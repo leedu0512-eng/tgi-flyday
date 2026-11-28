@@ -15,7 +15,11 @@ export const HALL = { w: 9.5, l: 25.6, h: 2.92 };
 // plastic hexagons, flat sides joined, tips to the sides, 46 cm tip to tip inside; the ×3 a stack of
 // rings (assumed the club's 24 in rings). Each stands on the floor; where two meet there are two tubes.
 export const OPEN = 0.6096, PIPE = 0.03, SILL = 0.03;
-export const GATE_Z = SILL + OPEN / 2;                     // the middle of a floor gate's opening
+export const GATE_Z = SILL + OPEN / 2;
+// the club's cube (Janno 28.11.2026, photo): a red fabric pop-up cube, 1 m a side, a 75 cm round hole in every side
+// and the top, flown in through one side's hole and out through the opposite one
+export const CUBE = { edge: 1.0, hole: 0.75 };
+export const CUBE_Z = CUBE.edge / 2;                       // the middle of its holes                     // the middle of a floor gate's opening
 export const HEX = { inside: 0.46, tube: 0.03 };
 export const HEX_H = HEX.inside * Math.sqrt(3) / 2;        // inside height, flat side to flat side (40 cm)
 export const HEX_PITCH = HEX_H + 2 * HEX.tube;               // stage to stage: two tubes where two hexagons meet
@@ -39,7 +43,7 @@ export const TIMING = { x: HALL.w - 1, y: HALL.l / 2 };  // middle of the right 
 export const TYPES = {
   timing:  { label: 'Timing gate', zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
   gate:    { label: 'Gate',        zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
-  cube:    { label: 'Cube',        zmin: 0, zmax: 0.74, r: 0.55, levels: [0.35] },
+  cube:    { label: 'Cube',        zmin: 0, zmax: CUBE.edge + 0.04, r: CUBE.edge * Math.SQRT1_2 + 0.05, levels: [CUBE_Z] },
   ring:    { label: 'Ring',        zmin: RING_Z - OPEN / 2 - 0.05, zmax: HALL.h, r: OPEN / 2 + 0.06, levels: [RING_Z] },
   ladder3: { label: 'Ladder ×3',   zmin: 0, zmax: 3 * (OPEN + 0.06), r: OPEN / 2 + 0.12, levels: stages('ladder3', 3) },
   ladder5: { label: 'Ladder ×5',   zmin: HANG_TOP - 5 * HEX_PITCH, zmax: HALL.h, r: HEX.inside / 2 + 0.12, levels: stages('ladder5', 5) },
@@ -117,18 +121,19 @@ function trickLadder(type, st, rand, wantUp, once) {
 // cube is flown through once: on its own, or as the way up to a ring on the far rail, carrying on
 // the way the lap goes.
 function trickAlpha(st, rand, withRing) {
-  const s2 = Math.SQRT1_2, z = 0.35, zone = 'A' + Math.floor(rand() * 1e6);
-  const C = { f: 0, l: 0.95 };
-  const cube = [{ f: -2.1, l: 0, z: null }, { f: -0.4 * s2, l: C.l - 0.4 * s2, z, zone }, { f: 0, l: C.l, z, pass: { local: 0, dir: { f: s2, l: s2 } }, zone }, { f: 0.4 * s2, l: C.l + 0.4 * s2, z, zone }];
+  // straight through it: from 30 cm before the hole in to 30 cm past the hole out
+  const s2 = Math.SQRT1_2, z = CUBE_Z, zone = 'A' + Math.floor(rand() * 1e6), H = CUBE.edge / 2 + 0.3;
+  const C = { f: 0, l: 1.1 };
+  const cube = [{ f: -2.3, l: 0, z: null }, { f: -H * s2, l: C.l - H * s2, z, zone }, { f: 0, l: C.l, z, pass: { local: 0, dir: { f: s2, l: s2 } }, zone }, { f: H * s2, l: C.l + H * s2, z, zone }];
   const up = [...cube, { f: 0.6, railK: 1, dl: 0, z: RING_Z, zone, pass: { local: 1, dir: { f: 1, l: 0 } } }]; // the middle rail
   // the easy way: through the cube once, a gentle right turn and back to the wall
-  const R = Math.max(st.rmin + 0.3, 0.85), cx = 0.4 * s2 + R * s2, cl = C.l + 0.4 * s2 - R * s2;
+  const R = Math.max(st.rmin + 0.3, 0.85), cx = H * s2 + R * s2, cl = C.l + H * s2 - R * s2;
   const ex = { f: cx + R * s2, l: cl + R * s2 };
   const once = [...cube, { f: cx, l: cl + R, z, zone }, ex, { f: ex.f + ex.l * 0.45, l: ex.l * 0.55, z: null }, { f: ex.f + ex.l + 1.0, l: 0, z: null }];
   const pieces = [{ type: 'cube', trick: withRing ? 'up' : 'once', at: C, z }];
   if (withRing) pieces.push({ type: 'ring', trick: 'loop', at: { f: 0.6, railK: 1, dl: 0 }, z: RING_Z });
   const levels = withRing ? { mid: once, easy: 'skip' } : { easy: once };
-  return { anchors: withRing ? up : once, before: 2.2, after: withRing ? 1.2 : 3.9, inward: withRing ? 4.2 : 2.5, entryZ: z, exitZ: withRing ? null : z /* the way down from the ring is long enough */, pieces, sideOnly: withRing, levels };
+  return { anchors: withRing ? up : once, before: 2.4, after: withRing ? 1.4 : 4.3, inward: withRing ? 4.4 : 2.8, entryZ: z, exitZ: withRing ? null : z /* the way down from the ring is long enough */, pieces, sideOnly: withRing, levels };
 }
 function trickFinger(st, rand, gates) { // from the wall into the hall (through a gate), round a flag, back (through a gate)
   const r = st.flagR, D = (gates ? 2.9 : 2.2) + rand() * 1.0, zone = 'F' + Math.floor(rand() * 1e6), z = GATE_Z;
@@ -467,7 +472,7 @@ function check(pieces, line, st) {
   for (const pc of pieces) {
     const t = TYPES[pc.type];
     for (const p of pts) {
-      if (pc.passes.some((ps) => { let ds = Math.abs(p.s - ps.s); ds = Math.min(ds, length - ds); return ds < 0.75; })) continue;
+      if (pc.passes.some((ps) => { let ds = Math.abs(p.s - ps.s); ds = Math.min(ds, length - ds); return ds < Math.max(0.75, t.r + 0.3); })) continue;
       if (p.z < t.zmin - 0.25 || p.z > t.zmax + 0.25) continue;
       if (Math.hypot(p.x - pc.x, p.y - pc.y) < t.r) return null;
     }
@@ -589,7 +594,7 @@ export function relayout(base, edits, changes) {
     pc.x += e.dx; pc.y += e.dy;
   }
   ch.added.forEach((a, k) => {
-    const yaw = yawOfRot(a.rot), z = a.type === 'ring' ? RING_Z : a.type === 'cube' ? 0.35 : a.type === 'flag' ? 0 : GATE_Z;
+    const yaw = yawOfRot(a.rot), z = a.type === 'ring' ? RING_Z : a.type === 'cube' ? CUBE_Z : a.type === 'flag' ? 0 : GATE_Z;
     all.push({ type: a.type, x: a.x, y: a.y, z, trick: 'once', key: 'a' + k, added: true, dx: Math.cos(yaw), dy: Math.sin(yaw), passes: [] });
   });
   const removed = new Set(ch.removed);
@@ -769,7 +774,7 @@ export function issuesOf(tr) {
     P.forEach((pc, k) => {
       const t = TYPES[pc.type];
       for (const p of pts) {
-        if (pc.passes.some((ps) => { let ds = Math.abs(p.s - ps.s); ds = Math.min(ds, length - ds); return ds < 0.75; })) continue;
+        if (pc.passes.some((ps) => { let ds = Math.abs(p.s - ps.s); ds = Math.min(ds, length - ds); return ds < Math.max(0.75, t.r + 0.3); })) continue;
         if (p.z < t.zmin - 0.25 || p.z > t.zmax + 0.25) continue;
         if (Math.hypot(p.x - pc.x, p.y - pc.y) < t.r) { say('clip' + k, `The line hits piece ${k + 1} (${t.label}).`, pc.x, pc.y, level); break; }
       }
@@ -794,7 +799,7 @@ export function issuesOf(tr) {
 // same frame as ours (x across from the left wall, y up the page, z up, metres, yaw counter
 // clockwise from +x), a whoop room ('micro', which grows to fit the hall). Pieces become its
 // elements: gates and the timing gate `gate`, ladders a stack of `hexGate`s (×5) or `hoop`s (×3) in one group,
-// a cube five gates in one group (its edges), rings `hoop`s up on their sill (ladders and rings `floating`: they hang), flags `flag` markers flown round on one
+// a cube four hoops in one group (its round holes), rings `hoop`s up on their sill (ladders and rings `floating`: they hang), flags `flag` markers flown round on one
 // side. The flying order is ours, pass by pass. WebFPV draws its own line through them.
 const r6 = (v) => Math.round(v * 1e6) / 1e6;
 function hash8(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, '0'); }
@@ -826,12 +831,12 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
     else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring', floating: true }), yaw });
     else if (pc.type === 'flag') pieceEls.set(i, { el: el('flag', pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: 'Flag' }) });
     else if (pc.type === 'cube') {
-      // a 70 cm cube: front and back whole, the sides without their own uprights (they are the front's and back's)
-      const c = Math.cos(yaw), s = Math.sin(yaw), h = 0.35, e = 0.7 - PIPE, group = `grp-${i + 1}`;
-      const dims = { levels: 1, sillH: 0, clearW: e, clearH: e, levelPitch: e + PIPE };
-      const back = el('gate', pc.x - h * c, pc.y - h * s, yaw, dims, { group, name: 'Cube' });
-      const front = el('gate', pc.x + h * c, pc.y + h * s, yaw, dims, { group, name: 'Cube' });
-      for (const k of [1, -1]) el('gate', pc.x - k * h * s, pc.y + k * h * c, yaw + Math.PI / 2, dims, { group, name: 'Cube', unbuiltSides: ['left', 'right'] });
+      // the fabric cube: a round hole in each side, as hoops on the cube's faces (no legs: the fabric holds them)
+      const c = Math.cos(yaw), s = Math.sin(yaw), h = CUBE.edge / 2, group = `grp-${i + 1}`;
+      const dims = { levels: 1, sillH: r6(CUBE_Z - CUBE.hole / 2), clearW: CUBE.hole, clearH: CUBE.hole, levelPitch: CUBE.edge };
+      const back = el('hoop', pc.x - h * c, pc.y - h * s, yaw, dims, { group, name: 'Cube', floating: true });
+      const front = el('hoop', pc.x + h * c, pc.y + h * s, yaw, dims, { group, name: 'Cube', floating: true });
+      for (const k of [1, -1]) el('hoop', pc.x - k * h * s, pc.y + k * h * c, yaw + Math.PI / 2, dims, { group, name: 'Cube', floating: true });
       pieceEls.set(i, { back, front, yaw });
     }
   });

@@ -281,7 +281,7 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
 <script type="module">
 import { post, tr, langSwitch, esc, LANG } from '/assets/common.js';
 import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, floorAt } from '/assets/hall.js';
-import { packTrack, HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, onRail, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
+import { packTrack, HALL, RAILS, START, TIMING, TYPES, OPEN, PIPE, GATE_Z, HEX, LADDER, CUBE, CUBE_Z, onRail, code, generate, rebuild, relayout, makeTrack, cleanEdits, toWebFPV, webfpvLink, KIT_COUNT, KIT_MAX, cleanKit, ADDABLE } from '/assets/trackgen.js';
 import { qrSvg } from '/assets/common.js';
 import { buildHall, CSS, tubePaths } from '/assets/hall3d.js';
 import { pieceMats, pieceObject, yawOf, numberSprite, frameMesh, hexMesh } from '/assets/pieces3d.js';
@@ -427,7 +427,7 @@ let hitMat = null, ray = null, floorPlane = null;   // made once THREE is there 
 function hitBox(pc) {
   let g, y;
   if (pc.type === 'gate' || pc.type === 'timing') { g = new THREE.BoxGeometry(OPEN + 0.12, OPEN + 0.12, 0.3); y = GATE_Z; }
-  else if (pc.type === 'cube') { g = new THREE.BoxGeometry(0.8, 0.8, 0.8); y = 0.35; }
+  else if (pc.type === 'cube') { g = new THREE.BoxGeometry(CUBE.edge + 0.08, CUBE.edge + 0.08, CUBE.edge + 0.08); y = CUBE.edge / 2; }
   else if (pc.type === 'flag') { g = new THREE.BoxGeometry(0.45, 1.9, 0.45); y = 0.95; }
   else if (pc.type === 'ring') { g = new THREE.BoxGeometry(OPEN + 0.1, OPEN + 0.1, 0.25); y = pc.z; }
   else { const L = LADDER[pc.type], lv = TYPES[pc.type].levels, lo = lv[0] - L.h / 2 - L.tube, hi = lv[lv.length - 1] + L.h / 2 + L.tube; g = new THREE.BoxGeometry(L.w + 0.12, hi - lo, 0.3); y = (lo + hi) / 2; }
@@ -436,7 +436,7 @@ function hitBox(pc) {
 function ghostOf(type) { // what follows the pointer while a piece is armed
   const g = new THREE.Group(), m = new THREE.MeshBasicMaterial({ color: 0xff9a4d, transparent: true, opacity: 0.6, depthWrite: false });
   if (type === 'gate') { const f = frameMesh(OPEN, OPEN, 0.03, m); f.position.y = GATE_Z; g.add(f); }
-  else if (type === 'cube') { const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(0.7, 0.7, 0.7)), new THREE.LineBasicMaterial({ color: 0xff9a4d })); e.position.y = 0.35; g.add(e); }
+  else if (type === 'cube') { const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(CUBE.edge, CUBE.edge, CUBE.edge)), new THREE.LineBasicMaterial({ color: 0xff9a4d })); e.position.y = CUBE.edge / 2; g.add(e); }
   else if (type === 'ring') { const r = new THREE.Mesh(new THREE.TorusGeometry(OPEN / 2 + 0.015, 0.02, 8, 40), m); r.position.y = RING_Z; g.add(r); }
   else if (type === 'flag') { const p = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.9, 8), m); p.position.y = 0.95; g.add(p); const c = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.9), m); c.position.set(0.17, 1.4, 0); g.add(c); }
   else if (LADDER[type]) { const L = LADDER[type]; for (const z of TYPES[type].levels) { const f = L.shape === 'hex' ? hexMesh(m) : new THREE.Mesh(new THREE.TorusGeometry(L.w / 2 + L.tube / 2, L.tube / 2, 8, 40), m); f.position.y = z; g.add(f); } }
@@ -581,7 +581,7 @@ function draw3d(tr0) {
   tr0.seq = [];
   tr0.pieces.forEach((pc, i) => (tr0.cur.passes[i] || []).forEach((ps) => {
     const st = ps.info && ps.info.stage != null ? ps.info.stage : pc.level || 0;
-    const h = pc.type === 'ring' ? pc.z : pc.type === 'cube' ? 0.35 : pc.type.startsWith('ladder') ? TYPES[pc.type].levels[st] : GATE_Z;
+    const h = pc.type === 'ring' ? pc.z : pc.type === 'cube' ? CUBE_Z : pc.type.startsWith('ladder') ? TYPES[pc.type].levels[st] : GATE_Z;
     tr0.seq.push({ s: ps.s, type: pc.type, x: pc.x, y: pc.y, h: h + (pc.lift || 0), yaw: Math.atan2(ps.dx, -ps.dy) });
   }));
   tr0.seq.sort((a, b) => a.s - b.s);
@@ -630,8 +630,8 @@ function planSvg(t) {
     for (const is of editing ? t.issues : []) g += `<circle cx="${px(is)}" cy="${py(is)}" r="11" fill="none" stroke="#ff3b30" stroke-width="2.5" stroke-dasharray="4 3"/>`;
     t.pieces.forEach((pc, i) => {
       const pass = t.passes[i], ang = Math.atan2(pass.dx, pass.dy) * 180 / Math.PI;
-      const col = pc.type === 'timing' ? '#22c55e' : pc.type === 'ring' ? '#7fc8ff' : '#fff';
-      const w = (pc.type === 'cube' ? 0.7 : pc.type.startsWith('ladder') ? LADDER[pc.type].w + 0.06 : OPEN + 0.05) * S;
+      const col = pc.type === 'timing' ? '#22c55e' : pc.type === 'ring' || pc.type === 'cube' ? '#ff4d52' : pc.type === 'ladder5' ? '#3fbf5a' : '#fff';   // the club's red cubes and rings, green hexagons
+      const w = (pc.type === 'cube' ? CUBE.edge : pc.type.startsWith('ladder') ? LADDER[pc.type].w + 0.06 : OPEN + 0.05) * S;
       const shape = pc.type === 'flag' ? `<g transform="rotate(${-ang})"><line x1="0" y1="0" x2="0" y2="-14" stroke="#fff" stroke-width="1.6"/><path d="M0,-14 L9,-11 L0,-8 Z" fill="#ff6b00"/><circle r="2.2" fill="#fff"/></g>`
         : pc.type === 'cube' ? `<rect x="${-w / 2}" y="${-w / 2}" width="${w}" height="${w}" fill="none" stroke="${col}" stroke-width="2"/>`
         : pc.type === 'ring' ? `<ellipse rx="${w / 2}" ry="3" fill="none" stroke="${col}" stroke-width="2"/>`
