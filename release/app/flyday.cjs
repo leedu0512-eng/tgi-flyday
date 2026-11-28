@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1426" : "dev";
+var VERSION = true ? "2026.11.28-1509" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -4661,7 +4661,7 @@ function toWebFPV(tr, level = "full", now = /* @__PURE__ */ new Date()) {
   return {
     schemaVersion: 3,
     id: "trk-" + hash8(tag + JSON.stringify(tr.edits || {})),
-    name: `HOBIzone hall \xB7 ${tag}`,
+    name: `HOBIzone hall ${tag}`,
     createdUtc: iso2,
     modifiedUtc: iso2,
     trackClass: "micro",

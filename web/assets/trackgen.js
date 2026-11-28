@@ -864,7 +864,7 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
   return {
     schemaVersion: 3,
     id: 'trk-' + hash8(tag + JSON.stringify(tr.edits || {})),
-    name: `HOBIzone hall · ${tag}`,
+    name: `HOBIzone hall ${tag}`,
     createdUtc: iso,
     modifiedUtc: iso,
     trackClass: 'micro',
