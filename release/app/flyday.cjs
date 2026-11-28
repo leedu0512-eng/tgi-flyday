@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1509" : "dev";
+var VERSION = true ? "2026.11.28-1517" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -4608,8 +4608,18 @@ function toWebFPV(tr, level = "full", now = /* @__PURE__ */ new Date()) {
     const yaw = yawOf(pc);
     if (pc.type === "gate") pieceEls.set(i, { el: el("gate", pc.x, pc.y, yaw, { levels: 1, sillH: r6(SILL + (pc.lift || 0)), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
     else if (pc.type === "timing") pieceEls.set(i, { el: el("flaggedGate", pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: "Timing gate", flagSide: "both" }), yaw });
-    else if (pc.type.startsWith("ladder")) pieceEls.set(i, { el: el("ladder", pc.x, pc.y, yaw, { levels: pc.type === "ladder3" ? 3 : 5, sillH: r6(TYPES[pc.type].levels[0] - LADDER[pc.type].h / 2), clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });
-    else if (pc.type === "ring") pieceEls.set(i, { el: el("hoop", pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: "Ring" }), yaw });
+    else if (pc.type.startsWith("ladder")) {
+      const Ld = LADDER[pc.type], lv = TYPES[pc.type].levels, hex = Ld.shape === "hex";
+      const stages2 = lv.map((z, k) => el(
+        hex ? "hexGate" : "hoop",
+        pc.x,
+        pc.y,
+        yaw,
+        { levels: 1, sillH: r6(z - Ld.h / 2), clearW: r6(Ld.w), clearH: r6(Ld.h), levelPitch: r6(Ld.pitch) },
+        { name: `${TYPES[pc.type].label} ${k + 1}`, group: `grp-lad-${i + 1}`, ...z - Ld.h / 2 > 5e-3 ? { floating: true } : {} }
+      ));
+      pieceEls.set(i, { stages: stages2, yaw });
+    } else if (pc.type === "ring") pieceEls.set(i, { el: el("hoop", pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: "Ring", floating: true }), yaw });
     else if (pc.type === "flag") pieceEls.set(i, { el: el("flag", pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: "Flag" }) });
     else if (pc.type === "cube") {
       const c = Math.cos(yaw), s = Math.sin(yaw), h = 0.35, e = 0.7 - PIPE, group = `grp-${i + 1}`;
@@ -4649,8 +4659,10 @@ function toWebFPV(tr, level = "full", now = /* @__PURE__ */ new Date()) {
         q(m.back.id, { apertureIndex: 0, entry });
         q(m.front.id, { apertureIndex: 0, entry });
       } else {
-        const stage = pc.type.startsWith("ladder") ? ev.ps.info?.stage ?? 0 : 0;
-        q(m.el.id, { apertureIndex: stage, entry, ...prev === ev.i && pc.type.startsWith("ladder") ? { wrap: "left" } : {} });
+        if (pc.type.startsWith("ladder")) {
+          const stage = Math.max(0, Math.min(m.stages.length - 1, ev.ps.info?.stage ?? 0));
+          q(m.stages[stage].id, { apertureIndex: 0, entry, ...prev === ev.i ? { wrap: "left" } : {} });
+        } else q(m.el.id, { apertureIndex: 0, entry });
       }
     }
     prev = ev.i;

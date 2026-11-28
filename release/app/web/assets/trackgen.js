@@ -793,8 +793,8 @@ export function issuesOf(tr) {
 // A track document in WebFPV's own format (schemaVersion 3, its src/trackbuilder/schema.md): the
 // same frame as ours (x across from the left wall, y up the page, z up, metres, yaw counter
 // clockwise from +x), a whoop room ('micro', which grows to fit the hall). Pieces become its
-// elements: gates and the timing gate `gate`, ladders a stack of openings, a cube five gates in
-// one group (its edges), rings `hoop`s up on their sill, flags `flag` markers flown round on one
+// elements: gates and the timing gate `gate`, ladders a stack of `hexGate`s (×5) or `hoop`s (×3) in one group,
+// a cube five gates in one group (its edges), rings `hoop`s up on their sill (ladders and rings `floating`: they hang), flags `flag` markers flown round on one
 // side. The flying order is ours, pass by pass. WebFPV draws its own line through them.
 const r6 = (v) => Math.round(v * 1e6) / 1e6;
 function hash8(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, '0'); }
@@ -813,8 +813,17 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
     if (pc.type === 'gate') pieceEls.set(i, { el: el('gate', pc.x, pc.y, yaw, { levels: 1, sillH: r6(SILL + (pc.lift || 0)), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
     // the timing gate stands out in the sim too: WebFPV's flagged gate, a pennant on each side of its header
     else if (pc.type === 'timing') pieceEls.set(i, { el: el('flaggedGate', pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: 'Timing gate', flagSide: 'both' }), yaw });
-    else if (pc.type.startsWith('ladder')) pieceEls.set(i, { el: el('ladder', pc.x, pc.y, yaw, { levels: pc.type === 'ladder3' ? 3 : 5, sillH: r6(TYPES[pc.type].levels[0] - LADDER[pc.type].h / 2), clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });
-    else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring' }), yaw });
+    else if (pc.type.startsWith('ladder')) {
+      // the club's ladders as they are (Janno 28.11.2026, "the hanging gates"): the ×5 a stack of hexagons (flat
+      // sides joined, tips to the sides: WebFPV's hexGate) hanging from a cable, the ×3 a stack of rings; one
+      // opening each, `floating` (no legs to the floor), in one group, each stage passed as its own opening
+      const Ld = LADDER[pc.type], lv = TYPES[pc.type].levels, hex = Ld.shape === 'hex';
+      const stages = lv.map((z, k) => el(hex ? 'hexGate' : 'hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(z - Ld.h / 2), clearW: r6(Ld.w), clearH: r6(Ld.h), levelPitch: r6(Ld.pitch) },
+        { name: `${TYPES[pc.type].label} ${k + 1}`, group: `grp-lad-${i + 1}`, ...(z - Ld.h / 2 > 0.005 ? { floating: true } : {}) }));
+      pieceEls.set(i, { stages, yaw });
+    }
+    // rings hang from the ceiling cables: no stand to the floor (WebFPV's floating flag)
+    else if (pc.type === 'ring') pieceEls.set(i, { el: el('hoop', pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: 'Ring', floating: true }), yaw });
     else if (pc.type === 'flag') pieceEls.set(i, { el: el('flag', pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: 'Flag' }) });
     else if (pc.type === 'cube') {
       // a 70 cm cube: front and back whole, the sides without their own uprights (they are the front's and back's)
@@ -851,8 +860,10 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
       const dir = Math.atan2(ev.ps.dy, ev.ps.dx), entry = Math.cos(dir - m.yaw) >= 0 ? 1 : -1;
       if (pc.type === 'cube') { q(m.back.id, { apertureIndex: 0, entry }); q(m.front.id, { apertureIndex: 0, entry }); }
       else {
-        const stage = pc.type.startsWith('ladder') ? ev.ps.info?.stage ?? 0 : 0;
-        q(m.el.id, { apertureIndex: stage, entry, ...(prev === ev.i && pc.type.startsWith('ladder') ? { wrap: 'left' } : {}) });
+        if (pc.type.startsWith('ladder')) {
+          const stage = Math.max(0, Math.min(m.stages.length - 1, ev.ps.info?.stage ?? 0));
+          q(m.stages[stage].id, { apertureIndex: 0, entry, ...(prev === ev.i ? { wrap: 'left' } : {}) });
+        } else q(m.el.id, { apertureIndex: 0, entry });
       }
     }
     prev = ev.i;
