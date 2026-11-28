@@ -244,7 +244,9 @@ async function typeKeys(scope, text) {
           const was = await spot(i); await tk.click(`#rows tr[data-row="${i}"]`);
           if (await tk.$eval(sel, (b) => b.disabled)) continue;
           await tk.click(sel); await tk.waitForTimeout(250);
-          ok = (await spot(i + dir)) === was;
+          // the piece moves that way: one place, or past a whole trick it can't go inside
+          const at = await tk.evaluate((was) => [...document.querySelectorAll('#rows tr[data-row]')].findIndex((r) => r.children[1].textContent.trim().split(' ')[0] + r.children[2].textContent + r.children[3].textContent === was), was);
+          ok = at >= 0 && (at - i) * dir > 0;
         }
       }
       check(ok, 'Track: ◀ / ▶ moves the picked piece in the flying order'); }
