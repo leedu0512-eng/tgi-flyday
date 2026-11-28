@@ -6,7 +6,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { dirname } from 'node:path';
 import { EngineError } from './engine.ts';
 
-export type TrackOpts = { style: 'flowing' | 'technical'; pieces: number; rings: boolean; flags: boolean; kit?: Record<string, number> };
+export type TrackOpts = { style: 'flowing' | 'technical'; pieces: number; rings: boolean; flags: boolean; zigzag?: boolean; kit?: Record<string, number> };
 export type TrackEdit = { dx: number; dy: number; rot: number };
 export type TrackAdded = { type: string; x: number; y: number; rot: number };
 export type TrackLadder = { mode: 'up' | 'down' | 'once'; n: number; at: number };
@@ -33,6 +33,7 @@ export function cleanTrack(b: any, now = new Date()): SavedTrack {
   const o = t?.opts ?? {};
   if (o.style !== 'flowing' && o.style !== 'technical') throw new EngineError('Unknown track style.');
   const opts: TrackOpts = { style: o.style, pieces: Math.round(num(o.pieces, 6, 15)) || 15, rings: !!o.rings, flags: !!o.flags };
+  if (o.zigzag) opts.zigzag = true;   // gates side by side (Janno 28.11.2026); left out = a track from before, built as it was
   const kit = cleanKit(o.kit);
   if (kit) opts.kit = kit;
   const edits: Record<string, TrackEdit> = {};

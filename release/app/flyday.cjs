@@ -474,7 +474,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1754" : "dev";
+var VERSION = true ? "2026.11.28-1802" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -2707,6 +2707,7 @@ function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
   const o = t?.opts ?? {};
   if (o.style !== "flowing" && o.style !== "technical") throw new EngineError("Unknown track style.");
   const opts = { style: o.style, pieces: Math.round(num(o.pieces, 6, 15)) || 15, rings: !!o.rings, flags: !!o.flags };
+  if (o.zigzag) opts.zigzag = true;
   const kit = cleanKit(o.kit);
   if (kit) opts.kit = kit;
   const edits = {};
@@ -3800,8 +3801,8 @@ function cleanKit2(k) {
   return out;
 }
 var STYLE = {
-  flowing: { rmin: 0.55, turn: 0.6, orbit: 0.4, pole: 0.45, spacing: 2.2, lap: [70, 115], flagR: 0.95, loopR: 1, alphas: 1, climb5: 3 },
-  technical: { rmin: 0.4, turn: 0.45, orbit: 0.36, pole: 0.38, spacing: 1.8, lap: [75, 130], flagR: 0.75, loopR: 0.85, alphas: 2, climb5: 5 }
+  flowing: { rmin: 0.55, turn: 0.6, orbit: 0.4, pole: 0.45, spacing: 2.2, lap: [70, 115], flagR: 0.95, loopR: 1, alphas: 1, climb5: 3, zigzag: 2 },
+  technical: { rmin: 0.4, turn: 0.45, orbit: 0.36, pole: 0.38, spacing: 1.8, lap: [75, 130], flagR: 0.75, loopR: 0.85, alphas: 2, climb5: 5, zigzag: 3 }
 };
 var MARGIN = 0.4;
 var STEP = 0.1;
@@ -3942,6 +3943,21 @@ function trickRings(st, rand, n) {
   A.push({ f: r, l: 1.35, z: 1.2, zone, lin: true }, { f: r + 0.45, l: 0.35, z: 0.4, zone }, { f: r + 1.7, l: 0, z: null });
   return { anchors: A, before: r + 1.8, after: r + 1.8, inward: 4 + 0.55 + r, entryZ: 0.25, exitZ: 0.25, pieces, sideOnly: true, levels: { easy: "skip" } };
 }
+function trickZigzag(st, rand, n) {
+  const P = OPEN + PIPE, z = GATE_Z, zone = "Z" + Math.floor(rand() * 1e6), L = n === 3 ? 1.95 : 1.35;
+  const fk = (k) => (k - (n - 1) / 2) * P, last = fk(n - 1), outF = n % 2 ? last + 2 : last + 1.6;
+  const A = [{ f: fk(0) - 1.6, l: 0, z: null }];
+  for (let k = 0; k < n; k++) A.push({ f: fk(k), l: L, z, zone, pass: { local: k, dir: { f: 0, l: k % 2 ? -1 : 1 } } });
+  A.push({ f: outF, l: 0, z: null });
+  const easy = [
+    { f: fk(0) - 1.6, l: 0, z: null },
+    { f: fk(0), l: L, z, zone, pass: { local: 0, dir: { f: 0, l: 1 } } },
+    { f: fk(0) + 1.35, l: L + 1.05, z: null, zone },
+    { f: outF, l: 0, z: null }
+  ];
+  const pieces = Array.from({ length: n }, (_, k) => ({ type: "gate", trick: "zigzag", at: { f: fk(k), l: L }, z }));
+  return { anchors: A, before: -fk(0) + 1.8, after: outF + 0.2, inward: L + 1.7, entryZ: z, exitZ: z, pieces, levels: { easy } };
+}
 function plain(type, rand, st) {
   const lv = TYPES[type].levels, li = type === "ladder5" ? 2 + Math.floor(rand() * 3) : type === "ladder3" ? 1 + Math.floor(rand() * 2) : 0, z = lv[li];
   return {
@@ -3989,6 +4005,13 @@ function makeTrack1(seed, opts, once) {
     while (k < 4 && take("ring")) k++;
     const kk = k;
     items.push({ make: () => trickRings(st, rand, kk) });
+  }
+  {
+    const zn = opts.zigzag ? st.zigzag || 0 : 0;
+    if (zn && count("gate") >= zn + 1) {
+      for (let i = 0; i < zn; i++) take("gate");
+      items.push({ make: () => trickZigzag(st, rand, zn) });
+    }
   }
   for (let i = 0; i < flags; i++) {
     let g = 0;
@@ -4356,7 +4379,7 @@ function check(pieces, line, st) {
     gap = Math.min(gap, length - gap);
     if (gap < 2) continue;
     if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < 0.8) {
-      if (pts[i].zone && pts[i].zone[0] === "L" && pts[i].zone === pts[j].zone) continue;
+      if (pts[i].zone && (pts[i].zone[0] === "L" || pts[i].zone[0] === "Z") && pts[i].zone === pts[j].zone) continue;
       return null;
     }
   }
@@ -4371,6 +4394,7 @@ function score(f, pieces, line, st) {
   const zs = pts.map((p) => p.z), zm = zs.reduce((a, b) => a + b, 0) / zs.length;
   sc += Math.sqrt(zs.reduce((a, b) => a + (b - zm) ** 2, 0) / zs.length) * 8;
   sc += pieces.filter((p) => p.trick === "loop").length * 8 + pieces.filter((p) => p.trick === "climb" || p.trick === "descend").length * 12;
+  sc += pieces.filter((p) => p.trick === "zigzag").length * 7;
   return sc;
 }
 var clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -4687,7 +4711,7 @@ function issuesOf(tr) {
       gap = Math.min(gap, length - gap);
       if (gap < 2) continue;
       if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < 0.8) {
-        if (pts[i].zone && pts[i].zone[0] === "L" && pts[i].zone === pts[j].zone) continue;
+        if (pts[i].zone && (pts[i].zone[0] === "L" || pts[i].zone[0] === "Z") && pts[i].zone === pts[j].zone) continue;
         const key = "x" + Math.round(pts[i].x) + "," + Math.round(pts[i].y);
         if (!seen.has(key)) {
           crosses++;

@@ -200,6 +200,12 @@ body.trk { --ceiling: #7fc8ff; --timing: #22c55e; --display: 'Big Shoulders', 'A
             <button type="button" data-v="no" aria-pressed="false">Leave out</button>
           </div>
         </div>
+        <div class="field"><span>Gates side by side</span>
+          <div class="seg" id="zigzag">
+            <button type="button" data-v="yes" aria-pressed="true">Zigzag</button>
+            <button type="button" data-v="no" aria-pressed="false">Leave out</button>
+          </div>
+        </div>
         <button type="button" class="tb primary" id="genBtn">Generate track</button>
         <div class="field" id="historyField" hidden><span>Earlier tracks</span><select id="history"></select></div>
       </div>
@@ -300,7 +306,7 @@ let kit = cleanKit(null), kitSaved = cleanKit(null); // the club's kit: being ed
 let track = null;                             // what's shown: a built track
 let editing = false, picked = -1, undo = [];
 let level = 'full', mode = 'orbit', rideT = 0;
-const opts = { style: 'flowing', pieces: 15, rings: true, flags: true };
+const opts = { style: 'flowing', pieces: 15, rings: true, flags: true, zigzag: true };   // zigzag: gates side by side (Janno 28.11.2026)
 const bases = new Map();                       // seed+opts → generated track (edits go on top)
 const baseOf = (seed, o) => {
   const k = seed + JSON.stringify(o);
@@ -670,18 +676,21 @@ function through(pc, ps) {
   }
   if (pc.type === 'cube') return pc.trick === 'up' && ps.length ? tr('through it, then up to the ring') : tr('straight through');
   if (pc.type === 'ring') return pc.trick === 'loop' ? tr('up from the cube') : tr('ceiling hairpin');
+  if (pc.trick === 'zigzag') return tr('side by side: zigzag through the row');
   if (pc.type === 'timing') return tr('start and finish of every lap');
   return tr('floor gate');
 }
 function trickChip(t) {
   const Ps = t.levels[level].passes, c = (f) => t.pieces.filter((p, i) => f(p, Ps[i].length)).length;
   const parts = [];
+  const zz = t.pieces.some((p, i) => p.trick === 'zigzag' && Ps[i].length > 1 || p.trick === 'zigzag' && Ps[i].length && t.pieces.filter((q, j) => q.trick === 'zigzag' && Ps[j].length).length > 1);
   const up = c((p, n) => p.trick === 'loop' && n), cl = c((p, n) => p.type.startsWith('ladder') && n > 1), hp = c((p, n) => p.trick === 'hairpin' && n) ? 1 : 0, fl = c((p) => p.type === 'flag');
   if (up) parts.push(tr('{n} cube to ceiling', { n: up }));
   if (cl) parts.push(tr(cl > 1 ? '{n} ladder climbs' : '{n} ladder climb', { n: cl }));
   if (hp) parts.push(tr('ceiling hairpin'));
   if (fl) parts.push(tr(fl > 1 ? '{n} flag turns' : '{n} flag turn', { n: fl }));
-  return parts.length ? `<span class="chip"><span>${tr('Tricks')}</span><b>${parts.join(' · ')}</b></span>` : '';
+  if (zz) parts.push(tr('zigzag'));
+  return parts.length ? `<span class="chip"><span>${tr('Tricks')}</span><b>${parts.join(', ')}</b></span>` : '';
 }
 function renderSheet() {
   $('plan').innerHTML = planSvg(track);
@@ -912,12 +921,12 @@ function setEditing(on) {
   $('title').textContent = tr(on ? 'Edit track' : 'Today\'s track');
   closeAdd(); setPlacing(null); show3d(false);
   picked = -1; undo = [];
-  if (on && track) { Object.assign(opts, track.opts); syncControls(); }
+  if (on && track) { Object.assign(opts, { zigzag: false }, track.opts); syncControls(); }
   if (on && !track) runGenerate();
   else show(track, { keep3d: true });
 }
 function syncControls() {
-  for (const [id, v] of [['style', opts.style], ['ceiling', opts.rings ? 'yes' : 'no'], ['flags', opts.flags ? 'yes' : 'no']]) $(id).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  for (const [id, v] of [['style', opts.style], ['ceiling', opts.rings ? 'yes' : 'no'], ['flags', opts.flags ? 'yes' : 'no'], ['zigzag', opts.zigzag ? 'yes' : 'no']]) $(id).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
   $('pieces').max = opts.rings ? 15 : 10;
   $('pieces').value = Math.min(opts.pieces, Number($('pieces').max));
   opts.pieces = Number($('pieces').value);
@@ -1026,18 +1035,18 @@ $('history').onchange = () => {
   $('history').value = '';
   if (!s) return;
   remember(); picked = -1;
-  Object.assign(opts, s.opts); syncControls();
+  Object.assign(opts, { zigzag: false }, s.opts); syncControls();
   apply({ seed: s.seed, opts: s.opts, edits: s.edits || {}, removed: s.removed || [], added: s.added || [], ladders: s.ladders || {}, order: s.order || {} });
 };
-for (const id of ['style', 'ceiling', 'flags']) $(id).addEventListener('click', (e) => {
+for (const id of ['style', 'ceiling', 'flags', 'zigzag']) $(id).addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
-  if (id === 'style') opts.style = b.dataset.v; else if (id === 'flags') opts.flags = b.dataset.v === 'yes'; else opts.rings = b.dataset.v === 'yes';
+  if (id === 'style') opts.style = b.dataset.v; else if (id === 'flags') opts.flags = b.dataset.v === 'yes'; else if (id === 'zigzag') opts.zigzag = b.dataset.v === 'yes'; else opts.rings = b.dataset.v === 'yes';
   syncControls();
 });
 $('pieces').addEventListener('input', () => { opts.pieces = Number($('pieces').value); syncControls(); });
 $('sel').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.undo != null) { const c = undo.pop(); if (c) { Object.assign(opts, c.opts); syncControls(); apply(c); } return; }
+  if (b.dataset.undo != null) { const c = undo.pop(); if (c) { Object.assign(opts, { zigzag: false }, c.opts); syncControls(); apply(c); } return; }
   const pc = track?.pieces[picked]; if (!pc) return;
   const key = pc.key;
   if (b.dataset.rot) return change((c) => moveBy(c, key, 0, 0, Number(b.dataset.rot)));

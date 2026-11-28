@@ -59,8 +59,8 @@ export function cleanKit(k) {
   return out;
 }
 export const STYLE = {
-  flowing:   { rmin: 0.55, turn: 0.6,  orbit: 0.4,  pole: 0.45, spacing: 2.2, lap: [70, 115], flagR: 0.95, loopR: 1.0, alphas: 1, climb5: 3 },
-  technical: { rmin: 0.4,  turn: 0.45, orbit: 0.36, pole: 0.38, spacing: 1.8, lap: [75, 130], flagR: 0.75, loopR: 0.85, alphas: 2, climb5: 5 },
+  flowing:   { rmin: 0.55, turn: 0.6,  orbit: 0.4,  pole: 0.45, spacing: 2.2, lap: [70, 115], flagR: 0.95, loopR: 1.0, alphas: 1, climb5: 3, zigzag: 2 },
+  technical: { rmin: 0.4,  turn: 0.45, orbit: 0.36, pole: 0.38, spacing: 1.8, lap: [75, 130], flagR: 0.75, loopR: 0.85, alphas: 2, climb5: 5, zigzag: 3 },
 };
 const MARGIN = 0.4, STEP = 0.1, CLIMB = 1.8;
 
@@ -175,6 +175,22 @@ function trickRings(st, rand, n) { // from a long wall: climb across the hall, u
   A.push({ f: r, l: 1.35, z: 1.2, zone, lin: true }, { f: r + 0.45, l: 0.35, z: 0.4, zone }, { f: r + 1.7, l: 0, z: null });
   return { anchors: A, before: r + 1.8, after: r + 1.8, inward: 4.0 + 0.55 + r, entryZ: 0.25, exitZ: 0.25, pieces, sideOnly: true, levels: { easy: 'skip' } };
 }
+// Gates side by side (Janno 28.11.2026: "double and triple gates side by side ... zigzags"): two or three of
+// the club's own gates stood touching in a row along the wall, flown as a zigzag: in through the first, a
+// tight turn, back out through the next, and with three in again through the third. The passes are only a
+// gate apart, so the line comes back near itself here on purpose (zone Z: the one other exception besides a
+// ladder's orbit). Beginners fly the first gate and go round the rest.
+function trickZigzag(st, rand, n) {
+  const P = OPEN + PIPE, z = GATE_Z, zone = 'Z' + Math.floor(rand() * 1e6), L = n === 3 ? 1.95 : 1.35;
+  const fk = (k) => (k - (n - 1) / 2) * P, last = fk(n - 1), outF = n % 2 ? last + 2.0 : last + 1.6;
+  const A = [{ f: fk(0) - 1.6, l: 0, z: null }];
+  for (let k = 0; k < n; k++) A.push({ f: fk(k), l: L, z, zone, pass: { local: k, dir: { f: 0, l: k % 2 ? -1 : 1 } } });
+  A.push({ f: outF, l: 0, z: null });
+  const easy = [{ f: fk(0) - 1.6, l: 0, z: null }, { f: fk(0), l: L, z, zone, pass: { local: 0, dir: { f: 0, l: 1 } } },
+    { f: fk(0) + 1.35, l: L + 1.05, z: null, zone }, { f: outF, l: 0, z: null }];
+  const pieces = Array.from({ length: n }, (_, k) => ({ type: 'gate', trick: 'zigzag', at: { f: fk(k), l: L }, z }));
+  return { anchors: A, before: -fk(0) + 1.8, after: outF + 0.2, inward: L + 1.7, entryZ: z, exitZ: z, pieces, levels: { easy } };
+}
 function plain(type, rand, st) {
   const lv = TYPES[type].levels, li = type === 'ladder5' ? 2 + Math.floor(rand() * 3) : type === 'ladder3' ? 1 + Math.floor(rand() * 2) : 0, z = lv[li];
   return { anchors: [{ f: -0.4, l: 0, z }, { f: 0, l: 0, z, pass: { local: 0, stage: li, dir: 1 } }, { f: 0.4, l: 0, z }], before: 0.8, after: 0.8, inward: 0,
@@ -201,6 +217,10 @@ function makeTrack1(seed, opts, once) {
   for (let i = 0; i < st.alphas && count('cube'); i++) { take('cube'); const ring = take('ring'); items.push({ make: () => trickAlpha(st, rand, ring) }); }
   // the rest of the rings (up to three) in a hairpin under the ceiling
   if (count('ring')) { let k = 0; while (k < 4 && take('ring')) k++; const kk = k; items.push({ make: () => trickRings(st, rand, kk) }); }
+  // gates side by side, flown as a zigzag: two in a flowing track, three in a technical one, when the kit has them
+  // only with opts.zigzag (a setting of its own), so every track saved before it builds exactly as before:
+  // the random numbers drawn stay the same
+  { const zn = opts.zigzag ? st.zigzag || 0 : 0; if (zn && count('gate') >= zn + 1) { for (let i = 0; i < zn; i++) take('gate'); items.push({ make: () => trickZigzag(st, rand, zn) }); } }
   // flag hairpins, each taking up to two gates into the middle
   for (let i = 0; i < flags; i++) { let g = 0; while (g < 2 && take('gate')) g++; const gg = g; items.push({ make: () => trickFinger(st, rand, gg) }); }
   for (const t of pool) {
@@ -478,13 +498,14 @@ function check(pieces, line, st) {
     }
   }
   // the line never crosses or runs close by itself, at any height (Janno 22.11.2026: a midair
-  // collision waiting to happen). Only a ladder's orbit passes over itself, a stage higher.
+  // collision waiting to happen). Only a ladder's orbit passes over itself, a stage higher, and a zigzag
+  // through gates side by side comes back a gate away.
   let crossings = 0;
   for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) {
     let gap = Math.abs(pts[i].s - pts[j].s); gap = Math.min(gap, length - gap);
     if (gap < 2.0) continue;
     if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < 0.8) {
-      if (pts[i].zone && pts[i].zone[0] === 'L' && pts[i].zone === pts[j].zone) continue;
+      if (pts[i].zone && (pts[i].zone[0] === 'L' || pts[i].zone[0] === 'Z') && pts[i].zone === pts[j].zone) continue;   // a ladder's orbit, a zigzag
       return null;
     }
   }
@@ -499,6 +520,7 @@ function score(f, pieces, line, st) {
   const zs = pts.map((p) => p.z), zm = zs.reduce((a, b) => a + b, 0) / zs.length;
   sc += Math.sqrt(zs.reduce((a, b) => a + (b - zm) ** 2, 0) / zs.length) * 8;
   sc += pieces.filter((p) => p.trick === 'loop').length * 8 + pieces.filter((p) => p.trick === 'climb' || p.trick === 'descend').length * 12;
+  sc += pieces.filter((p) => p.trick === 'zigzag').length * 7;      // gates side by side are worth the room they take
   return sc;
 }
 
@@ -795,7 +817,7 @@ export function issuesOf(tr) {
       let gap = Math.abs(pts[i].s - pts[j].s); gap = Math.min(gap, length - gap);
       if (gap < 2.0) continue;
       if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < 0.8) {
-        if (pts[i].zone && pts[i].zone[0] === 'L' && pts[i].zone === pts[j].zone) continue;
+        if (pts[i].zone && (pts[i].zone[0] === 'L' || pts[i].zone[0] === 'Z') && pts[i].zone === pts[j].zone) continue;   // a ladder's orbit, a zigzag
         const key = 'x' + Math.round(pts[i].x) + ',' + Math.round(pts[i].y);
         if (!seen.has(key)) { crosses++; say(key, `The line crosses or runs close by itself (${(HALL.w - pts[i].x).toFixed(1)} m from the right wall, ${pts[i].y.toFixed(1)} m up).`, pts[i].x, pts[i].y, level); }
         break;
