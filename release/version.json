@@ -1,9 +1,9 @@
 {
- "version": "2026.11.28-1544",
+ "version": "2026.11.28-1601",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "6231f9076072ae7e959e55807cb89add3839110886acabf7dc361d138d5dbc52"
+   "sha256": "c687940ef51c5fc44c7d07d202809eb6eed79ce49d7955fbd7bb6622cc37e567"
   },
   {
    "path": "web/ar.html",
@@ -71,11 +71,11 @@
   },
   {
    "path": "web/assets/hall.js",
-   "sha256": "7ea7a2d1223cae1c39d3614fe5f423487fbc31d9119000908c6d28c6ea992117"
+   "sha256": "c2c89d36687f94b30f3e519987c5cfdd9d4619ddb0af8e1e20f7b7c9953ab5d8"
   },
   {
    "path": "web/assets/hall3d.js",
-   "sha256": "0105a33f039886e6a3a3b57981673d3b73d96c1a6a03086e5cca125323e0ad55"
+   "sha256": "e92d1dc329385b158a5d14c8517ac816ea02d860dba285cd125783e0a9c4a33c"
   },
   {
    "path": "web/assets/i18n-et.js",
@@ -144,6 +144,30 @@
   {
    "path": "web/assets/light.js",
    "sha256": "7b4a590cd1175ed0585d78929fc26c22c71f443544f5c4bfc38300203a896163"
+  },
+  {
+   "path": "web/assets/logos/hobizone-on-dark.svg",
+   "sha256": "f6cab6d42355c8c632e6b2f0272044324992eb1a47223f9bf080605425ebe0c6"
+  },
+  {
+   "path": "web/assets/logos/supporter-kky.svg",
+   "sha256": "7cde94ab09ec3ea18aeaed040ea9597d9eea671ae85be2c084841137d5ef16f8"
+  },
+  {
+   "path": "web/assets/logos/supporter-mudellend.svg",
+   "sha256": "8b8e32d2d6eb5c95c915283269f1d14245c0cc1313b04e5ec5e46c5342b4ab65"
+  },
+  {
+   "path": "web/assets/logos/supporter-nordrc.svg",
+   "sha256": "c1fec8b60dfacf91164f63140e6c492691561e2ffa886fb498ab423e6b2b74f6"
+  },
+  {
+   "path": "web/assets/logos/supporter-saue-vald.svg",
+   "sha256": "986836045fb5e3f156516e0f73ca8b2549d3cad2edf354c40f70b54733b4a08c"
+  },
+  {
+   "path": "web/assets/logos/supporter-velvet.svg",
+   "sha256": "c7139bba193a53ffda930764061271d587c45542c63b4b7c29657bc0ceda5a8a"
   },
   {
    "path": "web/assets/mark-car-small.svg",

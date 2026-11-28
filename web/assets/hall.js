@@ -65,11 +65,25 @@ export const WALLS = {
   end: {
     paint: 'black', skirting: null,
     items: [
-      { kind: 'banner', at: 3.6, w: 2.4, z: 1.45, h: 0.75, text: 'HOBIzone', sub: 'AUTOMUDELITE VÕISTLUSKESKUS' },
-      { kind: 'mural', at: 6.6, w: 2.4, z: 1.2, h: 1.3 },
       { kind: 'sign', at: 4.5, z: 0.75, text: '3' },
     ],
   },
+};
+
+// What is on the black end wall (Janno 28.11.2026: "almost like spray-painted with the big HOBIzone logo", and
+// the supporters' logos on the walls). The files are the website's (hub files/logo, 28.11.2026), in ./logos next
+// to hall3d.js: the HOBIzone logo for dark backgrounds, sprayed on (rough edge, overspray, a few drips; the letter
+// shapes stay), and the five supporters' logos for dark backgrounds, as they are (never sprayed, recoloured or
+// stretched), in the website's order, sized by its optical heights so they look equally heavy.
+export const END_ART = {
+  logo: { file: 'hobizone-on-dark.svg', at: 5.0, z: 1.02, w: 5.6 },
+  supporters: { z: 2.16, x0: 2.2, x1: 7.8, tallest: 0.36, logos: [
+    { name: 'Saue vald', file: 'supporter-saue-vald.svg', opt: 50 },
+    { name: 'Velvet', file: 'supporter-velvet.svg', opt: 34 },
+    { name: 'NordRC', file: 'supporter-nordrc.svg', opt: 34 },
+    { name: 'Küberkaitseüksus', file: 'supporter-kky.svg', opt: 52 },
+    { name: 'Eesti Mudellennuühendus', file: 'supporter-mudellend.svg', opt: 56 },
+  ] },
 };
 
 // Things standing on the floor (the RC track's jumps, the benches by the orange wall). Boxes and

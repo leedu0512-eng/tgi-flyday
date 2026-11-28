@@ -5,7 +5,7 @@
 // buildHall(scene, V): V(x, y, z) maps a hall point (x across, y up the hall, z up, metres) to a
 // THREE.Vector3; sizes are in metres, so a caller that needs another scale scales the group it passes.
 import { HALL, RAILS } from './trackgen.js';
-import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL } from './hall.js';
+import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, END_ART } from './hall.js';
 
 let V = null;
 export const CSS = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -62,6 +62,62 @@ function wallPicture(wall, len, h, flip, from = 0) { // items' at = metres in th
   const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
   return tex;
 }
+// The black end wall's art (END_ART in hall.js): each logo a plane of its own just in front of the wall, so it
+// stays sharp, drawn once its SVG has loaded (the plane is there, clear, until then).
+const logoUrl = (file) => new URL('./logos/' + file, import.meta.url).href;
+function wallArt(scene) {
+  const y = HALL.l - 0.012;
+  const plane = (cx, cz, w, h, draw, px) => {
+    const c = document.createElement('canvas'); c.width = px; c.height = Math.round(px * h / w);
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }));
+    m.position.copy(V(cx, y, cz)); m.lookAt(V(cx, 0, cz)); scene.add(m);
+    return { c, tex, done: () => { tex.needsUpdate = true; } };
+  };
+  const load = (file) => { const img = new Image(); img.src = logoUrl(file); return img.decode().then(() => img); };
+  // HOBIzone, sprayed on: overspray round it, a grainy edge, a few drips under the letters
+  const L = END_ART.logo, lw = L.w, lh = lw * 67 / 421, pad = 0.18;
+  const sp = plane(L.at, L.z + lh / 2, lw + 2 * pad, lh + 2 * pad + 0.25, null, 2400);
+  load(L.file).then((img) => {
+    const { c } = sp, g = c.getContext('2d'), k = c.width / (lw + 2 * pad), ox = pad * k, oy = pad * k, W = lw * k, H = lh * k;
+    let rnd = 7; const rand = () => ((rnd = (rnd * 16807) % 2147483647) / 2147483647);   // the same spray every time
+    if ('filter' in g) { g.filter = `blur(${Math.round(0.035 * k)}px)`; g.globalAlpha = 0.3; g.drawImage(img, ox, oy, W, H); g.filter = 'none'; }
+    g.globalAlpha = 1; g.drawImage(img, ox, oy, W, H);
+    const px = g.getImageData(0, 0, c.width, c.height).data, at = (x, yy) => (Math.round(yy) * c.width + Math.round(x)) * 4;
+    // drips: from the bottom edge of a letter, straight down
+    for (let n = 0, tries = 0; n < 26 && tries < 4000; tries++) {
+      const x = ox + rand() * W, yy = oy + H * (0.3 + rand() * 0.7), i = at(x, yy), j = at(x, yy + 2);
+      if (px[i + 3] < 200 || px[j + 3] > 40) continue;
+      const len = (0.03 + rand() * rand() * 0.22) * k, wd = (0.004 + rand() * 0.006) * k;
+      g.fillStyle = `rgba(${px[i]},${px[i + 1]},${px[i + 2]},0.85)`;
+      g.fillRect(x - wd / 2, yy, wd, len); g.beginPath(); g.arc(x, yy + len, wd * 0.9, 0, 7); g.fill(); n++;
+    }
+    // mist: fine dots round the letters, in their own colours
+    for (let n = 0; n < 2600; n++) {
+      const x = ox + (rand() * 1.1 - 0.05) * W, yy = oy + (rand() * 1.4 - 0.2) * H, i = at(Math.min(c.width - 1, Math.max(0, x)), Math.min(c.height - 1, Math.max(0, yy)));
+      const near = px[i + 3] > 0 ? 1 : 0.25;
+      g.fillStyle = `rgba(${px[i + 3] ? px[i] : 255},${px[i + 3] ? px[i + 1] : 255},${px[i + 3] ? px[i + 2] : 255},${0.12 * near})`;
+      g.fillRect(x, yy, 1 + rand() * 2, 1 + rand() * 2);
+    }
+    // grain: the paint didn't cover everywhere
+    g.globalCompositeOperation = 'destination-out';
+    for (let n = 0; n < 9000; n++) { g.fillStyle = `rgba(0,0,0,${0.25 + rand() * 0.6})`; g.fillRect(ox + rand() * W, oy + rand() * H, 1 + rand() * 2.2, 1 + rand() * 2.2); }
+    g.globalCompositeOperation = 'source-over';
+    sp.done();
+  }).catch(() => {});
+  // the supporters, as they are: one row, the website's order, its optical heights
+  const S = END_ART.supporters, size = (o) => S.tallest * o.opt / Math.max(...S.logos.map((q) => q.opt));
+  Promise.all(S.logos.map((o) => load(o.file).then((img) => ({ o, img, h: size(o), w: size(o) * img.naturalWidth / img.naturalHeight })).catch(() => null))).then((list) => {
+    list = list.filter(Boolean);
+    const total = list.reduce((a, q) => a + q.w, 0), gap = Math.max(0.15, (S.x1 - S.x0 - total) / Math.max(1, list.length - 1));
+    let x = (S.x0 + S.x1) / 2 - (total + gap * (list.length - 1)) / 2;
+    for (const q of list) {
+      const p = plane(x + q.w / 2, S.z + S.tallest / 2, q.w, q.h, null, Math.min(1024, Math.round(q.w * 900)));
+      p.c.getContext('2d').drawImage(q.img, 0, 0, p.c.width, p.c.height); p.done();
+      x += q.w + gap;
+    }
+  });
+}
 function rampGeometry(pr) { // a side profile (along y, up z) pushed across x, placed in the hall
   const len = pr.y1 - pr.y0, sh = new THREE.Shape();
   sh.moveTo(0, 0); for (const [u, z] of pr.profile) sh.lineTo(u * len, z); sh.lineTo(len, 0); sh.lineTo(0, 0);
@@ -98,6 +154,7 @@ export function buildHall(scene, mapV) {
   endTex.repeat.set(1 / endW, 1 / CEIL.middle);
   const end = new THREE.Mesh(new THREE.ShapeGeometry(es), lam(0xffffff, { map: endTex }));
   end.position.copy(V(-SIDE, HALL.l, 0)); scene.add(end);
+  wallArt(scene);   // the sprayed HOBIzone logo and the supporters (END_ART)
   // the ceiling: two slopes up to the middle, the ribs across it at 2.92 m, spotlights on the cables
   const half = HALL.w / 2 + SIDE, rise = CEIL.middle - CEIL.side, slope = Math.hypot(half, rise), tilt = Math.atan2(rise, half);
   for (const s of [-1, 1]) {
