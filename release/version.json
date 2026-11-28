@@ -1,9 +1,9 @@
 {
- "version": "2026.11.28-1922",
+ "version": "2026.11.28-1954",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "dec2569e9bbf28d948e107debdd8a340555bc0c21f58582e1d7854bfe69e3d25"
+   "sha256": "09a3ad49960cd8ec36e28d376f5b8cdaf6dcebffd344504320e3a12d5adc4583"
   },
   {
    "path": "web/ar.html",
@@ -71,11 +71,11 @@
   },
   {
    "path": "web/assets/hall.js",
-   "sha256": "729656faa9e1c5ed11860c30ad1f77c495115ea92f4ad9da94fbef8dad079b8a"
+   "sha256": "2941a90700fd59c187bd8d70d4fff13c4d86c598382c8f2c63813eb23e3e8e64"
   },
   {
    "path": "web/assets/hall3d.js",
-   "sha256": "f22df3c4e811ae28a088bad98272647ac5cd825e71d87f37b4e8ece5a461e0e3"
+   "sha256": "7975d600f5de186753e25bf010a9badf2eb768bfba66db96d595cb3d04a8404f"
   },
   {
    "path": "web/assets/i18n-et.js",
@@ -150,20 +150,40 @@
    "sha256": "f6cab6d42355c8c632e6b2f0272044324992eb1a47223f9bf080605425ebe0c6"
   },
   {
+   "path": "web/assets/logos/supporter-kky-on-light.svg",
+   "sha256": "f4502757263855f89ee0dcd6e1d83808938b0204cf3c9a0c9e4f696e54ea609e"
+  },
+  {
    "path": "web/assets/logos/supporter-kky.svg",
    "sha256": "7cde94ab09ec3ea18aeaed040ea9597d9eea671ae85be2c084841137d5ef16f8"
+  },
+  {
+   "path": "web/assets/logos/supporter-mudellend-on-light.svg",
+   "sha256": "014538bbc2925e3187cab679fa2aa7b150f0b260fb5eeec74b674e3aa2f20d0b"
   },
   {
    "path": "web/assets/logos/supporter-mudellend.svg",
    "sha256": "8b8e32d2d6eb5c95c915283269f1d14245c0cc1313b04e5ec5e46c5342b4ab65"
   },
   {
+   "path": "web/assets/logos/supporter-nordrc-on-light.svg",
+   "sha256": "4375c5afc8106150d2dfa1a0faa4401ec32212727214e8e5b809e3db3a174cd0"
+  },
+  {
    "path": "web/assets/logos/supporter-nordrc.svg",
    "sha256": "c1fec8b60dfacf91164f63140e6c492691561e2ffa886fb498ab423e6b2b74f6"
   },
   {
+   "path": "web/assets/logos/supporter-saue-vald-on-light.svg",
+   "sha256": "1f4ee884a4eca8a8385cd0062ba57920069d6509a45b40277910e52dea90c918"
+  },
+  {
    "path": "web/assets/logos/supporter-saue-vald.svg",
    "sha256": "986836045fb5e3f156516e0f73ca8b2549d3cad2edf354c40f70b54733b4a08c"
+  },
+  {
+   "path": "web/assets/logos/supporter-velvet-on-light.svg",
+   "sha256": "c574d2a02c47094c8a334e50f6f465a82c6805d4de63728fa0ef6d7c5a3dd169"
   },
   {
    "path": "web/assets/logos/supporter-velvet.svg",

@@ -5,7 +5,7 @@
 // buildHall(scene, V): V(x, y, z) maps a hall point (x across, y up the hall, z up, metres) to a
 // THREE.Vector3; sizes are in metres, so a caller that needs another scale scales the group it passes.
 import { HALL, RAILS } from './trackgen.js';
-import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, END_ART, WALL_NAMES } from './hall.js';
+import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, END_ART, WALL_NAMES, WINDOW_ART } from './hall.js';
 
 let V = null;
 export const CSS = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -118,6 +118,32 @@ function wallArt(scene) {
     }
   });
 }
+// A supporter's logo on each window (WINDOW_ART), the light-background versions, in order round the hall.
+function windowLogos(scene) {
+  const S = END_ART.supporters.logos, top = Math.max(...S.map((q) => q.opt));
+  const load = (file) => { const img = new Image(); img.src = logoUrl(file); return img.decode().then(() => img); };
+  const imgs = S.map((o) => load(o.file.replace(/\.svg$/, WINDOW_ART.suffix + '.svg')).catch(() => null));
+  let n = 0;
+  for (const side of ['left', 'right']) {
+    const x = side === 'left' ? -SIDE + 0.012 : HALL.w + SIDE - 0.012, toward = side === 'left' ? HALL.w : 0;
+    for (const it of WALLS[side].items) {
+      if (it.kind !== 'window') continue;
+      const o = S[n % S.length], img = imgs[n % S.length]; n++;
+      img.then((im) => {
+        if (!im) return;
+        let h = WINDOW_ART.tallest * o.opt / top, w = h * im.naturalWidth / im.naturalHeight;
+        const room = it.w - 2 * WINDOW_ART.margin;
+        if (w > room) { h *= room / w; w = room; }
+        const c = document.createElement('canvas'); c.width = Math.min(1024, Math.round(w * 900)); c.height = Math.max(1, Math.round(c.width * h / w));
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }));
+        const zm = it.z + it.h / 2;
+        m.position.copy(V(x, it.at, zm)); m.lookAt(V(toward, it.at, zm)); scene.add(m);
+      });
+    }
+  }
+}
 // The thank-you names on the orange wall (WALL_NAMES): white, a few sizes, a little tilt, shared out over the
 // stretches by length. names: an array of strings, or a promise of one (the sim fetches them); the same list
 // always lands the same way.
@@ -137,6 +163,8 @@ function loadWallFont() {
 function wallNames(scene, names) {
   const list = (Array.isArray(names) ? names : []).map((n) => String(n ?? '').trim().toLocaleUpperCase('et')).filter(Boolean).slice(0, 120);
   if (!list.length) return;
+  // a new order every time the hall is drawn (Janno 28.11.2026: "the names should be in random order")
+  for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
   const spans = WALL_NAMES.spans, H = WALL_NAMES.z1 - WALL_NAMES.z0, total = spans.reduce((a, [y0, y1]) => a + y1 - y0, 0);
   let seed = 0; for (const n of list) for (let i = 0; i < n.length; i++) seed = (seed * 31 + n.charCodeAt(i)) % 2147483647;
   let rnd = seed || 7; const rand = () => ((rnd = (rnd * 16807) % 2147483647) / 2147483647);
@@ -149,6 +177,9 @@ function wallNames(scene, names) {
     const k = 300, c = document.createElement('canvas'); c.width = Math.round((y1 - y0) * k); c.height = Math.round(H * k);
     const g = c.getContext('2d'), W = c.width, Hp = c.height;
     const words = mine.map((n) => ({ n, s: [1, 0.8, 0.64][Math.floor(rand() * 3)], tilt: (rand() - 0.5) * 0.08, dy: (rand() - 0.5) * 0.12, a: 0.82 + rand() * 0.18 }));
+    // "Aitäh!" before the names and "Thank you!" after them, bigger, in black (the wall is the club's orange; Janno 28.11.2026)
+    if (si === 0) words.unshift({ n: 'AITÄH!', s: 1.25, tilt: -0.03, dy: 0, a: 1, thanks: true });
+    if (si === spans.length - 1) words.push({ n: 'THANK YOU!', s: 1.25, tilt: 0.03, dy: 0, a: 1, thanks: true });
     // the biggest size at which every name fits, in rows
     let B = Hp / 2, rows = null;
     for (; B > 8; B *= 0.92) {
@@ -167,7 +198,7 @@ function wallNames(scene, names) {
     rows.forEach(({ row, w }, ri) => {
       let x = (W - w) / 2; const y = top + (ri + 0.5) * lineH;
       for (const wd of row) {
-        g.save(); g.font = `900 ${Math.round(B * wd.s)}px ${font}`; g.textBaseline = 'middle'; g.fillStyle = `rgba(255,255,255,${wd.a.toFixed(2)})`;
+        g.save(); g.font = `900 ${Math.round(B * wd.s)}px ${font}`; g.textBaseline = 'middle'; g.fillStyle = wd.thanks ? '#111111' : `rgba(255,255,255,${wd.a.toFixed(2)})`;
         g.translate(x + wd.w / 2, y + wd.dy * B); g.rotate(wd.tilt); g.fillText(wd.n, -wd.w / 2, 0); g.restore();
         x += wd.w + B * 0.35;
       }
@@ -215,6 +246,7 @@ export function buildHall(scene, mapV, opts = {}) {
   const end = new THREE.Mesh(new THREE.ShapeGeometry(es), lam(0xffffff, { map: endTex }));
   end.position.copy(V(-SIDE, HALL.l, 0)); scene.add(end);
   wallArt(scene);   // the sprayed HOBIzone logo and the supporters (END_ART)
+  windowLogos(scene);   // a supporter on each window (WINDOW_ART)
   // the thank-you names on the orange wall: given now, or as a promise (the lettering loaded first)
   if (opts.names) { const Vnow = V; Promise.all([Promise.resolve(opts.names), loadWallFont()]).then(([n]) => { const keep = V; V = Vnow; wallNames(scene, n); V = keep; }).catch(() => {}); }
   // the ceiling: two slopes up to the middle, the ribs across it at 2.92 m, spotlights on the cables

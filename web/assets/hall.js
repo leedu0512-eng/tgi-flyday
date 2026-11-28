@@ -85,6 +85,12 @@ export const END_ART = {
   ] },
 };
 
+// The supporters on the windows too (Janno 28.11.2026: "put the other supporters' logos also on the windows, one per
+// window"): the website's versions for light backgrounds (-on-light, ink instead of white: the blinds are light
+// grey), in the website's order round the hall from the pilots' end, at the website's optical heights (`tallest`
+// for the heaviest), never wider than the window less a margin.
+export const WINDOW_ART = { tallest: 0.4, margin: 0.14, suffix: '-on-light' };
+
 // The club's thank-you names (the ones the kiosk's TrackDay screen shows) written in white on the orange wall
 // (Janno 28.11.2026), a new set each week, none highlighted. Under the windows (they run 1.15 to 2.15 m; above
 // 2.3 m the wall is white), in the stretches clear of the columns, the downpipe, the benches and their steps, and the green boxes.
