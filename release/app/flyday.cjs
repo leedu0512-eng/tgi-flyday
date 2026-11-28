@@ -177,6 +177,42 @@ var ScreenFeed = class {
     return false;
   }
 };
+function isoWeek(now) {
+  const d = new Date(now), day = (d.getDay() + 6) % 7;
+  const th = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 3);
+  const jan4 = new Date(th.getFullYear(), 0, 4), w1 = new Date(jan4.getFullYear(), 0, 4 - (jan4.getDay() + 6) % 7);
+  const week = 1 + Math.round((th.getTime() - w1.getTime()) / (7 * 864e5));
+  return `${th.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+var WallNames = class {
+  week = "";
+  names = [];
+  file;
+  constructor(dataDir) {
+    this.file = (0, import_node_path.join)(dataDir, "wall-names.json");
+    try {
+      const saved2 = (0, import_node_fs.existsSync)(this.file) ? JSON.parse((0, import_node_fs.readFileSync)(this.file, "utf8")) : null;
+      if (typeof saved2?.week === "string" && Array.isArray(saved2.names)) {
+        this.week = saved2.week;
+        this.names = saved2.names.filter((n) => typeof n === "string");
+      }
+    } catch {
+    }
+  }
+  now(now, latest2) {
+    const week = isoWeek(now);
+    const fresh = [...new Set((latest2 ?? []).map((n) => String(n).trim()).filter(Boolean))].slice(0, 120);
+    if (fresh.length && (week !== this.week || !this.names.length)) {
+      this.week = week;
+      this.names = fresh;
+      try {
+        (0, import_node_fs.writeFileSync)(this.file, JSON.stringify({ week, names: fresh }));
+      } catch {
+      }
+    }
+    return this.names;
+  }
+};
 
 // server/launch.ts
 var import_node_child_process = require("node:child_process");
@@ -438,7 +474,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1603" : "dev";
+var VERSION = true ? "2026.11.28-1623" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -4860,6 +4896,7 @@ var store = saver(DATA_FILE, () => engine.toSaved());
 var pairing = new Install((0, import_node_path9.resolve)(DATA_FILE, ".."));
 outbox = new Outbox((0, import_node_path9.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
 var screenFeed = new ScreenFeed((0, import_node_path9.resolve)(DATA_FILE, ".."));
+var wallNames = new WallNames((0, import_node_path9.resolve)(DATA_FILE, ".."));
 var kioskAskedAt = null;
 var kioskRestartAt = null;
 var kioskNow = (now) => kioskScreen({
@@ -5197,7 +5234,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
     }
     return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
-  if (path === "/api/track" && req.method === "GET") return json(res, 200, tracks.view());
+  if (path === "/api/track" && req.method === "GET") return json(res, 200, { ...tracks.view(), wallNames: wallNames.now(Date.now(), screenFeed.data?.thanks?.names.map((n) => n.name)) });
   if (path === "/api/kiosk/restart" && req.method === "POST") {
     kioskRestartAt = Date.now();
     stateDirty = true;

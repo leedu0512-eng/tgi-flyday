@@ -1,9 +1,9 @@
 {
- "version": "2026.11.28-1603",
+ "version": "2026.11.28-1623",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "4c5fa7075852ddd1dfd9f0beaf48c905374dc556c4c65b4a5288befea2191f65"
+   "sha256": "a1d503337c7b3526ce52f21299dfdc934d2f4d3b38d1b1b93f66c631ad6d5f9a"
   },
   {
    "path": "web/ar.html",
@@ -71,11 +71,11 @@
   },
   {
    "path": "web/assets/hall.js",
-   "sha256": "3998628f62d53c3dd386e1a414efebb96e55252743d74dda41f7bf9d298702a3"
+   "sha256": "729656faa9e1c5ed11860c30ad1f77c495115ea92f4ad9da94fbef8dad079b8a"
   },
   {
    "path": "web/assets/hall3d.js",
-   "sha256": "e92d1dc329385b158a5d14c8517ac816ea02d860dba285cd125783e0a9c4a33c"
+   "sha256": "7092f6654f7620156918164d6aa30d661336972dab9960be554f3b007fada0de"
   },
   {
    "path": "web/assets/i18n-et.js",
@@ -263,7 +263,7 @@
   },
   {
    "path": "web/track.html",
-   "sha256": "4587a4f5c6aa23db0166d2468ce4991a390fce7b58e4c83bfaa728456f2d9e9f"
+   "sha256": "0ec8e4dd4068832bd78fbe78c94d3584e4d80ac374f1e199d0441beaa2fccc5f"
   }
  ]
 }

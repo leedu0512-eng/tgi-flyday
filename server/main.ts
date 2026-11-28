@@ -10,7 +10,7 @@ import { hostname, networkInterfaces } from 'node:os';
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as sea from 'node:sea';
-import { ScreenFeed, kioskScreen } from './screenfeed.ts';
+import { ScreenFeed, kioskScreen, WallNames } from './screenfeed.ts';
 import { closeOldWindows, firewallAllow, firewallStatus, keepAwake, openBigScreen, openRdWindows, relaunch, tameConsole, type FirewallStatus } from './launch.ts';
 import { install, latest, tidy, why } from './update.ts';
 import { VERSION } from './version.ts';
@@ -204,6 +204,7 @@ const pairing = new Install(resolve(DATA_FILE, '..'));
 outbox = new Outbox(resolve(DATA_FILE, '..'), () => engine.config.cloud, hostname(), (m) => console.log(new Date().toLocaleTimeString(), m), pairing);
 /** What the screens get: the engine's state plus how the outbox and the Flyday pairing are doing (no secret, no token). */
 const screenFeed = new ScreenFeed(resolve(DATA_FILE, '..'));
+const wallNames = new WallNames(resolve(DATA_FILE, '..'));   // the thank-you names on the 3D hall's orange wall, a new set each week
 /** The kiosk PC's screen on or dark (Janno 17.11.2026), and when the kiosk PC last asked. */
 let kioskAskedAt: number | null = null;
 /** The RD console's "Restart the kiosk": the kiosk PC's helper gets "restart" once, within a minute. */
@@ -539,7 +540,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     return json(res, 200, { rows, dark: engine.config.lights.dark });
   }
   // Today's track and the ten before it (the track page builds them with web/assets/trackgen.js).
-  if (path === '/api/track' && req.method === 'GET') return json(res, 200, tracks.view());
+  if (path === '/api/track' && req.method === 'GET') return json(res, 200, { ...tracks.view(), wallNames: wallNames.now(Date.now(), screenFeed.data?.thanks?.names.map((n) => n.name)) });
   if (path === '/api/kiosk/restart' && req.method === 'POST') {
     kioskRestartAt = Date.now();
     stateDirty = true;

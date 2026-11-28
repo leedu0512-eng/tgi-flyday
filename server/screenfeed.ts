@@ -176,3 +176,37 @@ export class ScreenFeed {
     return false;
   }
 }
+
+/** The ISO week a moment falls in, local time: "2026-W48". */
+export function isoWeek(now: number): string {
+  const d = new Date(now), day = (d.getDay() + 6) % 7;            // Monday 0
+  const th = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day + 3);   // this week's Thursday
+  const jan4 = new Date(th.getFullYear(), 0, 4), w1 = new Date(jan4.getFullYear(), 0, 4 - ((jan4.getDay() + 6) % 7));
+  const week = 1 + Math.round((th.getTime() - w1.getTime()) / (7 * 86_400_000));
+  return `${th.getFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
+/** The thank-you names written on the orange wall of the hall in 3D (Janno 28.11.2026: "update those each week").
+ * Taken from the portal's latest thank-you list once a week (and as soon as there is one), kept in
+ * data/wall-names.json, so the wall stays the same all week and offline. */
+export class WallNames {
+  week = '';
+  names: string[] = [];
+  private file: string;
+  constructor(dataDir: string) {
+    this.file = join(dataDir, 'wall-names.json');
+    try {
+      const saved = existsSync(this.file) ? JSON.parse(readFileSync(this.file, 'utf8')) : null;
+      if (typeof saved?.week === 'string' && Array.isArray(saved.names)) { this.week = saved.week; this.names = saved.names.filter((n: unknown) => typeof n === 'string'); }
+    } catch {}
+  }
+  now(now: number, latest: string[] | null | undefined): string[] {
+    const week = isoWeek(now);
+    const fresh = [...new Set((latest ?? []).map((n) => String(n).trim()).filter(Boolean))].slice(0, 120);
+    if (fresh.length && (week !== this.week || !this.names.length)) {
+      this.week = week; this.names = fresh;
+      try { writeFileSync(this.file, JSON.stringify({ week, names: fresh })); } catch {}
+    }
+    return this.names;
+  }
+}

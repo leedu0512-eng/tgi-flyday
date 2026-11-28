@@ -66,3 +66,19 @@ test('kiosk screen: awake an hour around the day’s events, birthdays and close
   const empty = cleanScreen({ events: [] }, day(12));
   assert.deepEqual(kioskScreen({ sleep: true, data: empty, now: day(18), practice: false, lastActivity: null }), { awake: false, why: 'nothing on', from: null, to: null });
 });
+
+test('the orange wall\'s names: a new set once a week, kept through restarts', async () => {
+  const { WallNames, isoWeek } = await import('./screenfeed.ts');
+  const { mkdtempSync } = await import('node:fs'); const { tmpdir } = await import('node:os'); const { join } = await import('node:path');
+  assert.equal(isoWeek(new Date(2026, 10, 28, 12).getTime()), '2026-W48');
+  assert.equal(isoWeek(new Date(2026, 0, 1, 12).getTime()), '2026-W01');
+  assert.equal(isoWeek(new Date(2027, 0, 1, 12).getTime()), '2026-W53');
+  const dir = mkdtempSync(join(tmpdir(), 'wall-')), sat = new Date(2026, 10, 28, 12).getTime(), day = 86_400_000;
+  const w = new WallNames(dir);
+  assert.deepEqual(w.now(sat, null), []);
+  assert.deepEqual(w.now(sat, ['Mari', ' Jaan ', 'Mari', '']), ['Mari', 'Jaan']);
+  assert.deepEqual(w.now(sat + day, ['Kalle']), ['Mari', 'Jaan']);           // Sunday: still this week's
+  assert.deepEqual(new WallNames(dir).now(sat + day, ['Kalle']), ['Mari', 'Jaan']);
+  assert.deepEqual(w.now(sat + 2 * day, ['Kalle']), ['Kalle']);              // Monday: a new week
+  assert.deepEqual(w.now(sat + 9 * day, null), ['Kalle']);                    // no list now: the wall keeps the last one
+});

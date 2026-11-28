@@ -85,6 +85,11 @@ export const END_ART = {
   ] },
 };
 
+// The club's thank-you names (the ones the kiosk's TrackDay screen shows) written in white on the orange wall
+// (Janno 28.11.2026), a new set each week, none highlighted. Under the windows (they run 1.15 to 2.15 m; above
+// 2.3 m the wall is white), in the stretches clear of the columns, the downpipe, the benches and their steps, and the green boxes.
+export const WALL_NAMES = { z0: 0.16, z1: 1.06, spans: [[3.95, 7.85], [17.3, 18.25], [18.95, 21.95]] };
+
 // Things standing on the floor (the RC track's jumps, the benches by the orange wall). Boxes and
 // shapes: x0..x1 across, y0..y1 along, h height. profile: heights along y (0..1 of the length) for ramps.
 export const PROPS = [

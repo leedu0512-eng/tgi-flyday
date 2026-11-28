@@ -5,7 +5,7 @@
 // buildHall(scene, V): V(x, y, z) maps a hall point (x across, y up the hall, z up, metres) to a
 // THREE.Vector3; sizes are in metres, so a caller that needs another scale scales the group it passes.
 import { HALL, RAILS } from './trackgen.js';
-import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, END_ART } from './hall.js';
+import { SIDE, CEIL, COL, WALLS, PROPS, TUBES, RAIL, END_ART, WALL_NAMES } from './hall.js';
 
 let V = null;
 export const CSS = (n) => '#' + n.toString(16).padStart(6, '0');
@@ -118,6 +118,53 @@ function wallArt(scene) {
     }
   });
 }
+// The thank-you names on the orange wall (WALL_NAMES): white, a few sizes, a little tilt, shared out over the
+// stretches by length. names: an array of strings, or a promise of one (the sim fetches them); the same list
+// always lands the same way.
+function wallNames(scene, names) {
+  const list = (Array.isArray(names) ? names : []).map((n) => String(n ?? '').trim()).filter(Boolean).slice(0, 120);
+  if (!list.length) return;
+  const spans = WALL_NAMES.spans, H = WALL_NAMES.z1 - WALL_NAMES.z0, total = spans.reduce((a, [y0, y1]) => a + y1 - y0, 0);
+  let seed = 0; for (const n of list) for (let i = 0; i < n.length; i++) seed = (seed * 31 + n.charCodeAt(i)) % 2147483647;
+  let rnd = seed || 7; const rand = () => ((rnd = (rnd * 16807) % 2147483647) / 2147483647);
+  const font = '"Big Shoulders", "Big Shoulders Display", Archivo, Impact, sans-serif';
+  let from = 0;
+  spans.forEach(([y0, y1], si) => {
+    const share = si === spans.length - 1 ? list.length - from : Math.round(list.length * (y1 - y0) / total);
+    const mine = list.slice(from, from + share); from += share;
+    if (!mine.length) return;
+    const k = 300, c = document.createElement('canvas'); c.width = Math.round((y1 - y0) * k); c.height = Math.round(H * k);
+    const g = c.getContext('2d'), W = c.width, Hp = c.height;
+    const words = mine.map((n) => ({ n, s: [1, 0.8, 0.64][Math.floor(rand() * 3)], tilt: (rand() - 0.5) * 0.08, dy: (rand() - 0.5) * 0.12, a: 0.82 + rand() * 0.18 }));
+    // the biggest size at which every name fits, in rows
+    let B = Hp / 2, rows = null;
+    for (; B > 8; B *= 0.92) {
+      rows = []; let row = [], w = 0, ok = true;
+      for (const wd of words) {
+        g.font = `800 ${Math.round(B * wd.s)}px ${font}`; wd.w = g.measureText(wd.n).width; const gap = B * 0.35;
+        if (w && w + gap + wd.w > W * 0.96) { rows.push({ row, w }); row = []; w = 0; }
+        if (wd.w > W * 0.96) { ok = false; break; }
+        w += (w ? gap : 0) + wd.w; row.push(wd);
+      }
+      if (!ok) continue;
+      if (row.length) rows.push({ row, w });
+      if (rows.length * B * 1.08 <= Hp * 0.94) break;
+    }
+    const lineH = B * 1.08, top = (Hp - rows.length * lineH) / 2;
+    rows.forEach(({ row, w }, ri) => {
+      let x = (W - w) / 2; const y = top + (ri + 0.5) * lineH;
+      for (const wd of row) {
+        g.save(); g.font = `800 ${Math.round(B * wd.s)}px ${font}`; g.textBaseline = 'middle'; g.fillStyle = `rgba(255,255,255,${wd.a.toFixed(2)})`;
+        g.translate(x + wd.w / 2, y + wd.dy * B); g.rotate(wd.tilt); g.fillText(wd.n, -wd.w / 2, 0); g.restore();
+        x += wd.w + B * 0.35;
+      }
+    });
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(y1 - y0, H), new THREE.MeshLambertMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 }));
+    const x0 = HALL.w + SIDE - 0.012, ym = (y0 + y1) / 2, zm = WALL_NAMES.z0 + H / 2;
+    m.position.copy(V(x0, ym, zm)); m.lookAt(V(0, ym, zm)); scene.add(m);
+  });
+}
 function rampGeometry(pr) { // a side profile (along y, up z) pushed across x, placed in the hall
   const len = pr.y1 - pr.y0, sh = new THREE.Shape();
   sh.moveTo(0, 0); for (const [u, z] of pr.profile) sh.lineTo(u * len, z); sh.lineTo(len, 0); sh.lineTo(0, 0);
@@ -125,7 +172,7 @@ function rampGeometry(pr) { // a side profile (along y, up z) pushed across x, p
   geo.applyMatrix4(new THREE.Matrix4().set(0, 0, 1, pr.x0 - HALL.w / 2, 0, 1, 0, 0, -1, 0, 0, HALL.l / 2 - pr.y0, 0, 0, 0, 1));
   return geo;
 }
-export function buildHall(scene, mapV) {
+export function buildHall(scene, mapV, opts = {}) {
   V = mapV;
   const lam = (n, o = {}) => new THREE.MeshLambertMaterial({ color: n, ...o });
   const flat = (w, l, x, y, z, color, o) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lam(color, o)); m.rotation.x = -Math.PI / 2; m.position.copy(V(x, y, z)); scene.add(m); return m; };
@@ -155,6 +202,8 @@ export function buildHall(scene, mapV) {
   const end = new THREE.Mesh(new THREE.ShapeGeometry(es), lam(0xffffff, { map: endTex }));
   end.position.copy(V(-SIDE, HALL.l, 0)); scene.add(end);
   wallArt(scene);   // the sprayed HOBIzone logo and the supporters (END_ART)
+  // the thank-you names on the orange wall: given now, or as a promise (fonts first, so the canvas uses ours)
+  if (opts.names) { const Vnow = V; Promise.all([Promise.resolve(opts.names), document.fonts ? document.fonts.ready : null]).then(([n]) => { const keep = V; V = Vnow; wallNames(scene, n); V = keep; }).catch(() => {}); }
   // the ceiling: two slopes up to the middle, the ribs across it at 2.92 m, spotlights on the cables
   const half = HALL.w / 2 + SIDE, rise = CEIL.middle - CEIL.side, slope = Math.hypot(half, rise), tilt = Math.atan2(rise, half);
   for (const s of [-1, 1]) {

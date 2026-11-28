@@ -342,7 +342,8 @@ function setup3d() {
   controls.maxPolarAngle = Math.PI * 0.495; controls.minDistance = 2; controls.maxDistance = 45;
   scene.add(new THREE.HemisphereLight(0xffffff, 0x222222, 0.9));
   const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(6, 12, 8); scene.add(sun);
-  buildHall(scene, V);
+  // the hall, with this week's thank-you names on the orange wall (sent with today's track)
+  buildHall(scene, V, { names: fetch('/api/track', { cache: 'no-store' }).then((r) => r.json()).then((d) => d.wallNames || []).catch(() => []) });
   const pad = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
   pad.rotation.x = -Math.PI / 2; pad.position.copy(V(START.x, START.y, 0.004)); scene.add(pad);
   const padIn = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshBasicMaterial({ color: 0x000000 }));
