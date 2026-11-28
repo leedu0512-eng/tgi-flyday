@@ -741,14 +741,16 @@ function placeInOrder(A, order, all) {
     const flown = units.filter((u) => u.whos.size);               // a unit with nobody in it isn't a place
     const mine = flown.find((u) => u.whos.has(who));
     if (!mine || mine.whos.size > 1 || mine.whos.has(0)) continue;
-    const others = flown.filter((u) => u !== mine);
-    // numbers go in flying order: 1 = the first unit (the timing gate's)
-    const target = others[Math.min(n - 1, others.length)];
+    // place n counts pieces, as the set-up list numbers them (1 = the timing gate), not tricks: the piece now
+    // at n says where to go; earlier: in before its unit, later: in after it (never inside a trick)
+    // (flags are listed last, after every piece flown through, so they don't count here)
+    const seq = []; for (const u of flown) for (const w of u.whos) if (all[w] && all[w].type !== 'flag' && !seq.some((q) => q.w === w)) seq.push({ w, u });
+    const now = seq.findIndex((q) => q.w === who), there = seq[Math.max(0, Math.min(n - 1, seq.length - 1))];
+    if (now < 0 || !there || there.u === mine) continue;
     const seg = A.slice(mine.start, mine.end + 1), rest = A.slice(0, mine.start).concat(A.slice(mine.end + 1));
-    let at;
-    if (!target) at = rest.length;
-    else at = target.start > mine.end ? target.start - seg.length : target.start;
-    if (n - 1 >= others.length) { const last = others[others.length - 1]; at = (last.end > mine.end ? last.end - seg.length : last.end) + 1; }
+    const t = there.u, later = n - 1 > now;
+    const edge = later ? t.end + 1 : t.start;                      // in the whole lap
+    const at = edge > mine.end ? edge - seg.length : edge;          // in the lap without this piece
     A = rest.slice(0, at).concat(seg, rest.slice(at));
   }
   return A;

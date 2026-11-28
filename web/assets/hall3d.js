@@ -121,13 +121,26 @@ function wallArt(scene) {
 // The thank-you names on the orange wall (WALL_NAMES): white, a few sizes, a little tilt, shared out over the
 // stretches by length. names: an array of strings, or a promise of one (the sim fetches them); the same list
 // always lands the same way.
+// The names' lettering is the kiosk's (Big Shoulders, heavy, capitals), loaded here from ./fonts so it is there
+// whatever page draws the hall (the sim has no club fonts of its own).
+const LATIN = 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD';
+const LATIN_EXT = 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF';
+let wallFont = null;
+function loadWallFont() {
+  if (wallFont) return wallFont;
+  if (typeof FontFace === 'undefined' || !document.fonts) return (wallFont = Promise.resolve(false));
+  const face = (file, range) => new FontFace('HZ Wall', `url(${new URL('./fonts/' + file, import.meta.url).href}) format('woff2')`, { weight: '100 900', unicodeRange: range });
+  wallFont = Promise.all([face('big-shoulders-display-latin-wght-normal.woff2', LATIN), face('big-shoulders-display-latin-ext-wght-normal.woff2', LATIN_EXT)]
+    .map((f) => f.load().then((ff) => { document.fonts.add(ff); return true; }))).then(() => true).catch(() => false);
+  return wallFont;
+}
 function wallNames(scene, names) {
-  const list = (Array.isArray(names) ? names : []).map((n) => String(n ?? '').trim()).filter(Boolean).slice(0, 120);
+  const list = (Array.isArray(names) ? names : []).map((n) => String(n ?? '').trim().toLocaleUpperCase('et')).filter(Boolean).slice(0, 120);
   if (!list.length) return;
   const spans = WALL_NAMES.spans, H = WALL_NAMES.z1 - WALL_NAMES.z0, total = spans.reduce((a, [y0, y1]) => a + y1 - y0, 0);
   let seed = 0; for (const n of list) for (let i = 0; i < n.length; i++) seed = (seed * 31 + n.charCodeAt(i)) % 2147483647;
   let rnd = seed || 7; const rand = () => ((rnd = (rnd * 16807) % 2147483647) / 2147483647);
-  const font = '"Big Shoulders", "Big Shoulders Display", Archivo, Impact, sans-serif';
+  const font = '"HZ Wall", "Big Shoulders", Impact, sans-serif';
   let from = 0;
   spans.forEach(([y0, y1], si) => {
     const share = si === spans.length - 1 ? list.length - from : Math.round(list.length * (y1 - y0) / total);
@@ -141,7 +154,7 @@ function wallNames(scene, names) {
     for (; B > 8; B *= 0.92) {
       rows = []; let row = [], w = 0, ok = true;
       for (const wd of words) {
-        g.font = `800 ${Math.round(B * wd.s)}px ${font}`; wd.w = g.measureText(wd.n).width; const gap = B * 0.35;
+        g.font = `900 ${Math.round(B * wd.s)}px ${font}`; wd.w = g.measureText(wd.n).width; const gap = B * 0.35;
         if (w && w + gap + wd.w > W * 0.96) { rows.push({ row, w }); row = []; w = 0; }
         if (wd.w > W * 0.96) { ok = false; break; }
         w += (w ? gap : 0) + wd.w; row.push(wd);
@@ -154,7 +167,7 @@ function wallNames(scene, names) {
     rows.forEach(({ row, w }, ri) => {
       let x = (W - w) / 2; const y = top + (ri + 0.5) * lineH;
       for (const wd of row) {
-        g.save(); g.font = `800 ${Math.round(B * wd.s)}px ${font}`; g.textBaseline = 'middle'; g.fillStyle = `rgba(255,255,255,${wd.a.toFixed(2)})`;
+        g.save(); g.font = `900 ${Math.round(B * wd.s)}px ${font}`; g.textBaseline = 'middle'; g.fillStyle = `rgba(255,255,255,${wd.a.toFixed(2)})`;
         g.translate(x + wd.w / 2, y + wd.dy * B); g.rotate(wd.tilt); g.fillText(wd.n, -wd.w / 2, 0); g.restore();
         x += wd.w + B * 0.35;
       }
@@ -202,8 +215,8 @@ export function buildHall(scene, mapV, opts = {}) {
   const end = new THREE.Mesh(new THREE.ShapeGeometry(es), lam(0xffffff, { map: endTex }));
   end.position.copy(V(-SIDE, HALL.l, 0)); scene.add(end);
   wallArt(scene);   // the sprayed HOBIzone logo and the supporters (END_ART)
-  // the thank-you names on the orange wall: given now, or as a promise (fonts first, so the canvas uses ours)
-  if (opts.names) { const Vnow = V; Promise.all([Promise.resolve(opts.names), document.fonts ? document.fonts.ready : null]).then(([n]) => { const keep = V; V = Vnow; wallNames(scene, n); V = keep; }).catch(() => {}); }
+  // the thank-you names on the orange wall: given now, or as a promise (the lettering loaded first)
+  if (opts.names) { const Vnow = V; Promise.all([Promise.resolve(opts.names), loadWallFont()]).then(([n]) => { const keep = V; V = Vnow; wallNames(scene, n); V = keep; }).catch(() => {}); }
   // the ceiling: two slopes up to the middle, the ribs across it at 2.92 m, spotlights on the cables
   const half = HALL.w / 2 + SIDE, rise = CEIL.middle - CEIL.side, slope = Math.hypot(half, rise), tilt = Math.atan2(rise, half);
   for (const s of [-1, 1]) {

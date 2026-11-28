@@ -258,6 +258,7 @@ async function typeKeys(scope, text) {
     await tk.click('#saveBtn');
     await tk.waitForSelector('#editBtn:not([hidden])', { timeout: 5000 });
     const saved = await (await fetch(B + '/api/track')).json();
+    if (!(saved.today && saved.today.removed?.length === 1 && saved.today.added?.length === 1 && saved.today.order && Object.keys(saved.today.order).length === 1)) console.log('  saved:', JSON.stringify({ removed: saved.today?.removed, added: saved.today?.added, order: saved.today?.order }));
     check(saved.today && saved.today.removed?.length === 1 && saved.today.added?.length === 1 && saved.today.order && Object.keys(saved.today.order).length === 1, 'Track: saved as today\'s track, with the hand tuning, the removed and the added gate and the order');
     // with a PIN set (RD console), saving asks for it on the number pad
     await fetch(B + '/api/track/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: '2580' }) });
