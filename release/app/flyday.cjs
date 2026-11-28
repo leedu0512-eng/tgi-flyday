@@ -474,7 +474,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1623" : "dev";
+var VERSION = true ? "2026.11.28-1646" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -4549,16 +4549,14 @@ function placeInOrder(A, order, all) {
     const flown = units.filter((u) => u.whos.size);
     const mine = flown.find((u) => u.whos.has(who));
     if (!mine || mine.whos.size > 1 || mine.whos.has(0)) continue;
-    const others = flown.filter((u) => u !== mine);
-    const target = others[Math.min(n - 1, others.length)];
+    const seq = [];
+    for (const u of flown) for (const w of u.whos) if (all[w] && all[w].type !== "flag" && !seq.some((q) => q.w === w)) seq.push({ w, u });
+    const now = seq.findIndex((q) => q.w === who), there = seq[Math.max(0, Math.min(n - 1, seq.length - 1))];
+    if (now < 0 || !there || there.u === mine) continue;
     const seg = A.slice(mine.start, mine.end + 1), rest = A.slice(0, mine.start).concat(A.slice(mine.end + 1));
-    let at;
-    if (!target) at = rest.length;
-    else at = target.start > mine.end ? target.start - seg.length : target.start;
-    if (n - 1 >= others.length) {
-      const last = others[others.length - 1];
-      at = (last.end > mine.end ? last.end - seg.length : last.end) + 1;
-    }
+    const t = there.u, later = n - 1 > now;
+    const edge2 = later ? t.end + 1 : t.start;
+    const at = edge2 > mine.end ? edge2 - seg.length : edge2;
     A = rest.slice(0, at).concat(seg, rest.slice(at));
   }
   return A;
