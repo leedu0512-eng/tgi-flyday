@@ -236,12 +236,18 @@ async function typeKeys(scope, text) {
     // fly a piece one place earlier (pieces flown together in one trick keep their place and say so)
     { const spot = (i) => tk.evaluate((i) => { const r = document.querySelector(`#rows tr[data-row="${i}"]`); return r ? r.children[1].textContent.trim().split(' ')[0] + r.children[2].textContent + r.children[3].textContent : null; }, i);
       let ok = false; const n = await tk.$$eval('#rows tr[data-row]', (r) => r.length);
-      for (let i = 2; i < n && !ok; i++) {
-        const was = await spot(i); await tk.click(`#rows tr[data-row="${i}"]`);
-        await tk.click('#sel [data-order="-1"]'); await tk.waitForTimeout(250);
-        ok = (await spot(i - 1)) === was;
+      // most generated pieces share a trick (a gate with its flag, rings in a hairpin) and keep their place: the
+      // hand-added gate is the free one, and it may sit right after the timing gate, where only ▶ works
+      for (const [dir, sel] of [[-1, '#sel [data-order="-1"]'], [1, '#sel [data-order="1"]']]) {
+        for (let i = 1; i < n && !ok; i++) {
+          if (i + dir < 1 || i + dir >= n) continue;
+          const was = await spot(i); await tk.click(`#rows tr[data-row="${i}"]`);
+          if (await tk.$eval(sel, (b) => b.disabled)) continue;
+          await tk.click(sel); await tk.waitForTimeout(250);
+          ok = (await spot(i + dir)) === was;
+        }
       }
-      check(ok, 'Track: ◀ flies the picked piece one place earlier'); }
+      check(ok, 'Track: ◀ / ▶ moves the picked piece in the flying order'); }
     const lad = await tk.evaluate(() => { const r = [...document.querySelectorAll('#rows tr')].find((t) => /Ladder/.test(t.children[1].textContent)); return r ? r.dataset.row : null; });
     if (lad != null) {
       await tk.click(`#rows tr[data-row="${lad}"]`);
