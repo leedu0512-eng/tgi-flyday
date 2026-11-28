@@ -19,7 +19,10 @@ import { TrackStore } from './tracks.ts';
 import { load, saver } from './store.ts';
 import { RotorHazardLink } from './rotorhazard.ts';
 import { Outbox } from './outbox.ts';
-import { Install, publicInstall } from './flyday.ts';
+import { Install, publicInstall, stableId } from './flyday.ts';
+import { TrackSend, type TrackBody } from './tracksend.ts';
+// @ts-ignore: a browser module, shared with the track page (pure: no DOM)
+import { rebuild, code as trackCode, webfpvPayload } from '../web/assets/trackgen.js';
 import type { AudioEvent } from './types.ts';
 
 /** Running as the packaged tgiFlyDay.exe (a Node single executable application). */
@@ -236,7 +239,42 @@ async function refreshScreen(now = false) {
 setTimeout(() => void refreshScreen(), 5_000);
 setInterval(() => void refreshScreen(), 30_000);
 // Send what's waiting every half minute (once Flyday says send); a failure waits a minute.
-setInterval(() => { void outbox!.flush().then(() => { stateDirty = true; }); }, 30_000);
+setInterval(() => { void outbox!.flush().then(() => { stateDirty = true; }); void sendTrack(); }, 30_000);
+// Today's track to Flyday for sim.hobizone.org (Janno 28.11.2026; tracksend.ts): queued on every save,
+// sent with the upload token until the portal has it. Only from a PC Flyday has approved.
+const trackSend = new TrackSend(resolve(DATA_FILE, '..'));
+async function queueTrack(saved: any) {
+  try {
+    const tr = saved ? rebuild(saved) : null;
+    if (!tr) return;
+    const doc = { seed: saved.seed, opts: saved.opts, edits: saved.edits || {}, removed: saved.removed || [], added: saved.added || [], ladders: saved.ladders || {}, order: saved.order || {} };
+    const body: TrackBody = {
+      schema: 1,
+      install: pairing.state.id,
+      track: {
+        id: stableId('track', pairing.state.id, saved.seed, JSON.stringify(saved.opts)),
+        code: trackCode(saved.seed),
+        name: trackCode(saved.seed),
+        saved_at: saved.savedAt || new Date().toISOString(),
+        pieces: tr.pieces.filter((p: any) => p.type !== 'timing' && p.type !== 'flag').length,
+        lap_m: Math.round(tr.levels.full.facts.length * 10) / 10,
+        pro: await webfpvPayload(tr, 'full'),
+        beginner: await webfpvPayload(tr, 'easy'),
+        trk: null,
+        doc,
+      },
+    };
+    trackSend.queue(body);
+    void sendTrack();
+  } catch (e: any) {
+    console.log(new Date().toLocaleTimeString(), `Today's track for Flyday: ${e?.message ?? e}`);
+  }
+}
+async function sendTrack() {
+  if (pairing.state.status !== 'approved') return;
+  if (await trackSend.flush(outbox!.base(), pairing.state.token)) console.log(new Date().toLocaleTimeString(), "Today's track is on Flyday (sim.hobizone.org).");
+  else if (trackSend.pending && trackSend.lastError) console.log(new Date().toLocaleTimeString(), `Today's track to Flyday: ${trackSend.lastError}`);
+}
 engine.resume(saved.clock, Date.now());
 // Photos taken before they were remembered by name: remember them now.
 for (const p of engine.pilots.values()) if (p.photo && !existsSync(knownFile(p.callsign))) rememberPhoto(p.id);
@@ -328,7 +366,7 @@ function json(res: ServerResponse, status: number, body: unknown) {
 type Handler = (body: any) => unknown;
 
 const API: Record<string, Handler> = {
-  '/api/track/save': (b) => tracks.save(b),
+  '/api/track/save': (b) => { const d = tracks.save(b); void queueTrack(d.today); return d; },
   '/api/track/pin': (b) => tracks.setPin(b),
   '/api/track/kit': (b) => tracks.setKit(b),
   '/api/action': (b) => engine.action(String(b.type), Date.now()),

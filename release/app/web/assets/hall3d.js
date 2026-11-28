@@ -73,15 +73,20 @@ export function buildHall(scene, mapV) {
   V = mapV;
   const lam = (n, o = {}) => new THREE.MeshLambertMaterial({ color: n, ...o });
   const flat = (w, l, x, y, z, color, o) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, l), lam(color, o)); m.rotation.x = -Math.PI / 2; m.position.copy(V(x, y, z)); scene.add(m); return m; };
-  // the floor: grey carpet, the 50 cm strips to the walls (red by the white wall, dark by the orange one), the pit
-  flat(HALL.w, HALL.l, HALL.w / 2, HALL.l / 2, 0, COL.carpet);
+  // the floor: grey carpet, the 50 cm strips to the walls (red by the white wall, dark by the orange one), the pit.
+  // Lifted off whatever ground the caller has (the sim's room has its own at 0) and layered with polygon
+  // offsets as well as height, so nothing flickers from flying height (Janno 28.11.2026: "the floor flickers").
+  const layer = (k) => ({ polygonOffset: true, polygonOffsetFactor: -k, polygonOffsetUnits: -4 * k });
+  flat(HALL.w, HALL.l, HALL.w / 2, HALL.l / 2, 0.004, COL.carpet, layer(1));
   const grid = new THREE.GridHelper(HALL.l, Math.round(HALL.l), 0x4a4c52, 0x44464b);
-  grid.scale.set(HALL.w / HALL.l, 1, 1); grid.position.copy(V(HALL.w / 2, HALL.l / 2, 0.002)); scene.add(grid);
-  flat(SIDE, HALL.l, -SIDE / 2, HALL.l / 2, 0.001, COL.red);
-  flat(SIDE, HALL.l, HALL.w + SIDE / 2, HALL.l / 2, 0.001, 0x26272a);
-  for (const x of [0, HALL.w]) flat(0.05, HALL.l, x, HALL.l / 2, 0.012, 0xf4f4f4);                        // the white board along the carpet's edges
-  flat(HALL.w + 2 * SIDE, RAIL.grass, HALL.w / 2, RAIL.y + RAIL.grass / 2, 0.003, COL.turf);
-  flat(HALL.w + 2 * SIDE, RAIL.pitDepth, HALL.w / 2, RAIL.y - RAIL.pitDepth / 2, 0.001, COL.pit);
+  grid.scale.set(HALL.w / HALL.l, 1, 1); grid.position.copy(V(HALL.w / 2, HALL.l / 2, 0.009));
+  for (const gm of [].concat(grid.material)) Object.assign(gm, layer(2));
+  scene.add(grid);
+  flat(SIDE, HALL.l, -SIDE / 2, HALL.l / 2, 0.004, COL.red, layer(1));
+  flat(SIDE, HALL.l, HALL.w + SIDE / 2, HALL.l / 2, 0.004, 0x26272a, layer(1));
+  for (const x of [0, HALL.w]) flat(0.05, HALL.l, x, HALL.l / 2, 0.014, 0xf4f4f4, layer(3));                        // the white board along the carpet's edges
+  flat(HALL.w + 2 * SIDE, RAIL.grass, HALL.w / 2, RAIL.y + RAIL.grass / 2, 0.006, COL.turf, layer(2));
+  flat(HALL.w + 2 * SIDE, RAIL.pitDepth, HALL.w / 2, RAIL.y - RAIL.pitDepth / 2, 0.004, COL.pit, layer(1));
   // the long walls and the black end wall
   const wallLen = HALL.l - RAIL.y, wallMid = (HALL.l + RAIL.y) / 2;
   const left = new THREE.Mesh(new THREE.PlaneGeometry(wallLen, CEIL.side), lam(0xffffff, { map: wallPicture(WALLS.left, wallLen, CEIL.side, false, RAIL.y) }));

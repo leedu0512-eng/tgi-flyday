@@ -877,14 +877,19 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
 
 /** The link that opens a track in WebFPV: their own #track= fragment (deflate-raw, base64url). */
 export const WEBFPV_BUILDER = 'https://webfpv.org/sim/src/trackbuilder/index.html';
-export async function webfpvLink(tr, level = 'full') {
+/** The track in WebFPV's format as a link payload: `z.` + deflate-raw + base64url (`j.` + base64url JSON where
+    the runtime can't compress). WebFPV's own #track= links and the HOBIzone sim's #hz= links carry this. */
+export async function webfpvPayload(tr, level = 'full') {
   const bytes = new TextEncoder().encode(JSON.stringify(toWebFPV(tr, level)));
   const b64 = (u8) => { let bin = ''; for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
   if (typeof CompressionStream === 'function') {
     const z = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
-    return `${WEBFPV_BUILDER}#track=z.${b64(z)}`;
+    return 'z.' + b64(z);
   }
-  return `${WEBFPV_BUILDER}#track=j.${b64(bytes)}`;
+  return 'j.' + b64(bytes);
+}
+export async function webfpvLink(tr, level = 'full') {
+  return `${WEBFPV_BUILDER}#track=${await webfpvPayload(tr, level)}`;
 }
 
 // ---------- a whole track in a link (the phone's AR builder, ar.html) ----------

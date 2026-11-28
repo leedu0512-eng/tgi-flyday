@@ -26,9 +26,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // server/main.ts
 var import_node_http = require("node:http");
 var import_promises2 = require("node:fs/promises");
-var import_node_fs8 = require("node:fs");
+var import_node_fs9 = require("node:fs");
 var import_node_os2 = require("node:os");
-var import_node_path8 = require("node:path");
+var import_node_path9 = require("node:path");
 var import_node_url = require("node:url");
 var sea = __toESM(require("node:sea"), 1);
 
@@ -438,7 +438,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1316" : "dev";
+var VERSION = true ? "2026.11.28-1426" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -657,8 +657,8 @@ function channelGap(ch, others) {
 var CLEAR_MHZ = 37;
 var CHANNEL_PREFERENCE = ["R1", "R2", "F2", "F4", "R7", "R8", "R3", "R4", "R5", "R6", "F1", "F3", "F5", "F6", "F7", "F8", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"];
 function bestChannels(taken, count = 3) {
-  const score = (c) => Math.min(channelGap(c, taken), CLEAR_MHZ);
-  return CHANNEL_PREFERENCE.filter((c) => !taken.some((t) => sameFrequency(c, t))).filter((c, i, list) => list.findIndex((x) => CHANNEL_MHZ[x] === CHANNEL_MHZ[c]) === i).sort((a, b) => score(b) - score(a) || CHANNEL_PREFERENCE.indexOf(a) - CHANNEL_PREFERENCE.indexOf(b)).slice(0, count);
+  const score2 = (c) => Math.min(channelGap(c, taken), CLEAR_MHZ);
+  return CHANNEL_PREFERENCE.filter((c) => !taken.some((t) => sameFrequency(c, t))).filter((c, i, list) => list.findIndex((x) => CHANNEL_MHZ[x] === CHANNEL_MHZ[c]) === i).sort((a, b) => score2(b) - score2(a) || CHANNEL_PREFERENCE.indexOf(a) - CHANNEL_PREFERENCE.indexOf(b)).slice(0, count);
 }
 function fillText(template, vars) {
   const out = template.replace(/\{(\w+)\}/g, (m, k) => k in vars ? String(vars[k]) : m).replace(/\s+/g, " ").trim();
@@ -2680,19 +2680,19 @@ function cleanTrack(b, now = /* @__PURE__ */ new Date()) {
     if (ed.dx || ed.dy || ed.rot) edits[k] = ed;
   }
   const removed = [...new Set((Array.isArray(t?.removed) ? t.removed : []).map(Number))].filter((i) => Number.isInteger(i) && i > 0 && i < 40).slice(0, 40);
-  const TYPES2 = ["gate", "cube", "ladder3", "ladder5", "ring", "flag"];
-  const added = (Array.isArray(t?.added) ? t.added : []).slice(0, 20).filter((a) => a && TYPES2.includes(a.type)).map((a) => ({ type: a.type, x: Math.round(num(a.x, 0, 30) * 100) / 100, y: Math.round(num(a.y, 0, 30) * 100) / 100, rot: Math.round(num(a.rot, 0, 359)) }));
+  const TYPES3 = ["gate", "cube", "ladder3", "ladder5", "ring", "flag"];
+  const added = (Array.isArray(t?.added) ? t.added : []).slice(0, 20).filter((a) => a && TYPES3.includes(a.type)).map((a) => ({ type: a.type, x: Math.round(num(a.x, 0, 30) * 100) / 100, y: Math.round(num(a.y, 0, 30) * 100) / 100, rot: Math.round(num(a.rot, 0, 359)) }));
   const ladders = {};
   for (const [k, l] of Object.entries(t?.ladders ?? {}).slice(0, 10)) {
     if (!/^(\d{1,2}|a\d{1,2})$/.test(k) || !l || typeof l !== "object") continue;
     const x = l;
     ladders[k] = { mode: x.mode === "up" || x.mode === "down" ? x.mode : "once", n: Math.round(num(x.n, 1, 5)), at: Math.round(num(x.at, 0, 4)) };
   }
-  const code = String(t?.code ?? "").replace(/[^A-Z0-9-]/gi, "").slice(0, 12);
+  const code2 = String(t?.code ?? "").replace(/[^A-Z0-9-]/gi, "").slice(0, 12);
   const from = String(b?.from ?? "").replace(/[^a-z]/g, "").slice(0, 12) || "page";
   const order = {};
   for (const [k, v] of Object.entries(t?.order ?? {}).slice(0, 40)) if (/^(\d{1,2}|a\d{1,2})$/.test(k) && k !== "0") order[k] = Math.round(num(v, 2, 99));
-  return { seed, opts, edits, ...removed.length ? { removed } : {}, ...added.length ? { added } : {}, ...Object.keys(ladders).length ? { ladders } : {}, ...Object.keys(order).length ? { order } : {}, code, savedAt: now.toISOString(), from };
+  return { seed, opts, edits, ...removed.length ? { removed } : {}, ...added.length ? { added } : {}, ...Object.keys(ladders).length ? { ladders } : {}, ...Object.keys(order).length ? { order } : {}, code: code2, savedAt: now.toISOString(), from };
 }
 var PIN_TRIES = 5;
 var PIN_WAIT_MS = 6e4;
@@ -3339,18 +3339,18 @@ function partsOf(b, max = SAFE_SIZE) {
   return s ? [...partsOf(s[0], max), ...partsOf(s[1], max)] : [b];
 }
 function verdictOf(status, text2) {
-  let portalError = null;
+  let portalError2 = null;
   try {
     const j = JSON.parse(text2);
-    if (j && typeof j.error === "string") portalError = j.error;
+    if (j && typeof j.error === "string") portalError2 = j.error;
   } catch {
   }
-  if (status >= 200 && status < 300) return { verdict: "stored", portalError };
-  if (status === 401 && (portalError === "token_invalid" || portalError === "revoked")) return { verdict: "token", portalError };
-  if (status === 429) return { verdict: "backoff", portalError };
-  if (status === 413) return { verdict: "split", portalError };
-  if (status >= 400 && status < 500 && status !== 401 && status !== 403 && portalError !== null) return { verdict: "stop", portalError };
-  return { verdict: "retry", portalError };
+  if (status >= 200 && status < 300) return { verdict: "stored", portalError: portalError2 };
+  if (status === 401 && (portalError2 === "token_invalid" || portalError2 === "revoked")) return { verdict: "token", portalError: portalError2 };
+  if (status === 429) return { verdict: "backoff", portalError: portalError2 };
+  if (status === 413) return { verdict: "split", portalError: portalError2 };
+  if (status >= 400 && status < 500 && status !== 401 && status !== 403 && portalError2 !== null) return { verdict: "stop", portalError: portalError2 };
+  return { verdict: "retry", portalError: portalError2 };
 }
 
 // server/outbox.ts
@@ -3459,9 +3459,9 @@ var Outbox = class {
               signal: AbortSignal.timeout(2e4)
             });
             const text2 = await res.text().catch(() => "");
-            const { verdict, portalError } = verdictOf(res.status, text2);
+            const { verdict, portalError: portalError2 } = verdictOf(res.status, text2);
             if (verdict === "stored") continue;
-            const msg = `Flyday answered ${res.status}${portalError ? `: ${portalError}` : text2 ? ` (${text2.replace(/\s+/g, " ").slice(0, 120)})` : ""}`;
+            const msg = `Flyday answered ${res.status}${portalError2 ? `: ${portalError2}` : text2 ? ` (${text2.replace(/\s+/g, " ").slice(0, 120)})` : ""}`;
             if (verdict === "split") {
               const halves = splitBody(body);
               if (halves) {
@@ -3514,39 +3514,1210 @@ var Outbox = class {
   }
 };
 
+// server/tracksend.ts
+var import_node_fs8 = require("node:fs");
+var import_node_path8 = require("node:path");
+function portalError(text2) {
+  try {
+    const j = JSON.parse(text2);
+    return typeof j?.error === "string" ? j.error : null;
+  } catch {
+    return null;
+  }
+}
+var TrackSend = class {
+  file;
+  pending = null;
+  lastError = "";
+  lastSent = null;
+  nextTry = 0;
+  constructor(dir) {
+    this.file = (0, import_node_path8.join)(dir, "track-send.json");
+    try {
+      const j = JSON.parse((0, import_node_fs8.readFileSync)(this.file, "utf8"));
+      if (j?.track?.id) this.pending = j;
+    } catch {
+    }
+  }
+  queue(body) {
+    this.pending = body;
+    this.nextTry = 0;
+    this.write();
+  }
+  write() {
+    try {
+      if (!this.pending) {
+        try {
+          (0, import_node_fs8.unlinkSync)(this.file);
+        } catch {
+        }
+        return;
+      }
+      (0, import_node_fs8.mkdirSync)((0, import_node_path8.join)(this.file, ".."), { recursive: true });
+      (0, import_node_fs8.writeFileSync)(this.file + ".tmp", JSON.stringify(this.pending));
+      (0, import_node_fs8.renameSync)(this.file + ".tmp", this.file);
+    } catch {
+    }
+  }
+  /** Send the waiting track, if any and if it's time. True when Flyday stored it. */
+  async flush(base, token, now = Date.now(), post = fetch) {
+    if (!this.pending || now < this.nextTry) return false;
+    if (!token) {
+      this.lastError = "no token from Flyday yet";
+      return false;
+    }
+    const body = this.pending;
+    try {
+      const res = await post(base.replace(/\/?$/, "/") + "track", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}`, accept: "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(2e4)
+      });
+      const text2 = await res.text().catch(() => "");
+      if (res.ok) {
+        if (this.pending === body) {
+          this.pending = null;
+          this.write();
+        }
+        this.lastSent = body.track.id;
+        this.lastError = "";
+        return true;
+      }
+      const err = portalError(text2);
+      this.lastError = `${res.status}${err ? ` ${err}` : ""}`;
+      this.nextTry = now + (err && res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 429 ? 30 * 6e4 : 6e4);
+    } catch (e) {
+      this.lastError = e?.name === "TimeoutError" ? "no answer" : String(e?.cause?.code ?? e?.message ?? e);
+      this.nextTry = now + 6e4;
+    }
+    return false;
+  }
+};
+
+// web/assets/hall.js
+var SIDE = 0.5;
+var PROPS = [
+  // the plywood hump with green turf by the red door (Janno: 7 m long, 75 cm high), a black rubber
+  // kicker on the pilots' side
+  {
+    name: "hump",
+    x0: 0.05,
+    x1: 2.25,
+    y0: 15.2,
+    y1: 22.2,
+    side: "ply",
+    top: "turf",
+    profile: [[0, 0], [0.05, 0.38], [0.12, 0.72], [0.2, 0.75], [0.3, 0.5], [0.4, 0.36], [1, 0]]
+  },
+  { name: "kicker", x0: 0.1, x1: 2.2, y0: 14.2, y1: 15.3, color: "rubber", profile: [[0, 0], [0.85, 0.35], [1, 0.3]] },
+  // the blue backdrop curving up the white wall in the far corner
+  { name: "backdrop", kind: "quarter", x0: -SIDE, x1: 1.6, y0: 22.4, y1: 25.4, color: "blue", r: 1.6 },
+  // the black rubber tabletop in the middle near the far end
+  { name: "table-far", x0: 3.9, x1: 6.1, y0: 19.6, y1: 21.8, color: "rubber", profile: [[0, 0], [0.3, 0.28], [0.7, 0.28], [1, 0]] },
+  // the grey tabletop with a wooden side by the white wall, at the pilots' end
+  { name: "table-near", x0: 0.2, x1: 3, y0: 1.2, y1: 5.2, color: "carpet", side: "ply", profile: [[0, 0], [0.3, 0.3], [0.75, 0.3], [1, 0]] },
+  // the blue mats and the pallet table at the pilots' end, orange side
+  { name: "mats", x0: 5.6, x1: 9.3, y0: 0.5, y1: 3.4, color: "blue", h: 0.05 },
+  { name: "pallet-table", x0: 6.2, x1: 7.8, y0: 3.4, y1: 4.5, color: "navy", profile: [[0, 0], [0.4, 0.25], [1, 0.25]] },
+  { name: "mats-mid", x0: 3.1, x1: 5.6, y0: 0.5, y1: 3, color: "navy", h: 0.12 },
+  // the orange benches along the orange wall, stepping down toward the pilots, then two low green boxes
+  { name: "bench", x0: 9.2, x1: 9.5 + SIDE, y0: 11, y1: 16.2, color: "orange", h: 0.8 },
+  { name: "step-2", x0: 9.2, x1: 9.5 + SIDE, y0: 10.4, y1: 11, color: "orange", h: 0.55 },
+  { name: "step-1", x0: 9.2, x1: 9.5 + SIDE, y0: 9.8, y1: 10.4, color: "orange", h: 0.3 },
+  { name: "green-boxes", x0: 9.3, x1: 9.5 + SIDE, y0: 16.2, y1: 17.2, color: "turf", h: 0.35 },
+  // the steps up in the far corner on the orange side
+  { name: "stairs", kind: "stairs", x0: 8.4, x1: 9.5 + SIDE, y0: 24, y1: 25.6, color: "black", h: 0.75, steps: 4 }
+];
+function floorAt(x, y) {
+  let h = 0;
+  for (const pr of PROPS) {
+    if (pr.kind || x < pr.x0 || x > pr.x1 || y < pr.y0 || y > pr.y1) continue;
+    if (pr.profile) {
+      const u = (y - pr.y0) / (pr.y1 - pr.y0), p = pr.profile;
+      for (let i = 1; i < p.length; i++) if (u <= p[i][0]) {
+        const t = (u - p[i - 1][0]) / (p[i][0] - p[i - 1][0] || 1);
+        h = Math.max(h, p[i - 1][1] + t * (p[i][1] - p[i - 1][1]));
+        break;
+      }
+    } else if (pr.h) h = Math.max(h, pr.h);
+  }
+  return Math.round(h * 1e3) / 1e3;
+}
+
+// web/assets/trackgen.js
+var HALL = { w: 9.5, l: 25.6, h: 2.92 };
+var OPEN = 0.6096;
+var PIPE = 0.03;
+var SILL = 0.03;
+var GATE_Z = SILL + OPEN / 2;
+var HEX = { inside: 0.46, tube: 0.03 };
+var HEX_H = HEX.inside * Math.sqrt(3) / 2;
+var HEX_PITCH = HEX_H + 2 * HEX.tube;
+var LADDER = {
+  ladder3: { shape: "ring", w: OPEN, h: OPEN, tube: 0.03, pitch: OPEN + 2 * 0.03 },
+  // the tall one hangs from the ceiling cables like the rings (Janno 26.11.2026): its top 20 cm under the ribs
+  ladder5: { shape: "hex", w: HEX.inside, h: HEX_H, tube: HEX.tube, pitch: HEX_PITCH, hang: true }
+};
+var HANG_TOP = HALL.h - 0.2;
+var stages = (type, n) => {
+  const L = LADDER[type];
+  return Array.from({ length: n }, (_, i) => Math.round((L.hang ? HANG_TOP - (n - 1 - i) * L.pitch - L.tube - L.h / 2 : L.tube + L.h / 2 + i * L.pitch) * 1e3) / 1e3);
+};
+var onRail = (type) => type === "ring" || !!LADDER[type]?.hang;
+var liftOf = (pc) => pc.type === "flag" || onRail(pc.type) ? 0 : floorAt(pc.x, pc.y);
+var RING_Z = HALL.h - 0.2 - OPEN / 2;
+var RAILS = [HALL.w / 4, HALL.w / 2, HALL.w * 3 / 4];
+var START = { x: HALL.w - 1, y: 1 };
+var TIMING = { x: HALL.w - 1, y: HALL.l / 2 };
+var TYPES = {
+  timing: { label: "Timing gate", zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
+  gate: { label: "Gate", zmin: 0, zmax: SILL + OPEN + PIPE, r: OPEN / 2 + 0.12, levels: [GATE_Z] },
+  cube: { label: "Cube", zmin: 0, zmax: 0.74, r: 0.55, levels: [0.35] },
+  ring: { label: "Ring", zmin: RING_Z - OPEN / 2 - 0.05, zmax: HALL.h, r: OPEN / 2 + 0.06, levels: [RING_Z] },
+  ladder3: { label: "Ladder \xD73", zmin: 0, zmax: 3 * (OPEN + 0.06), r: OPEN / 2 + 0.12, levels: stages("ladder3", 3) },
+  ladder5: { label: "Ladder \xD75", zmin: HANG_TOP - 5 * HEX_PITCH, zmax: HALL.h, r: HEX.inside / 2 + 0.12, levels: stages("ladder5", 5) },
+  flag: { label: "Flag", zmin: 0, zmax: 1.9, r: 0.3, levels: [0] }
+};
+var KIT_DEFAULT = { gate: 6, cube: 2, ring: 5, ladder3: 1, ladder5: 1, flag: 2 };
+var KIT_MAX2 = { gate: 20, cube: 6, ring: 10, ladder3: 3, ladder5: 3, flag: 6 };
+function cleanKit2(k) {
+  const out = {};
+  for (const t of Object.keys(KIT_DEFAULT)) {
+    const n = Math.round(Number(k?.[t]));
+    out[t] = k && Number.isFinite(n) ? Math.max(0, Math.min(KIT_MAX2[t], n)) : KIT_DEFAULT[t];
+  }
+  return out;
+}
+var STYLE = {
+  flowing: { rmin: 0.55, turn: 0.6, orbit: 0.4, pole: 0.45, spacing: 2.2, lap: [70, 115], flagR: 0.95, loopR: 1, alphas: 1, climb5: 3 },
+  technical: { rmin: 0.4, turn: 0.45, orbit: 0.36, pole: 0.38, spacing: 1.8, lap: [75, 130], flagR: 0.75, loopR: 0.85, alphas: 2, climb5: 5 }
+};
+var MARGIN = 0.4;
+var STEP = 0.1;
+var CLIMB = 1.8;
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = a + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+var code = (seed) => "HZ-" + seed.toString(36).toUpperCase().padStart(6, "0").slice(-6);
+var BASE = { x0: 1.2, x1: HALL.w - 1, y0: 1.2, y1: HALL.l - 1.2, rc: 1.6 };
+function baseLegs() {
+  const { x0, x1, y0, y1, rc } = BASE;
+  const S = (ax, ay, bx, by) => ({ kind: "straight", ax, ay, bx, by, len: Math.hypot(bx - ax, by - ay), hx: Math.sign(bx - ax), hy: Math.sign(by - ay) });
+  const C = (cx, cy, a0) => ({ kind: "corner", cx, cy, a0, len: Math.PI / 2 * rc });
+  return [
+    S(x1, TIMING.y, x1, y1 - rc),
+    C(x1 - rc, y1 - rc, 0),
+    // right, upward; top-right corner
+    S(x1 - rc, y1, x0 + rc, y1),
+    C(x0 + rc, y1 - rc, Math.PI / 2),
+    // top, leftward; top-left corner
+    S(x0, y1 - rc, x0, y0 + rc),
+    C(x0 + rc, y0 + rc, Math.PI),
+    // left, downward; bottom-left
+    S(x0 + rc, y0, x1 - rc, y0),
+    C(x1 - rc, y0 + rc, -Math.PI / 2),
+    // bottom, rightward; bottom-right
+    S(x1, y0 + rc, x1, TIMING.y)
+    // right again, up to the timing gate
+  ].map((l, i) => ({ ...l, i }));
+}
+var LEGS = baseLegs();
+var acc = 0;
+for (const l of LEGS) {
+  l.u0 = acc;
+  acc += l.len;
+  l.u1 = acc;
+}
+var PER = acc;
+function basePoint(u) {
+  u = (u % PER + PER) % PER;
+  const l = LEGS.find((g) => u >= g.u0 && u < g.u1) || LEGS[LEGS.length - 1];
+  const t = u - l.u0;
+  if (l.kind === "straight") return { x: l.ax + l.hx * t, y: l.ay + l.hy * t, hx: l.hx, hy: l.hy, leg: l };
+  const a = l.a0 + t / BASE.rc;
+  return { x: l.cx + BASE.rc * Math.cos(a), y: l.cy + BASE.rc * Math.sin(a), hx: -Math.sin(a), hy: Math.cos(a), leg: l };
+}
+function trickLadder(type, st, rand, wantUp, once) {
+  const lv = TYPES[type].levels;
+  let stages2 = type === "ladder3" ? [0, 1, 2] : st.climb5 === 5 ? [0, 1, 2, 3, 4] : (() => {
+    const a = Math.floor(rand() * 3);
+    return [a, a + 1, a + 2];
+  })();
+  if (once === true || once === type) stages2 = [type === "ladder5" ? 2 + Math.floor(rand() * 3) : 1 + Math.floor(rand() * 2)];
+  if (!wantUp) stages2 = stages2.slice().reverse();
+  const zone = "L" + type, hang = LADDER[type].hang;
+  const at = (f) => hang ? { f, railK: 0, dl: 0, hangRail: true } : { f, l: 0 };
+  const route = (sts) => [{ ...at(-0.6), z: lv[sts[0]], zone }, ...sts.map((sIdx, j) => ({
+    ...at(0),
+    z: lv[sIdx],
+    zone,
+    pass: { local: 0, stage: sIdx, dir: { f: 1, l: 0 }, orbit: j < sts.length - 1 ? st.orbit : 0 }
+  })), { ...at(0.6), z: lv[sts[sts.length - 1]], zone }];
+  const anchors = route(stages2);
+  const levels = stages2.length > 1 ? { mid: stages2.length > 3 ? route(stages2.slice(0, 3)) : void 0, easy: route([0]) } : {};
+  return {
+    anchors,
+    before: hang ? 1.4 : 1.1,
+    after: hang ? 1.4 : 1.1,
+    inward: (hang ? 1.5 : 0) + 2 * st.orbit + 0.2,
+    entryZ: lv[stages2[0]],
+    exitZ: lv[stages2[stages2.length - 1]],
+    pieces: [{ type, stages: stages2, trick: stages2.length > 1 ? wantUp ? "climb" : "descend" : "once", at: at(0), z: lv[stages2[0]] }],
+    levels,
+    railSnap: hang
+  };
+}
+function trickAlpha(st, rand, withRing) {
+  const s2 = Math.SQRT1_2, z = 0.35, zone = "A" + Math.floor(rand() * 1e6);
+  const C = { f: 0, l: 0.95 };
+  const cube = [{ f: -2.1, l: 0, z: null }, { f: -0.4 * s2, l: C.l - 0.4 * s2, z, zone }, { f: 0, l: C.l, z, pass: { local: 0, dir: { f: s2, l: s2 } }, zone }, { f: 0.4 * s2, l: C.l + 0.4 * s2, z, zone }];
+  const up = [...cube, { f: 0.6, railK: 1, dl: 0, z: RING_Z, zone, pass: { local: 1, dir: { f: 1, l: 0 } } }];
+  const R = Math.max(st.rmin + 0.3, 0.85), cx = 0.4 * s2 + R * s2, cl = C.l + 0.4 * s2 - R * s2;
+  const ex = { f: cx + R * s2, l: cl + R * s2 };
+  const once = [...cube, { f: cx, l: cl + R, z, zone }, ex, { f: ex.f + ex.l * 0.45, l: ex.l * 0.55, z: null }, { f: ex.f + ex.l + 1, l: 0, z: null }];
+  const pieces = [{ type: "cube", trick: withRing ? "up" : "once", at: C, z }];
+  if (withRing) pieces.push({ type: "ring", trick: "loop", at: { f: 0.6, railK: 1, dl: 0 }, z: RING_Z });
+  const levels = withRing ? { mid: once, easy: "skip" } : { easy: once };
+  return { anchors: withRing ? up : once, before: 2.2, after: withRing ? 1.2 : 3.9, inward: withRing ? 4.2 : 2.5, entryZ: z, exitZ: withRing ? null : z, pieces, sideOnly: withRing, levels };
+}
+function trickFinger(st, rand, gates) {
+  const r = st.flagR, D = (gates ? 2.9 : 2.2) + rand() * 1, zone = "F" + Math.floor(rand() * 1e6), z = GATE_Z;
+  const A = [{ f: -(r + 1.7), l: 0, z: null }, { f: -(r + 0.45), l: 0.35, z: null, zone }, { f: -r, l: 1.35, z: null, zone }];
+  const pieces = [];
+  const mid = 1.35 + (D - 1.35) / 2;
+  if (gates >= 1) {
+    A.push({ f: -r, l: mid - 0.35, z, zone }, { f: -r, l: mid, z, zone, pass: { local: pieces.length } }, { f: -r, l: mid + 0.35, z, zone });
+    pieces.push({ type: "gate", trick: "once", at: { f: -r, l: mid }, z });
+  }
+  A.push({ f: 0, l: D, z: null, zone, round: { r: st.pole } });
+  if (gates >= 2) {
+    A.push({ f: r, l: mid + 0.35, z, zone }, { f: r, l: mid, z, zone, pass: { local: pieces.length } }, { f: r, l: mid - 0.35, z, zone });
+    pieces.push({ type: "gate", trick: "once", at: { f: r, l: mid }, z });
+  }
+  A.push({ f: r, l: 1.35, z: null, zone }, { f: r + 0.45, l: 0.35, z: null, zone }, { f: r + 1.7, l: 0, z: null });
+  return { anchors: A, before: r + 1.8, after: r + 1.8, inward: D + r, entryZ: gates ? z : null, exitZ: gates ? z : null, flag: { f: 0, l: D }, pieces };
+}
+function trickRings(st, rand, n) {
+  const r = Math.max(st.rmin + 0.25, 0.75), zone = "R" + Math.floor(rand() * 1e6), top = RING_Z;
+  const out = n >= 3 ? [0, 1] : [1], back = n >= 4 ? [1, 0] : n === 3 ? [1] : n === 2 ? [1] : [];
+  const pieces = [];
+  const A = [{ f: -(r + 1.7), l: 0, z: null }, { f: -(r + 0.45), l: 0.35, z: 0.4, zone }, { f: -r, l: 1.35, z: 1.2, zone, lin: true }];
+  const leg = (f, ks, ring, order) => {
+    for (const k of order) {
+      A.push({ f, railK: k, dl: -0.35, z: top, zone });
+      const has = ks.includes(k);
+      A.push({ f, railK: k, dl: 0, z: top, zone, pass: has ? { local: pieces.length } : null });
+      if (has) pieces.push({ type: "ring", trick: "hairpin", at: { f, railK: k, dl: 0 }, z: top });
+      A.push({ f, railK: k, dl: 0.35, z: top, zone });
+    }
+  };
+  leg(-r, out, true, [0, 1]);
+  for (let a = 180; a >= 0; a -= 30) A.push({ f: r * Math.cos(a * Math.PI / 180), railK: 1, dl: 0.55 + r * Math.sin(a * Math.PI / 180), z: top, zone });
+  const rev = [];
+  for (const k of [1, 0]) {
+    A.push({ f: r, railK: k, dl: 0.35, z: top, zone });
+    const has = back.includes(k);
+    A.push({ f: r, railK: k, dl: 0, z: top, zone, pass: has ? { local: pieces.length } : null });
+    if (has) pieces.push({ type: "ring", trick: "hairpin", at: { f: r, railK: k, dl: 0 }, z: top });
+    A.push({ f: r, railK: k, dl: -0.35, z: top, zone });
+  }
+  A.push({ f: r, l: 1.35, z: 1.2, zone, lin: true }, { f: r + 0.45, l: 0.35, z: 0.4, zone }, { f: r + 1.7, l: 0, z: null });
+  return { anchors: A, before: r + 1.8, after: r + 1.8, inward: 4 + 0.55 + r, entryZ: 0.25, exitZ: 0.25, pieces, sideOnly: true, levels: { easy: "skip" } };
+}
+function plain(type, rand, st) {
+  const lv = TYPES[type].levels, li = type === "ladder5" ? 2 + Math.floor(rand() * 3) : type === "ladder3" ? 1 + Math.floor(rand() * 2) : 0, z = lv[li];
+  return {
+    anchors: [{ f: -0.4, l: 0, z }, { f: 0, l: 0, z, pass: { local: 0, stage: li, dir: 1 } }, { f: 0.4, l: 0, z }],
+    before: 0.8,
+    after: 0.8,
+    inward: 0,
+    entryZ: z,
+    exitZ: z,
+    pieces: [{ type, stages: [li], trick: "once", at: { f: 0, l: 0 }, z }]
+  };
+}
+function makeTrack(seed, opts) {
+  return makeTrack1(seed, opts, false) || makeTrack1(seed, opts, "ladder5") || makeTrack1(seed, opts, true);
+}
+function makeTrack1(seed, opts, once) {
+  const rand = rng(seed), st = STYLE[opts.style];
+  const kit = cleanKit2(opts.kit);
+  let pool = [];
+  for (const t of ["gate", "cube", "ring", "ladder3", "ladder5"]) for (let i = 0; i < kit[t]; i++) pool.push(t);
+  if (!opts.rings) pool = pool.filter((t) => t !== "ring");
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  pool = pool.slice(0, Math.min(opts.pieces, pool.length));
+  const flags = opts.flags ? kit.flag : 0;
+  const count = (t) => pool.filter((x) => x === t).length;
+  const take = (t) => {
+    const i = pool.indexOf(t);
+    if (i >= 0) {
+      pool.splice(i, 1);
+      return true;
+    }
+    return false;
+  };
+  const items = [];
+  for (let i = 0; i < st.alphas && count("cube"); i++) {
+    take("cube");
+    const ring = take("ring");
+    items.push({ make: () => trickAlpha(st, rand, ring) });
+  }
+  if (count("ring")) {
+    let k = 0;
+    while (k < 4 && take("ring")) k++;
+    const kk = k;
+    items.push({ make: () => trickRings(st, rand, kk) });
+  }
+  for (let i = 0; i < flags; i++) {
+    let g = 0;
+    while (g < 2 && take("gate")) g++;
+    const gg = g;
+    items.push({ make: () => trickFinger(st, rand, gg) });
+  }
+  for (const t of pool) {
+    if (t.startsWith("ladder")) items.push({ make: (up) => trickLadder(t, st, rand, up, once), ladder: true });
+    else items.push({ make: () => plain(t, rand, st), ring: t === "ring" });
+  }
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  const rings = items.filter((it) => it.ring), rest = items.filter((it) => !it.ring);
+  const at = Math.floor(rand() * (rest.length + 1));
+  const seq = [...rest.slice(0, at), ...rings, ...rest.slice(at)];
+  const built = seq.map((it, i) => {
+    if (!it.ladder) return it.make();
+    const next = seq[i + 1], prev = seq[i - 1];
+    const up = next && next.ring ? true : prev && prev.ring ? false : rand() < 0.5;
+    return it.make(up);
+  });
+  const placed = [];
+  let u = 1.4, prevZ = GATE_Z, prevAfter = 0.6;
+  for (const it of built) {
+    const dz = it.entryZ == null ? 0 : Math.abs(it.entryZ - prevZ);
+    let want = u + Math.max(0.4, CLIMB * dz - 0.4) + it.before + rand() * 0.8;
+    let ok = false;
+    for (let guard = 0; guard < 8 && !ok; guard++) {
+      const leg = LEGS.find((l) => want >= l.u0 && want < l.u1);
+      if (!leg) return null;
+      if (leg.kind === "straight" && (!it.sideOnly || leg.hx === 0) && want - it.before >= leg.u0 + 0.7 && want + it.after <= leg.u1 - 0.7) {
+        const room = Math.abs(leg.hx) ? HALL.l - 2.4 : HALL.w - 1.8;
+        if (it.inward > room) return null;
+        if (leg.i === LEGS.length - 1 && want + it.after > leg.u1 - 1.6) return null;
+        ok = true;
+        if (it.railSnap && leg.hx) {
+          const w = RAILS.map((r) => leg.u0 + (r - leg.ax) / leg.hx).filter((v) => v >= want && v - it.before >= leg.u0 + 0.7 && v + it.after <= leg.u1 - 0.7).sort((a, b) => a - b)[0];
+          if (w != null) want = w;
+          else {
+            ok = false;
+            const next = LEGS.find((l) => l.kind === "straight" && l.u0 > leg.u0);
+            if (!next) return null;
+            want = next.u0 + 0.7 + it.before;
+          }
+        }
+      } else {
+        const next = LEGS.find((l) => l.kind === "straight" && l.u0 > want - (leg ? 0 : 0) && l !== leg && l.u0 >= (leg ? leg.u0 : 0));
+        if (!next) return null;
+        want = next.u0 + 0.7 + it.before;
+      }
+    }
+    if (!ok) return null;
+    placed.push({ ...it, u: want });
+    u = want + it.after;
+    if (it.exitZ != null) prevZ = it.exitZ;
+  }
+  if (u > PER - 1.6) return null;
+  const AL = { full: [], mid: [], easy: [] };
+  const all = (a) => {
+    for (const k in AL) AL[k].push({ ...a });
+  };
+  all({ x: TIMING.x, y: TIMING.y - 0.45, z: GATE_Z, zone: "T" });
+  all({ x: TIMING.x, y: TIMING.y, z: GATE_Z, pass: { piece: 0, k: 0 }, zone: "T" });
+  all({ x: TIMING.x, y: TIMING.y + 0.45, z: GATE_Z, zone: "T" });
+  const pieces = [{ type: "timing", x: TIMING.x, y: TIMING.y, z: GATE_Z, level: 0, passes: [], trick: "once" }];
+  const flagsOut = [];
+  const busy = placed.map((p) => [p.u - p.before - 1.3, p.u + p.after + 1.3]);
+  const freeAt = (uu) => !busy.some(([a, b]) => uu > a && uu < b) && uu > 0.8 && uu < PER - 0.8;
+  let pi = 0;
+  for (let uu = 0.8; uu < PER - 0.8; uu += 0.2) {
+    if (pi < placed.length && uu >= placed[pi].u - placed[pi].before - 0.3) {
+      const p = placed[pi], B2 = basePoint(p.u), nx = -B2.hy, ny = B2.hx;
+      const railL = (k) => RAILS.map((x) => Math.abs(x - B2.x)).sort((p2, q) => p2 - q)[k];
+      const map = (a) => {
+        const l = a.railK != null && !(a.hangRail && B2.hx) ? railL(a.railK) + (a.dl || 0) : a.l || 0;
+        return { x: B2.x + a.f * B2.hx + l * nx, y: B2.y + a.f * B2.hy + l * ny };
+      };
+      const base = pieces.length;
+      for (const pc of p.pieces || []) {
+        const c = map(pc.at);
+        pieces.push({ ...pc, x: c.x, y: c.y, passes: [], level: pc.stages ? pc.stages[0] : 0 });
+      }
+      if (p.flag) {
+        const c = map(p.flag);
+        flagsOut.push({ type: "flag", x: c.x, y: c.y, z: 0, passes: [], trick: "around" });
+      }
+      for (const k in AL) {
+        const v = k === "full" ? p.anchors : p.levels && p.levels[k] !== void 0 ? p.levels[k] : k === "easy" && p.levels && p.levels.mid ? p.anchors : p.anchors;
+        if (v === "skip") {
+          for (let w = p.u - p.before + 0.4; w <= p.u + p.after - 0.4; w += 1.2) {
+            const B22 = basePoint(w);
+            AL[k].push({ x: B22.x, y: B22.y, z: null });
+          }
+          continue;
+        }
+        for (const a of v) {
+          const q = { ...map(a), z: a.z, zone: a.zone, round: a.round, pass: a.pass ? { piece: base + a.pass.local, info: a.pass } : null };
+          if (a.pass && a.pass.dir && a.pass.dir.f != null) q.hx = a.pass.dir.f * B2.hx + a.pass.dir.l * nx, q.hy = a.pass.dir.f * B2.hy + a.pass.dir.l * ny;
+          AL[k].push(q);
+        }
+      }
+      uu = p.u + p.after + 0.3;
+      pi++;
+      continue;
+    }
+    const B = basePoint(uu);
+    const stepOk = B.leg.kind === "corner" ? Math.abs((uu - B.leg.u0) % 0.6) < 0.11 : Math.abs((uu - B.leg.u0) % 1.6) < 0.11;
+    if (stepOk && freeAt(uu)) all({ x: B.x, y: B.y, z: null });
+  }
+  for (const f of flagsOut) pieces.push(f);
+  return finish(seed, opts, st, AL, pieces);
+}
+var TAU = 2 * Math.PI;
+var M2 = (a) => (a % TAU + TAU) % TAU;
+function dubinsBest(q0, q1, r) {
+  const dx = q1.x - q0.x, dy = q1.y - q0.y, d = Math.hypot(dx, dy) / r, th = Math.atan2(dy, dx);
+  const a = M2(q0.h - th), b = M2(q1.h - th), sa = Math.sin(a), sb = Math.sin(b), ca = Math.cos(a), cb = Math.cos(b), cab = Math.cos(a - b);
+  const W = [];
+  let p2 = 2 + d * d - 2 * cab + 2 * d * (sa - sb);
+  if (p2 >= 0) {
+    const t1 = Math.atan2(cb - ca, d + sa - sb);
+    W.push(["LSL", M2(-a + t1), Math.sqrt(p2), M2(b - t1)]);
+  }
+  p2 = 2 + d * d - 2 * cab + 2 * d * (sb - sa);
+  if (p2 >= 0) {
+    const t1 = Math.atan2(ca - cb, d - sa + sb);
+    W.push(["RSR", M2(a - t1), Math.sqrt(p2), M2(-b + t1)]);
+  }
+  p2 = -2 + d * d + 2 * cab + 2 * d * (sa + sb);
+  if (p2 >= 0) {
+    const p = Math.sqrt(p2), t2 = Math.atan2(-ca - cb, d + sa + sb) - Math.atan2(-2, p);
+    W.push(["LSR", M2(-a + t2), p, M2(-b + t2)]);
+  }
+  p2 = d * d - 2 + 2 * cab - 2 * d * (sa + sb);
+  if (p2 >= 0) {
+    const p = Math.sqrt(p2), t2 = Math.atan2(ca + cb, d - sa - sb) - Math.atan2(2, p);
+    W.push(["RSL", M2(a - t2), p, M2(b - t2)]);
+  }
+  let tmp = (6 - d * d + 2 * cab + 2 * d * (sa - sb)) / 8;
+  if (Math.abs(tmp) <= 1) {
+    const p = M2(TAU - Math.acos(tmp)), t = M2(a - Math.atan2(ca - cb, d - sa + sb) + p / 2);
+    W.push(["RLR", t, p, M2(a - b - t + p)]);
+  }
+  tmp = (6 - d * d + 2 * cab + 2 * d * (sb - sa)) / 8;
+  if (Math.abs(tmp) <= 1) {
+    const p = M2(TAU - Math.acos(tmp)), t = M2(-a + Math.atan2(-ca + cb, d + sa - sb) + p / 2);
+    W.push(["LRL", t, p, M2(b - a - t + p)]);
+  }
+  let best = null;
+  for (const w of W) {
+    const L = (w[1] + w[2] + w[3]) * r;
+    if (!best || L < best.len) best = { word: w[0], segs: [w[1] * r, w[2] * r, w[3] * r], len: L, r };
+  }
+  return best;
+}
+function walk(q, kind, len, r, out) {
+  const n = Math.max(1, Math.ceil(len / STEP));
+  for (let i = 1; i <= n; i++) {
+    const s = len * i / n;
+    let x, y, h;
+    if (kind === "S") {
+      x = q.x + s * Math.cos(q.h);
+      y = q.y + s * Math.sin(q.h);
+      h = q.h;
+    } else if (kind === "L") {
+      h = q.h + s / r;
+      x = q.x + r * (Math.sin(h) - Math.sin(q.h));
+      y = q.y - r * (Math.cos(h) - Math.cos(q.h));
+    } else {
+      h = q.h - s / r;
+      x = q.x - r * (Math.sin(h) - Math.sin(q.h));
+      y = q.y + r * (Math.cos(h) - Math.cos(q.h));
+    }
+    out.push({ x, y, h });
+  }
+  return out.length ? { ...out[out.length - 1] } : q;
+}
+function dubinsPts(q0, q1, r, out) {
+  const b = dubinsBest(q0, q1, r);
+  let q = { ...q0 };
+  for (let i = 0; i < 3; i++) if (b.segs[i] > 1e-6) q = walk(q, b.word[i], b.segs[i], r, out);
+  return b.len;
+}
+var PRE = 0.3;
+function buildLine(anchors, nPieces, st) {
+  const m = anchors.length, passes = Array.from({ length: nPieces }, () => []);
+  const keys = [];
+  anchors.forEach((a, i) => {
+    if (!a.pass && !a.round) return;
+    let hx = a.hx, hy = a.hy;
+    if (hx == null) {
+      const p = anchors[(i - 1 + m) % m], n2 = anchors[(i + 1) % m];
+      hx = n2.x - p.x;
+      hy = n2.y - p.y;
+    }
+    keys.push({ ...a, h: Math.atan2(hy, hx) });
+  });
+  const pts = [], tags = [];
+  let cur = null;
+  const add = (arr, zone) => {
+    for (const p of arr) {
+      p.zone = zone;
+      pts.push(p);
+    }
+  };
+  const zoneOf = (a, b) => a && b && a.zone && a.zone === b.zone ? a.zone : null;
+  const entry = (k) => ({ x: k.x - PRE * Math.cos(k.h), y: k.y - PRE * Math.sin(k.h), h: k.h });
+  const k0 = keys[0];
+  cur = { x: k0.x, y: k0.y, h: k0.h };
+  pts.push({ ...cur, zone: k0.zone });
+  tags.push({ i: 0, z: k0.z, pass: k0.pass });
+  {
+    const o = [];
+    cur = walk(cur, "S", PRE, 1, o);
+    add(o, k0.zone);
+  }
+  for (let j = 1; j <= keys.length; j++) {
+    const k = keys[j % keys.length], prev = keys[j - 1];
+    if (k.round) {
+      const nk = keys[(j + 1) % keys.length], B = entry(nk), r = k.round.r;
+      let best = null;
+      for (const dir of [1, -1]) for (let ai = 0; ai < 24; ai++) {
+        const ain = ai / 24 * TAU, Pin = { x: k.x + r * Math.cos(ain), y: k.y + r * Math.sin(ain), h: ain + dir * Math.PI / 2 };
+        const l1 = dubinsBest(cur, Pin, st.turn).len;
+        if (best && l1 > best.len) continue;
+        for (let sw = 4; sw <= 9; sw++) {
+          const sweep = sw / 12 * TAU, aout = ain + dir * sweep;
+          const Pout = { x: k.x + r * Math.cos(aout), y: k.y + r * Math.sin(aout), h: aout + dir * Math.PI / 2 };
+          const L = l1 + sweep * r + dubinsBest(Pout, B, st.turn).len;
+          if (!best || L < best.len) best = { len: L, Pin, sweep, dir };
+        }
+      }
+      const o2 = [];
+      dubinsPts(cur, best.Pin, st.turn, o2);
+      tags.push({ i: pts.length + o2.length - 1, z: null });
+      cur = walk(best.Pin, best.dir > 0 ? "L" : "R", best.sweep * r, r, o2);
+      add(o2, k.zone);
+      continue;
+    }
+    const o = [];
+    if (prev.pass && prev.pass.info && prev.pass.info.orbit && !prev.round) {
+      cur = walk({ x: prev.x, y: prev.y, h: prev.h }, "L", TAU * prev.pass.info.orbit, prev.pass.info.orbit, o);
+      pts.splice(pts.length - Math.round(PRE / STEP));
+      add(o, prev.zone);
+    } else {
+      dubinsPts(cur, entry(k), st.turn, o);
+      cur = entry(k);
+      const z0 = zoneOf(prev, k), nn = o.length, near = Math.round(1.2 / STEP);
+      o.forEach((p, i) => {
+        p.zone = i < near && prev.zone && prev.zone !== "T" ? prev.zone : nn - i <= near && k.zone && k.zone !== "T" ? k.zone : z0;
+        pts.push(p);
+      });
+      const s1 = [];
+      cur = walk(cur, "S", PRE, 1, s1);
+      add(s1, k.zone);
+    }
+    if (j === keys.length) break;
+    tags.push({ i: pts.length - 1, z: k.z, pass: k.pass });
+    const s2 = [];
+    cur = walk(cur, "S", PRE, 1, s2);
+    add(s2, k.zone);
+  }
+  const n = pts.length;
+  let s = 0;
+  pts.forEach((p, i) => {
+    if (i) s += Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y);
+    p.s2 = s;
+  });
+  const len2 = s + Math.hypot(pts[0].x - pts[n - 1].x, pts[0].y - pts[n - 1].y);
+  const zt = tags.filter((t) => t.z != null);
+  for (let a = 0; a < zt.length; a++) {
+    const A = zt[a], Bt = zt[(a + 1) % zt.length];
+    const sA = pts[A.i].s2, sB = Bt.i > A.i || a < zt.length - 1 ? pts[Bt.i].s2 : len2;
+    const span = sB - sA || 1;
+    for (let i = A.i; i !== (a === zt.length - 1 ? n : Bt.i); i++) {
+      if (i >= n) break;
+      const f = (pts[i].s2 - sA) / span;
+      pts[i].z = A.z + (Bt.z - A.z) * f;
+    }
+  }
+  s = 0;
+  pts.forEach((p, i) => {
+    if (i) s += Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y, p.z - pts[i - 1].z);
+    p.s = s;
+  });
+  const length = s + Math.hypot(pts[0].x - pts[n - 1].x, pts[0].y - pts[n - 1].y, pts[0].z - pts[n - 1].z);
+  for (const t of tags) if (t.pass) {
+    const p = pts[t.i];
+    passes[t.pass.piece].push({ s: p.s, x: p.x, y: p.y, z: p.z, dx: Math.cos(p.h), dy: Math.sin(p.h), info: t.pass.info });
+  }
+  return { line: { pts, length }, passes };
+}
+function finish(seed, opts, st, AL, pieces) {
+  const levels = {};
+  const lifts = pieces.map((pc) => liftOf(pc));
+  for (const k of ["full", "easy"]) {
+    const b = buildLine(AL[k].map((q) => q.pass && lifts[q.pass.piece] && q.z != null ? { ...q, z: q.z + lifts[q.pass.piece] } : q), pieces.length, st);
+    for (const p of b.line.pts) if (p.z != null) {
+      const f = floorAt(p.x, p.y);
+      if (f && p.z < f + 0.25) p.z = f + 0.25;
+    }
+    const pcs = pieces.map((pc, i) => ({ ...pc, passes: b.passes[i] }));
+    for (const pc of pcs) if (pc.passes.length) {
+      pc.dx = pc.passes[0].dx;
+      pc.dy = pc.passes[0].dy;
+    }
+    const facts = check(pcs, b.line, st);
+    if (!facts) return null;
+    levels[k] = { line: b.line, facts, passes: b.passes };
+  }
+  const full = levels.full;
+  pieces.forEach((pc, i) => {
+    pc.passes = full.passes[i];
+  });
+  for (const pc of pieces) if (pc.passes.length) {
+    pc.dx = pc.passes[0].dx;
+    pc.dy = pc.passes[0].dy;
+  } else {
+    pc.dx = 0;
+    pc.dy = 1;
+  }
+  pieces[0].dx = 0;
+  pieces[0].dy = 1;
+  const passes = pieces.map((pc) => ({ x: pc.x, y: pc.y, z: pc.z, dx: pc.dx, dy: pc.dy }));
+  return { seed, opts: { ...opts }, pieces, passes, line: full.line, facts: full.facts, levels, score: score(full.facts, pieces, full.line, st), al: AL };
+}
+function check(pieces, line, st) {
+  const { pts, length } = line, n = pts.length;
+  for (const p of pts) if (p.x < MARGIN || p.x > HALL.w - MARGIN || p.y < MARGIN || p.y > HALL.l - MARGIN || p.z < 0.15 || p.z > HALL.h - 0.2) return null;
+  const rmin = Math.min(st.turn, st.orbit, st.pole);
+  let turn = 0;
+  for (let i = 0; i < n; i += 3) {
+    const a = pts[i], b = pts[(i + 3) % n], c = pts[(i + 6) % n];
+    let d = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(b.y - a.y, b.x - a.x);
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    turn += Math.abs(d);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = pts[i], b = pts[(i + 1) % n], h = Math.hypot(b.x - a.x, b.y - a.y);
+    if (h > 1e-6 && Math.abs(b.z - a.z) / h > 1) return null;
+  }
+  for (const pc of pieces) if (onRail(pc.type)) {
+    if (!RAILS.some((x) => Math.abs(pc.x - x) < 0.06)) return null;
+    for (const ps2 of pc.passes) if (Math.min(Math.abs(ps2.dx), Math.abs(ps2.dy)) > Math.sin(12 * Math.PI / 180)) return null;
+  }
+  for (const pc of pieces) {
+    const t = TYPES[pc.type];
+    for (const p of pts) {
+      if (pc.passes.some((ps2) => {
+        let ds = Math.abs(p.s - ps2.s);
+        ds = Math.min(ds, length - ds);
+        return ds < 0.75;
+      })) continue;
+      if (p.z < t.zmin - 0.25 || p.z > t.zmax + 0.25) continue;
+      if (Math.hypot(p.x - pc.x, p.y - pc.y) < t.r) return null;
+    }
+  }
+  let crossings = 0;
+  for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) {
+    let gap = Math.abs(pts[i].s - pts[j].s);
+    gap = Math.min(gap, length - gap);
+    if (gap < 2) continue;
+    if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < 0.8) {
+      if (pts[i].zone && pts[i].zone[0] === "L" && pts[i].zone === pts[j].zone) continue;
+      return null;
+    }
+  }
+  return { rmin, turn, crossings: crossings ? 1 : 0, length };
+}
+function score(f, pieces, line, st) {
+  const [lo, hi] = st.lap, L = f.length;
+  let sc = -(L < lo ? (lo - L) * 1.5 : L > hi ? (L - hi) * 1.5 : 0);
+  const pts = line.pts;
+  const mid = pts.filter((p) => p.x > 3 && p.x < 7 && p.y > 4 && p.y < 22).length / pts.length;
+  sc += mid * 60;
+  const zs = pts.map((p) => p.z), zm = zs.reduce((a, b) => a + b, 0) / zs.length;
+  sc += Math.sqrt(zs.reduce((a, b) => a + (b - zm) ** 2, 0) / zs.length) * 8;
+  sc += pieces.filter((p) => p.trick === "loop").length * 8 + pieces.filter((p) => p.trick === "climb" || p.trick === "descend").length * 12;
+  return sc;
+}
+var clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function cleanEdits(edits, pieces) {
+  const out = {};
+  for (const [k, e] of Object.entries(edits || {})) {
+    const i = Number(k), pc = pieces[i];
+    if (!pc || pc.type === "timing" || !e) continue;
+    let dx = clampN(Number(e.dx) || 0, -HALL.w, HALL.w), dy = clampN(Number(e.dy) || 0, -HALL.l, HALL.l), rot = (Math.round(Number(e.rot) || 0) % 360 + 360) % 360;
+    dx = clampN(pc.x + dx, 0.3, HALL.w - 0.3) - pc.x;
+    dy = clampN(pc.y + dy, 0.3, HALL.l - 0.3) - pc.y;
+    if (onRail(pc.type)) {
+      dx = RAILS.reduce((b, x) => Math.abs(x - (pc.x + dx)) < Math.abs(b - (pc.x + dx)) ? x : b, RAILS[0]) - pc.x;
+      rot = Math.round(rot / 90) * 90 % 360;
+    }
+    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6 && !rot) continue;
+    out[i] = { dx: Math.round(dx * 100) / 100, dy: Math.round(dy * 100) / 100, rot };
+  }
+  return out;
+}
+var ADDABLE = ["gate", "cube", "ladder3", "ladder5", "ring", "flag"];
+var yawOfRot = (rot) => (90 - rot) * Math.PI / 180;
+var nearRail = (x) => RAILS.reduce((b, r) => Math.abs(r - x) < Math.abs(b - x) ? r : b, RAILS[0]);
+function cleanChanges(changes, base) {
+  const c = changes || {}, n = base.pieces.length;
+  const removed = [...new Set((Array.isArray(c.removed) ? c.removed : []).map(Number))].filter((i) => Number.isInteger(i) && i > 0 && i < n).sort((x, y) => x - y);
+  const have = {};
+  base.pieces.forEach((pc, i) => {
+    if (pc.type !== "timing" && !removed.includes(i)) have[pc.type] = (have[pc.type] || 0) + 1;
+  });
+  const added = [];
+  for (const a of (Array.isArray(c.added) ? c.added : []).slice(0, 20)) {
+    if (!a || !ADDABLE.includes(a.type) || (have[a.type] || 0) >= (KIT_MAX2[a.type] || 0)) continue;
+    have[a.type] = (have[a.type] || 0) + 1;
+    let x = clampN(Number(a.x) || HALL.w / 2, 0.3, HALL.w - 0.3), rot = (Math.round(Number(a.rot) || 0) % 360 + 360) % 360;
+    const y = clampN(Number(a.y) || HALL.l / 2, 0.3, HALL.l - 0.3);
+    if (onRail(a.type)) {
+      x = nearRail(x);
+      rot = Math.round(rot / 90) * 90 % 360;
+    }
+    added.push({ type: a.type, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, rot });
+  }
+  const ladders = {};
+  const typeOf = (key) => key[0] === "a" ? added[Number(key.slice(1))]?.type : removed.includes(Number(key)) ? null : base.pieces[Number(key)]?.type;
+  for (const [key, l] of Object.entries(c.ladders || {})) {
+    const t = /^(\d{1,2}|a\d{1,2})$/.test(key) ? typeOf(key) : null;
+    if (!t || !t.startsWith("ladder") || !l) continue;
+    const levels = TYPES[t].levels.length, mode = ["up", "down", "once"].includes(l.mode) ? l.mode : "once";
+    ladders[key] = { mode, n: clampN(Math.round(Number(l.n) || levels), 2, levels), at: clampN(Math.round(Number(l.at) || 0), 0, levels - 1) };
+  }
+  const order = {};
+  for (const [key, v] of Object.entries(c.order || {})) {
+    const t = /^(\d{1,2}|a\d{1,2})$/.test(key) && key !== "0" ? typeOf(key) : null, n2 = Math.round(Number(v));
+    if (t && Number.isInteger(n2) && n2 >= 2 && n2 <= 99) order[key] = n2;
+  }
+  return { removed, added, ladders, order };
+}
+var ladderStages = (l, levels) => l.mode === "up" ? Array.from({ length: l.n }, (_, i) => i) : l.mode === "down" ? Array.from({ length: l.n }, (_, i) => l.n - 1 - i) : [Math.min(l.at, levels - 1)];
+function relayout(base, edits, changes) {
+  edits = cleanEdits(edits, base.pieces);
+  const ch = cleanChanges(changes, base);
+  const changed = ch.removed.length || ch.added.length || Object.keys(ch.ladders).length || Object.keys(ch.order).length;
+  if (!Object.keys(edits).length && !changed && !base.pieces.some((pc) => liftOf(pc) > 5e-3)) return { ...base, pieces: base.pieces.map((pc, i) => ({ ...pc, key: String(i) })), edits, changes: ch, issues: issuesOf(base) };
+  const st = STYLE[base.opts.style];
+  const all = base.pieces.map((pc, i) => ({ ...pc, key: String(i) }));
+  const moves = /* @__PURE__ */ new Map();
+  for (const [k, e] of Object.entries(edits)) {
+    const i = Number(k), pc = all[i], a = -e.rot * Math.PI / 180;
+    moves.set(i, { cx: pc.x, cy: pc.y, nx: pc.x + e.dx, ny: pc.y + e.dy, c: Math.cos(a), s: Math.sin(a) });
+    pc.x += e.dx;
+    pc.y += e.dy;
+  }
+  ch.added.forEach((a, k) => {
+    const yaw = yawOfRot(a.rot), z = a.type === "ring" ? RING_Z : a.type === "cube" ? 0.35 : a.type === "flag" ? 0 : GATE_Z;
+    all.push({ type: a.type, x: a.x, y: a.y, z, trick: "once", key: "a" + k, added: true, dx: Math.cos(yaw), dy: Math.sin(yaw), passes: [] });
+  });
+  const removed = new Set(ch.removed);
+  const flagAt = /* @__PURE__ */ new Map();
+  base.pieces.forEach((pc, i) => {
+    if (pc.type === "flag") flagAt.set(pc.x.toFixed(4) + "," + pc.y.toFixed(4), i);
+  });
+  const ladderOf = (i) => ch.ladders[all[i].key];
+  const ladderKeys = (i, tmpl, level) => {
+    const pc = all[i], lv = TYPES[pc.type].levels, l = ladderOf(i) || { mode: "once", n: 1, at: 0 };
+    const sts = level === "easy" ? [0] : ladderStages(l, lv.length);
+    return sts.map((sIdx, j) => ({
+      x: tmpl.x,
+      y: tmpl.y,
+      z: lv[sIdx],
+      hx: tmpl.hx,
+      hy: tmpl.hy,
+      zone: tmpl.zone || "L" + pc.key,
+      pass: { piece: i, info: { local: 0, stage: sIdx, dir: { f: 1, l: 0 }, orbit: j < sts.length - 1 ? st.orbit : 0 } }
+    }));
+  };
+  const levels = {};
+  for (const k of ["full", "easy"]) {
+    const src = base.al[k], m = src.length;
+    let A = [];
+    const done = /* @__PURE__ */ new Set();
+    src.forEach((a, i) => {
+      const q = { ...a };
+      if (q.pass && q.hx == null) {
+        const p = src[(i - 1 + m) % m], n = src[(i + 1) % m];
+        q.hx = n.x - p.x;
+        q.hy = n.y - p.y;
+      }
+      const who = q.pass ? q.pass.piece : q.round ? flagAt.get(q.x.toFixed(4) + "," + q.y.toFixed(4)) : void 0;
+      if (who != null && removed.has(who)) return;
+      const mv = who != null ? moves.get(who) : null;
+      if (mv) {
+        const dx = q.x - mv.cx, dy = q.y - mv.cy;
+        q.x = mv.nx + dx * mv.c - dy * mv.s;
+        q.y = mv.ny + dx * mv.s + dy * mv.c;
+        if (q.hx != null) {
+          const hx = q.hx * mv.c - q.hy * mv.s, hy = q.hx * mv.s + q.hy * mv.c;
+          q.hx = hx;
+          q.hy = hy;
+        }
+      }
+      if (who != null) q.who = who;
+      if (q.pass && ladderOf(who) && all[who].type.startsWith("ladder")) {
+        if (done.has(who)) return;
+        done.add(who);
+        A.push(...ladderKeys(who, q, k).map((x) => ({ ...x, who })));
+        return;
+      }
+      A.push(q);
+    });
+    A = resequence(A, moves, removed);
+    for (let i = base.pieces.length; i < all.length; i++) {
+      const pc = all[i];
+      if (k === "easy" && pc.type === "ring") continue;
+      let best = null;
+      for (let g = 1; g <= A.length; g++) {
+        const P = A[g - 1], Q = A[g % A.length];
+        if (P.zone && P.zone === Q.zone) continue;
+        const cost = Math.hypot(pc.x - P.x, pc.y - P.y) + Math.hypot(Q.x - pc.x, Q.y - pc.y) - Math.hypot(Q.x - P.x, Q.y - P.y);
+        if (!best || cost < best.cost) best = { cost, at: g, P, Q };
+      }
+      if (!best) continue;
+      let hx = pc.dx, hy = pc.dy;
+      if (hx * (best.Q.x - best.P.x) + hy * (best.Q.y - best.P.y) < 0) {
+        hx = -hx;
+        hy = -hy;
+      }
+      const zone = "U" + pc.key;
+      const ins = pc.type === "flag" ? [{ x: pc.x, y: pc.y, z: null, round: { r: st.pole }, zone }] : pc.type.startsWith("ladder") ? ladderKeys(i, { x: pc.x, y: pc.y, hx, hy, zone: "L" + pc.key }, k) : [{ x: pc.x, y: pc.y, z: pc.z, hx, hy, zone, pass: { piece: i, info: { local: 0 } } }];
+      A.splice(best.at, 0, ...ins.map((q) => ({ ...q, who: i })));
+    }
+    A = placeInOrder(A, ch.order, all);
+    const lifts = all.map((pc) => liftOf(pc));
+    A = A.map((q) => q.who != null && lifts[q.who] && q.z != null ? { ...q, z: q.z + lifts[q.who] } : q);
+    const b = buildLine(A, all.length, st);
+    levels[k] = { line: b.line, allPasses: b.passes, facts: { length: b.line.length, rmin: Math.min(st.turn, st.orbit, st.pole) } };
+  }
+  const firstS = (i) => {
+    const p = levels.full.allPasses[i];
+    return p && p.length ? Math.min(...p.map((x) => x.s)) : Infinity;
+  };
+  const keep = all.map((_, i) => i).filter((i) => !removed.has(i)).sort((a, b) => a === 0 ? -1 : b === 0 ? 1 : firstS(a) - firstS(b) || a - b);
+  for (const k in levels) {
+    levels[k].passes = keep.map((i) => levels[k].allPasses[i]);
+    delete levels[k].allPasses;
+  }
+  const pieces = keep.map((i, v) => {
+    const pc = { ...all[i], passes: levels.full.passes[v], lift: liftOf(all[i]) };
+    if (pc.passes.length) {
+      pc.dx = pc.passes[0].dx;
+      pc.dy = pc.passes[0].dy;
+    } else if (moves.has(i)) {
+      const mv = moves.get(i), dx = pc.dx * mv.c - pc.dy * mv.s, dy = pc.dx * mv.s + pc.dy * mv.c;
+      pc.dx = dx;
+      pc.dy = dy;
+    }
+    if (pc.type.startsWith("ladder")) {
+      const sts = pc.passes.map((p) => p.info.stage);
+      pc.stages = sts.length ? sts : pc.stages;
+      pc.level = sts[0] ?? 0;
+      pc.trick = sts.length > 1 ? sts[1] > sts[0] ? "climb" : "descend" : "once";
+    }
+    return pc;
+  });
+  for (const k in levels) for (const p of levels[k].line.pts) if (p.z != null) {
+    const f = floorAt(p.x, p.y);
+    if (f && p.z < f + 0.25) p.z = f + 0.25;
+  }
+  pieces[0].dx = 0;
+  pieces[0].dy = 1;
+  const tr = { ...base, pieces, passes: pieces.map((pc) => ({ x: pc.x, y: pc.y, z: pc.z, dx: pc.dx, dy: pc.dy })), line: levels.full.line, facts: levels.full.facts, levels, edits, changes: ch };
+  tr.issues = issuesOf(tr);
+  return tr;
+}
+function resequence(A, moves, removed) {
+  const d = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+  for (const who of moves.keys()) {
+    if (who === 0 || removed.has(who)) continue;
+    const at = A.findIndex((a) => a.who === who);
+    if (at < 0) continue;
+    const z = A[at].zone;
+    let s = at, e = at;
+    if (z) {
+      while (s > 0 && A[s - 1].zone === z) s--;
+      while (e < A.length - 1 && A[e + 1].zone === z) e++;
+    } else while (e < A.length - 1 && A[e + 1].who === who) e++;
+    const grp = A.slice(s, e + 1);
+    if (grp.some((a) => a.who != null && a.who !== who)) continue;
+    if (A.slice(e + 1).some((a) => a.who === who)) continue;
+    const rest = A.slice(0, s).concat(A.slice(e + 1)), n = rest.length;
+    const flips = grp.length === 1 && grp[0].pass ? [false, true] : [false];
+    const cost = (g, flip) => {
+      const P = rest[(g - 1 + n) % n], Q = rest[g % n];
+      if (P.zone && P.zone === Q.zone) return Infinity;
+      const F = flip ? grp[grp.length - 1] : grp[0], L = flip ? grp[0] : grp[grp.length - 1];
+      let c = d(P, F) + d(L, Q) - d(P, Q);
+      const g0 = grp[0];
+      if (g0.hx != null && grp.length === 1) {
+        const sgn = flip ? -1 : 1, h = Math.hypot(g0.hx, g0.hy) || 1;
+        if (sgn * (g0.hx * (Q.x - P.x) + g0.hy * (Q.y - P.y)) / h < 0) c += 50;
+      }
+      return c;
+    };
+    const cur = cost(s, false);
+    let best = { c: cur, g: s, flip: false };
+    for (let g = 1; g <= n; g++) for (const f of flips) {
+      const c = cost(g, f);
+      if (c < best.c - 0.3) best = { c, g, flip: f };
+    }
+    if (best.g === s && !best.flip) continue;
+    const ins = best.flip ? [{ ...grp[0], hx: -grp[0].hx, hy: -grp[0].hy }] : grp;
+    A = rest.slice(0, best.g).concat(ins, rest.slice(best.g));
+  }
+  return A;
+}
+function placeInOrder(A, order, all) {
+  const want = Object.entries(order || {}).map(([key, n]) => ({ who: all.findIndex((pc) => pc.key === key), n })).filter((o) => o.who > 0).sort((a, b) => a.n - b.n);
+  for (const { who, n } of want) {
+    const units = [];
+    A.forEach((q, j) => {
+      const id = q.zone ? "z" + q.zone : q.who != null ? "w" + q.who : null;
+      if (!id) return;
+      const u = units[units.length - 1];
+      if (u && u.id === id && u.end === j - 1) {
+        u.end = j;
+        if (q.who != null) u.whos.add(q.who);
+      } else units.push({ id, start: j, end: j, whos: new Set(q.who != null ? [q.who] : []) });
+    });
+    const flown = units.filter((u) => u.whos.size);
+    const mine = flown.find((u) => u.whos.has(who));
+    if (!mine || mine.whos.size > 1 || mine.whos.has(0)) continue;
+    const others = flown.filter((u) => u !== mine);
+    const target = others[Math.min(n - 1, others.length)];
+    const seg = A.slice(mine.start, mine.end + 1), rest = A.slice(0, mine.start).concat(A.slice(mine.end + 1));
+    let at;
+    if (!target) at = rest.length;
+    else at = target.start > mine.end ? target.start - seg.length : target.start;
+    if (n - 1 >= others.length) {
+      const last = others[others.length - 1];
+      at = (last.end > mine.end ? last.end - seg.length : last.end) + 1;
+    }
+    A = rest.slice(0, at).concat(seg, rest.slice(at));
+  }
+  return A;
+}
+function rebuild(saved2) {
+  if (!saved2 || !Number.isFinite(saved2.seed) || !saved2.opts || !STYLE[saved2.opts.style]) return null;
+  const base = makeTrack(saved2.seed >>> 0, saved2.opts);
+  return base ? relayout(base, saved2.edits, { removed: saved2.removed, added: saved2.added, ladders: saved2.ladders, order: saved2.order }) : null;
+}
+function issuesOf(tr) {
+  const out = [], seen = /* @__PURE__ */ new Set();
+  const say = (key, text2, x, y, level) => {
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ text: text2, x, y, level });
+  };
+  for (const level of ["full", "easy"]) {
+    const L = tr.levels[level];
+    if (!L) continue;
+    const { pts, length } = L.line, n = pts.length, P = tr.pieces.map((pc, i) => ({ ...pc, passes: L.passes[i] }));
+    for (const p of pts) {
+      if (p.x < MARGIN || p.x > HALL.w - MARGIN || p.y < MARGIN || p.y > HALL.l - MARGIN) say("wall" + level, "The line comes closer than 40 cm to a wall.", p.x, p.y, level);
+      if (p.z > HALL.h - 0.2) say("ceil" + level, "The line goes too close to the ceiling.", p.x, p.y, level);
+    }
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % n], h = Math.hypot(b.x - a.x, b.y - a.y);
+      if (h > 1e-6 && Math.abs(b.z - a.z) / h > 1) {
+        say("climb" + level, "A climb or dive is steeper than 45\xB0: move the pieces further apart.", a.x, a.y, level);
+        break;
+      }
+    }
+    P.forEach((pc, k) => {
+      const t = TYPES[pc.type];
+      for (const p of pts) {
+        if (pc.passes.some((ps2) => {
+          let ds = Math.abs(p.s - ps2.s);
+          ds = Math.min(ds, length - ds);
+          return ds < 0.75;
+        })) continue;
+        if (p.z < t.zmin - 0.25 || p.z > t.zmax + 0.25) continue;
+        if (Math.hypot(p.x - pc.x, p.y - pc.y) < t.r) {
+          say("clip" + k, `The line hits piece ${k + 1} (${t.label}).`, pc.x, pc.y, level);
+          break;
+        }
+      }
+    });
+    let crosses = 0;
+    for (let i = 0; i < n && crosses < 3; i += 2) for (let j = i + 2; j < n; j += 2) {
+      let gap = Math.abs(pts[i].s - pts[j].s);
+      gap = Math.min(gap, length - gap);
+      if (gap < 2) continue;
+      if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < 0.8) {
+        if (pts[i].zone && pts[i].zone[0] === "L" && pts[i].zone === pts[j].zone) continue;
+        const key = "x" + Math.round(pts[i].x) + "," + Math.round(pts[i].y);
+        if (!seen.has(key)) {
+          crosses++;
+          say(key, `The line crosses or runs close by itself (${(HALL.w - pts[i].x).toFixed(1)} m from the right wall, ${pts[i].y.toFixed(1)} m up).`, pts[i].x, pts[i].y, level);
+        }
+        break;
+      }
+    }
+  }
+  return out;
+}
+var r6 = (v) => Math.round(v * 1e6) / 1e6;
+function hash8(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+function toWebFPV(tr, level = "full", now = /* @__PURE__ */ new Date()) {
+  const L = tr.levels[level];
+  const elements = [], sequence = [], pieceEls = /* @__PURE__ */ new Map();
+  let ne = 0, nq = 0;
+  const el = (type, x, y, yaw, dims, extra = {}) => {
+    const e = { id: `el-${++ne}`, type, name: "", position: { x: r6(x), y: r6(y), z: 0 }, yaw: r6(Math.atan2(Math.sin(yaw), Math.cos(yaw))), pitch: 0, yawOverridden: true, dims, ...extra };
+    elements.push(e);
+    return e;
+  };
+  const yawOf = (pc) => Math.atan2(pc.dy, pc.dx);
+  tr.pieces.forEach((pc, i) => {
+    const yaw = yawOf(pc);
+    if (pc.type === "gate") pieceEls.set(i, { el: el("gate", pc.x, pc.y, yaw, { levels: 1, sillH: r6(SILL + (pc.lift || 0)), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }), yaw });
+    else if (pc.type === "timing") pieceEls.set(i, { el: el("flaggedGate", pc.x, pc.y, yaw, { levels: 1, sillH: SILL, clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE, flagH: 0.5 }, { name: "Timing gate", flagSide: "both" }), yaw });
+    else if (pc.type.startsWith("ladder")) pieceEls.set(i, { el: el("ladder", pc.x, pc.y, yaw, { levels: pc.type === "ladder3" ? 3 : 5, sillH: r6(TYPES[pc.type].levels[0] - LADDER[pc.type].h / 2), clearW: r6(LADDER[pc.type].w), clearH: r6(LADDER[pc.type].h), levelPitch: r6(LADDER[pc.type].pitch) }, { name: TYPES[pc.type].label }), yaw });
+    else if (pc.type === "ring") pieceEls.set(i, { el: el("hoop", pc.x, pc.y, yaw, { levels: 1, sillH: r6(pc.z - OPEN / 2), clearW: OPEN, clearH: OPEN, levelPitch: OPEN + PIPE }, { name: "Ring" }), yaw });
+    else if (pc.type === "flag") pieceEls.set(i, { el: el("flag", pc.x, pc.y, 0, { height: 1.9, poleRadius: 0.012, clearance: 0.45 }, { name: "Flag" }) });
+    else if (pc.type === "cube") {
+      const c = Math.cos(yaw), s = Math.sin(yaw), h = 0.35, e = 0.7 - PIPE, group = `grp-${i + 1}`;
+      const dims = { levels: 1, sillH: 0, clearW: e, clearH: e, levelPitch: e + PIPE };
+      const back = el("gate", pc.x - h * c, pc.y - h * s, yaw, dims, { group, name: "Cube" });
+      const front = el("gate", pc.x + h * c, pc.y + h * s, yaw, dims, { group, name: "Cube" });
+      for (const k of [1, -1]) el("gate", pc.x - k * h * s, pc.y + k * h * c, yaw + Math.PI / 2, dims, { group, name: "Cube", unbuiltSides: ["left", "right"] });
+      pieceEls.set(i, { back, front, yaw });
+    }
+  });
+  const events = [];
+  tr.pieces.forEach((pc, i) => (L.passes[i] || []).forEach((ps2) => events.push({ s: ps2.s, i, ps: ps2 })));
+  const pts = L.line.pts;
+  tr.pieces.forEach((pc, i) => {
+    if (pc.type !== "flag") return;
+    let best = null;
+    pts.forEach((p, k) => {
+      const d = Math.hypot(p.x - pc.x, p.y - pc.y);
+      if (!best || d < best.d) best = { d, k };
+    });
+    if (best && best.d < 1.2) events.push({ s: pts[best.k].s, i, at: best.k, d: best.d });
+  });
+  events.sort((a, b) => a.s - b.s);
+  const t0 = events.findIndex((e) => tr.pieces[e.i].type === "timing");
+  const order = [...events.slice(Math.max(0, t0)), ...events.slice(0, Math.max(0, t0))];
+  let prev = null;
+  for (const ev of order) {
+    const pc = tr.pieces[ev.i], m = pieceEls.get(ev.i);
+    const q = (elementId, extra) => sequence.push({ id: `sq-${++nq}`, elementId, apertureIndex: null, entry: null, passSide: null, clearance: null, overridden: true, ...extra });
+    if (pc.type === "flag") {
+      const p = pts[ev.at], n = pts[(ev.at + 1) % pts.length];
+      const cross = (n.x - p.x) * (pc.y - p.y) - (n.y - p.y) * (pc.x - p.x);
+      q(m.el.id, { passSide: cross > 0 ? "right" : "left", clearance: r6(Math.max(0.2, ev.d)) });
+    } else {
+      const dir = Math.atan2(ev.ps.dy, ev.ps.dx), entry = Math.cos(dir - m.yaw) >= 0 ? 1 : -1;
+      if (pc.type === "cube") {
+        q(m.back.id, { apertureIndex: 0, entry });
+        q(m.front.id, { apertureIndex: 0, entry });
+      } else {
+        const stage = pc.type.startsWith("ladder") ? ev.ps.info?.stage ?? 0 : 0;
+        q(m.el.id, { apertureIndex: stage, entry, ...prev === ev.i && pc.type.startsWith("ladder") ? { wrap: "left" } : {} });
+      }
+    }
+    prev = ev.i;
+  }
+  elements.push({ id: `el-${++ne}`, type: "startPads", name: "", position: { x: START.x, y: START.y, z: 0 }, yaw: r6(Math.PI / 2), pitch: 0, yawOverridden: true, dims: { pads: 1, spacing: 0.5, padSize: 0.4 } });
+  const iso2 = now.toISOString().replace(/\.\d+Z$/, "Z");
+  const tag = code(tr.seed) + (level === "easy" ? " Beginner" : "");
+  return {
+    schemaVersion: 3,
+    id: "trk-" + hash8(tag + JSON.stringify(tr.edits || {})),
+    name: `HOBIzone hall \xB7 ${tag}`,
+    createdUtc: iso2,
+    modifiedUtc: iso2,
+    trackClass: "micro",
+    field: { width: HALL.w, depth: HALL.l, gridSize: 0.1 },
+    credit: { designer: "tgiFlyDay track generator", series: "HOBIzone", source: "tgiFlyDay", note: `HOBIzone whoop hall, ${HALL.w} \xD7 ${HALL.l} \xD7 ${HALL.h} m` },
+    elements,
+    sequence
+  };
+}
+async function webfpvPayload(tr, level = "full") {
+  const bytes = new TextEncoder().encode(JSON.stringify(toWebFPV(tr, level)));
+  const b64 = (u8) => {
+    let bin = "";
+    for (let i = 0; i < u8.length; i += 32768) bin += String.fromCharCode(...u8.subarray(i, i + 32768));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  if (typeof CompressionStream === "function") {
+    const z = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer());
+    return "z." + b64(z);
+  }
+  return "j." + b64(bytes);
+}
+
 // server/main.ts
 var IN_EXE = sea.isSea();
-var ROOT = IN_EXE ? (0, import_node_path8.dirname)(process.execPath) : (0, import_node_path8.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
+var ROOT = IN_EXE ? (0, import_node_path9.dirname)(process.execPath) : (0, import_node_path9.resolve)((0, import_node_url.fileURLToPath)(new URL("..", __tgiFlyDayUrl)));
 var APP_DIR = process.env.TGIFLYDAY_APP_DIR ?? process.env.FLYDAY_APP_DIR;
-var WEB = APP_DIR ? (0, import_node_path8.join)(APP_DIR, "web") : (0, import_node_path8.join)(ROOT, "web");
-var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs8.existsSync)((0, import_node_path8.join)(WEB, "console.html"));
+var WEB = APP_DIR ? (0, import_node_path9.join)(APP_DIR, "web") : (0, import_node_path9.join)(ROOT, "web");
+var WEB_FROM_DISK = !IN_EXE || !!APP_DIR || (0, import_node_fs9.existsSync)((0, import_node_path9.join)(WEB, "console.html"));
 async function webFile(full) {
   if (WEB_FROM_DISK) return (0, import_promises2.readFile)(full);
-  return Buffer.from(sea.getAsset("web/" + (0, import_node_path8.relative)(WEB, full).split(import_node_path8.sep).join("/")));
+  return Buffer.from(sea.getAsset("web/" + (0, import_node_path9.relative)(WEB, full).split(import_node_path9.sep).join("/")));
 }
-var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path8.join)(ROOT, "data", "flyday.json");
+var DATA_FILE = process.env.TGIFLYDAY_DATA ?? (0, import_node_path9.join)(ROOT, "data", "flyday.json");
 var PORT = Number(process.env.PORT ?? 8080);
-var PHOTOS = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "photos");
+var PHOTOS = (0, import_node_path9.join)((0, import_node_path9.resolve)(DATA_FILE, ".."), "photos");
 var photoFile = (id) => {
   if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw new EngineError("No such pilot.");
-  return (0, import_node_path8.join)(PHOTOS, `${id}.jpg`);
+  return (0, import_node_path9.join)(PHOTOS, `${id}.jpg`);
 };
-var KNOWN = (0, import_node_path8.join)(PHOTOS, "known");
-var knownFile = (callsign) => (0, import_node_path8.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
+var KNOWN = (0, import_node_path9.join)(PHOTOS, "known");
+var knownFile = (callsign) => (0, import_node_path9.join)(KNOWN, `${Buffer.from(callsign.trim().toLowerCase()).toString("base64url").slice(0, 160)}.jpg`);
 function rememberPhoto(id) {
   const p = engine.pilots.get(id);
   if (!p?.photo) return;
   try {
-    (0, import_node_fs8.mkdirSync)(KNOWN, { recursive: true });
-    (0, import_node_fs8.copyFileSync)(photoFile(id), knownFile(p.callsign));
+    (0, import_node_fs9.mkdirSync)(KNOWN, { recursive: true });
+    (0, import_node_fs9.copyFileSync)(photoFile(id), knownFile(p.callsign));
   } catch {
   }
 }
-var tracks = new TrackStore((0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "track.json"));
-var KNOWN_FILE = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "known.json");
+var tracks = new TrackStore((0, import_node_path9.join)((0, import_node_path9.resolve)(DATA_FILE, ".."), "track.json"));
+var KNOWN_FILE = (0, import_node_path9.join)((0, import_node_path9.resolve)(DATA_FILE, ".."), "known.json");
 var known = (() => {
   try {
-    return JSON.parse((0, import_node_fs8.readFileSync)(KNOWN_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs9.readFileSync)(KNOWN_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -3564,29 +4735,29 @@ function rememberChannel(pilotId) {
     if (known[k]?.channel === channel && !!known[k]?.club === club) return;
     known[k] = { ...channel ? { channel } : {}, ...club ? { club } : {} };
     try {
-      (0, import_node_fs8.mkdirSync)((0, import_node_path8.resolve)(KNOWN_FILE, ".."), { recursive: true });
-      (0, import_node_fs8.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
+      (0, import_node_fs9.mkdirSync)((0, import_node_path9.resolve)(KNOWN_FILE, ".."), { recursive: true });
+      (0, import_node_fs9.writeFileSync)(KNOWN_FILE, JSON.stringify(known, null, 1));
     } catch {
     }
     return;
   }
 }
-var CARDS_FILE = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "cards.json");
-var LIGHT_LOG = (0, import_node_path8.join)((0, import_node_path8.resolve)(DATA_FILE, ".."), "light-log.jsonl");
+var CARDS_FILE = (0, import_node_path9.join)((0, import_node_path9.resolve)(DATA_FILE, ".."), "cards.json");
+var LIGHT_LOG = (0, import_node_path9.join)((0, import_node_path9.resolve)(DATA_FILE, ".."), "light-log.jsonl");
 function logLight(row) {
   try {
-    (0, import_node_fs8.appendFileSync)(LIGHT_LOG, JSON.stringify(row) + "\n");
-    if ((0, import_node_fs8.statSync)(LIGHT_LOG).size > 3e6) {
-      const lines = (0, import_node_fs8.readFileSync)(LIGHT_LOG, "utf8").trim().split("\n");
-      (0, import_node_fs8.writeFileSync)(LIGHT_LOG + ".tmp", lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
-      (0, import_node_fs8.renameSync)(LIGHT_LOG + ".tmp", LIGHT_LOG);
+    (0, import_node_fs9.appendFileSync)(LIGHT_LOG, JSON.stringify(row) + "\n");
+    if ((0, import_node_fs9.statSync)(LIGHT_LOG).size > 3e6) {
+      const lines = (0, import_node_fs9.readFileSync)(LIGHT_LOG, "utf8").trim().split("\n");
+      (0, import_node_fs9.writeFileSync)(LIGHT_LOG + ".tmp", lines.slice(Math.floor(lines.length / 2)).join("\n") + "\n");
+      (0, import_node_fs9.renameSync)(LIGHT_LOG + ".tmp", LIGHT_LOG);
     }
   } catch {
   }
 }
 function readLightLog(since) {
   try {
-    return (0, import_node_fs8.readFileSync)(LIGHT_LOG, "utf8").split("\n").filter(Boolean).map((l) => {
+    return (0, import_node_fs9.readFileSync)(LIGHT_LOG, "utf8").split("\n").filter(Boolean).map((l) => {
       try {
         return JSON.parse(l);
       } catch {
@@ -3599,7 +4770,7 @@ function readLightLog(since) {
 }
 var cards = (() => {
   try {
-    return JSON.parse((0, import_node_fs8.readFileSync)(CARDS_FILE, "utf8"));
+    return JSON.parse((0, import_node_fs9.readFileSync)(CARDS_FILE, "utf8"));
   } catch {
     return {};
   }
@@ -3611,8 +4782,8 @@ function cardId(v) {
 }
 function saveCards() {
   try {
-    (0, import_node_fs8.mkdirSync)((0, import_node_path8.resolve)(CARDS_FILE, ".."), { recursive: true });
-    (0, import_node_fs8.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
+    (0, import_node_fs9.mkdirSync)((0, import_node_path9.resolve)(CARDS_FILE, ".."), { recursive: true });
+    (0, import_node_fs9.writeFileSync)(CARDS_FILE, JSON.stringify(cards, null, 1));
   } catch {
   }
 }
@@ -3629,17 +4800,17 @@ function restorePhotos() {
   for (const p of engine.pilots.values()) {
     if (p.photo) continue;
     const known2 = knownFile(p.callsign);
-    if (!(0, import_node_fs8.existsSync)(known2)) continue;
+    if (!(0, import_node_fs9.existsSync)(known2)) continue;
     try {
-      (0, import_node_fs8.mkdirSync)(PHOTOS, { recursive: true });
-      (0, import_node_fs8.copyFileSync)(known2, photoFile(p.id));
+      (0, import_node_fs9.mkdirSync)(PHOTOS, { recursive: true });
+      (0, import_node_fs9.copyFileSync)(known2, photoFile(p.id));
       engine.setPilotPhoto(p.id, Date.now().toString(36));
     } catch {
     }
   }
 }
-var OLD_DATA = (0, import_node_path8.join)(ROOT, "data", "eztimer.json");
-if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs8.existsSync)(DATA_FILE) && (0, import_node_fs8.existsSync)(OLD_DATA)) (0, import_node_fs8.renameSync)(OLD_DATA, DATA_FILE);
+var OLD_DATA = (0, import_node_path9.join)(ROOT, "data", "eztimer.json");
+if (!process.env.TGIFLYDAY_DATA && !(0, import_node_fs9.existsSync)(DATA_FILE) && (0, import_node_fs9.existsSync)(OLD_DATA)) (0, import_node_fs9.renameSync)(OLD_DATA, DATA_FILE);
 var clients = /* @__PURE__ */ new Set();
 function broadcast(type, payload) {
   const msg = `event: ${type}
@@ -3672,9 +4843,9 @@ var engine = new Engine(saved, {
   }
 });
 var store = saver(DATA_FILE, () => engine.toSaved());
-var pairing = new Install((0, import_node_path8.resolve)(DATA_FILE, ".."));
-outbox = new Outbox((0, import_node_path8.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
-var screenFeed = new ScreenFeed((0, import_node_path8.resolve)(DATA_FILE, ".."));
+var pairing = new Install((0, import_node_path9.resolve)(DATA_FILE, ".."));
+outbox = new Outbox((0, import_node_path9.resolve)(DATA_FILE, ".."), () => engine.config.cloud, (0, import_node_os2.hostname)(), (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m), pairing);
+var screenFeed = new ScreenFeed((0, import_node_path9.resolve)(DATA_FILE, ".."));
 var kioskAskedAt = null;
 var kioskRestartAt = null;
 var kioskNow = (now) => kioskScreen({
@@ -3722,15 +4893,49 @@ setInterval(() => {
   void outbox.flush().then(() => {
     stateDirty = true;
   });
+  void sendTrack();
 }, 3e4);
+var trackSend = new TrackSend((0, import_node_path9.resolve)(DATA_FILE, ".."));
+async function queueTrack(saved2) {
+  try {
+    const tr = saved2 ? rebuild(saved2) : null;
+    if (!tr) return;
+    const doc = { seed: saved2.seed, opts: saved2.opts, edits: saved2.edits || {}, removed: saved2.removed || [], added: saved2.added || [], ladders: saved2.ladders || {}, order: saved2.order || {} };
+    const body = {
+      schema: 1,
+      install: pairing.state.id,
+      track: {
+        id: stableId("track", pairing.state.id, saved2.seed, JSON.stringify(saved2.opts)),
+        code: code(saved2.seed),
+        name: code(saved2.seed),
+        saved_at: saved2.savedAt || (/* @__PURE__ */ new Date()).toISOString(),
+        pieces: tr.pieces.filter((p) => p.type !== "timing" && p.type !== "flag").length,
+        lap_m: Math.round(tr.levels.full.facts.length * 10) / 10,
+        pro: await webfpvPayload(tr, "full"),
+        beginner: await webfpvPayload(tr, "easy"),
+        trk: null,
+        doc
+      }
+    };
+    trackSend.queue(body);
+    void sendTrack();
+  } catch (e) {
+    console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Today's track for Flyday: ${e?.message ?? e}`);
+  }
+}
+async function sendTrack() {
+  if (pairing.state.status !== "approved") return;
+  if (await trackSend.flush(outbox.base(), pairing.state.token)) console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), "Today's track is on Flyday (sim.hobizone.org).");
+  else if (trackSend.pending && trackSend.lastError) console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Today's track to Flyday: ${trackSend.lastError}`);
+}
 engine.resume(saved.clock, Date.now());
-for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs8.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
+for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs9.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
 restorePhotos();
 timerLink = new RotorHazardLink(engine, (m) => console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), m));
 var webVersion = String(Date.now());
 var reloadTimer = null;
 try {
-  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs8.watch)(WEB, { recursive: true }, () => {
+  if (WEB_FROM_DISK && !APP_DIR) (0, import_node_fs9.watch)(WEB, { recursive: true }, () => {
     if (reloadTimer) clearTimeout(reloadTimer);
     reloadTimer = setTimeout(() => {
       webVersion = String(Date.now());
@@ -3764,7 +4969,7 @@ var PAGES = {
   "/sim": "sim.html",
   "/ar": "ar.html"
 };
-var TYPES = {
+var TYPES2 = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -3791,7 +4996,11 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 var API2 = {
-  "/api/track/save": (b) => tracks.save(b),
+  "/api/track/save": (b) => {
+    const d = tracks.save(b);
+    void queueTrack(d.today);
+    return d;
+  },
   "/api/track/pin": (b) => tracks.setPin(b),
   "/api/track/kit": (b) => tracks.setKit(b),
   "/api/action": (b) => engine.action(String(b.type), Date.now()),
@@ -3983,10 +5192,10 @@ data: ${JSON.stringify(snapshot(Date.now()))}
   if (path === "/kiosk.sh" && req.method === "GET") {
     let text2 = "";
     try {
-      text2 = (await webFile((0, import_node_path8.join)(WEB, "kiosk.sh"))).toString("utf8");
+      text2 = (await webFile((0, import_node_path9.join)(WEB, "kiosk.sh"))).toString("utf8");
     } catch {
       try {
-        text2 = await (0, import_promises2.readFile)((0, import_node_path8.join)(ROOT, "kiosk.sh"), "utf8");
+        text2 = await (0, import_promises2.readFile)((0, import_node_path9.join)(ROOT, "kiosk.sh"), "utf8");
       } catch {
       }
     }
@@ -4022,7 +5231,7 @@ data: ${JSON.stringify(snapshot(Date.now()))}
         await (0, import_promises2.unlink)(file2).catch(() => {
         });
         try {
-          (0, import_node_fs8.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
+          (0, import_node_fs9.unlinkSync)(knownFile(engine.pilots.get(id).callsign));
         } catch {
         }
         engine.setPilotPhoto(id, null);
@@ -4077,12 +5286,12 @@ data: ${JSON.stringify(snapshot(Date.now()))}
       return json(res, known2 ? 400 : 500, { error: known2 ? err.message : "Something went wrong on the server." });
     }
   }
-  const file = PAGES[path] ?? (0, import_node_path8.normalize)(path).replace(/^([/\\])+/, "");
-  const full = (0, import_node_path8.join)(WEB, file);
+  const file = PAGES[path] ?? (0, import_node_path9.normalize)(path).replace(/^([/\\])+/, "");
+  const full = (0, import_node_path9.join)(WEB, file);
   if (!full.startsWith(WEB)) return json(res, 404, { error: "Not found." });
   try {
     const body = await webFile(full);
-    res.writeHead(200, { "content-type": TYPES[(0, import_node_path8.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
+    res.writeHead(200, { "content-type": TYPES2[(0, import_node_path9.extname)(full)] ?? "application/octet-stream", "cache-control": "no-cache" });
     res.end(body);
   } catch {
     json(res, 404, { error: "Not found." });
@@ -4099,7 +5308,7 @@ var server = (0, import_node_http.createServer)((req, res) => {
 function lanAddresses() {
   const VIRTUAL = /vEthernet|WSL|Hyper-?V|Default Switch|VirtualBox|VMware|vmnet|vbox|docker|br-|veth|Loopback|Bluetooth|Tailscale|ZeroTier|Npcap|TAP|TUN|VPN|Hamachi|Radmin/i;
   const REAL = /Wi-?Fi|WLAN|Wireless|Ethernet|Local Area Connection|^eth|^en|^wl/i;
-  const score = (name, a) => {
+  const score2 = (name, a) => {
     let s = 0;
     if (VIRTUAL.test(name)) s -= 100;
     if (REAL.test(name)) s += 10;
@@ -4110,7 +5319,7 @@ function lanAddresses() {
     else if (/^172\.(1[6-9]|2\d|3[01])\./.test(a)) s += 1;
     return s;
   };
-  return Object.entries((0, import_node_os2.networkInterfaces)()).flatMap(([name, list]) => (list ?? []).filter((i) => i.family === "IPv4" && !i.internal).map((i) => ({ a: i.address, s: score(name, i.address) }))).sort((x, y) => y.s - x.s).map((x) => x.a);
+  return Object.entries((0, import_node_os2.networkInterfaces)()).flatMap(([name, list]) => (list ?? []).filter((i) => i.family === "IPv4" && !i.internal).map((i) => ({ a: i.address, s: score2(name, i.address) }))).sort((x, y) => y.s - x.s).map((x) => x.a);
 }
 var AFTER_UPDATE = process.argv.includes("--after-update");
 if (AFTER_UPDATE) kioskRestartAt = Date.now();
