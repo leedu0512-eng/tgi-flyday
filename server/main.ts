@@ -286,9 +286,18 @@ async function queueTrack(saved: any) {
     console.log(new Date().toLocaleTimeString(), `Today's track for Flyday: ${e?.message ?? e}`);
   }
 }
+/* The sim gets what this version's export makes of today's track (Janno 28.11.2026: "the new gates don't show up
+   in the game": the track was sent by an older version, before the club's cube, rings and ladders went into the
+   export). After an update, today's track is sent again once; data/track-sent.json says by which version. */
+const SENT_FILE = resolve(DATA_FILE, '..', 'track-sent.json');
+function sentBy(): string | null { try { return JSON.parse(readFileSync(SENT_FILE, 'utf8')).version ?? null; } catch { return null; } }
+if (tracks.data.today && sentBy() !== VERSION && !trackSend.pending) void queueTrack(tracks.data.today);
 async function sendTrack() {
   if (pairing.state.status !== 'approved') return;
-  if (await trackSend.flush(outbox!.base(), pairing.state.token)) console.log(new Date().toLocaleTimeString(), "Today's track is on Flyday (sim.hobizone.org).");
+  if (await trackSend.flush(outbox!.base(), pairing.state.token)) {
+    try { writeFileSync(SENT_FILE, JSON.stringify({ version: VERSION, at: new Date().toISOString() })); } catch {}
+    console.log(new Date().toLocaleTimeString(), "Today's track is on Flyday (sim.hobizone.org).");
+  }
   else if (trackSend.pending && trackSend.lastError) console.log(new Date().toLocaleTimeString(), `Today's track to Flyday: ${trackSend.lastError}`);
 }
 engine.resume(saved.clock, Date.now());

@@ -1,9 +1,9 @@
 {
- "version": "2026.11.28-1842",
+ "version": "2026.11.28-1922",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "62d76bff6e716fd308fda9264044c0bc13a34471a1ad85595a6b34b08b45f7f1"
+   "sha256": "dec2569e9bbf28d948e107debdd8a340555bc0c21f58582e1d7854bfe69e3d25"
   },
   {
    "path": "web/ar.html",

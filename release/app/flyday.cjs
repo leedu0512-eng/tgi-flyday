@@ -474,7 +474,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1842" : "dev";
+var VERSION = true ? "2026.11.28-1922" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -5088,10 +5088,24 @@ async function queueTrack(saved2) {
     console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Today's track for Flyday: ${e?.message ?? e}`);
   }
 }
+var SENT_FILE = (0, import_node_path10.resolve)(DATA_FILE, "..", "track-sent.json");
+function sentBy() {
+  try {
+    return JSON.parse((0, import_node_fs10.readFileSync)(SENT_FILE, "utf8")).version ?? null;
+  } catch {
+    return null;
+  }
+}
+if (tracks.data.today && sentBy() !== VERSION && !trackSend.pending) void queueTrack(tracks.data.today);
 async function sendTrack() {
   if (pairing.state.status !== "approved") return;
-  if (await trackSend.flush(outbox.base(), pairing.state.token)) console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), "Today's track is on Flyday (sim.hobizone.org).");
-  else if (trackSend.pending && trackSend.lastError) console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Today's track to Flyday: ${trackSend.lastError}`);
+  if (await trackSend.flush(outbox.base(), pairing.state.token)) {
+    try {
+      (0, import_node_fs10.writeFileSync)(SENT_FILE, JSON.stringify({ version: VERSION, at: (/* @__PURE__ */ new Date()).toISOString() }));
+    } catch {
+    }
+    console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), "Today's track is on Flyday (sim.hobizone.org).");
+  } else if (trackSend.pending && trackSend.lastError) console.log((/* @__PURE__ */ new Date()).toLocaleTimeString(), `Today's track to Flyday: ${trackSend.lastError}`);
 }
 engine.resume(saved.clock, Date.now());
 for (const p of engine.pilots.values()) if (p.photo && !(0, import_node_fs10.existsSync)(knownFile(p.callsign))) rememberPhoto(p.id);
