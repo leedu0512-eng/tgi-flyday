@@ -65,7 +65,6 @@ export const WALLS = {
   end: {
     paint: 'black', skirting: null,
     items: [
-      { kind: 'sign', at: 4.5, z: 0.75, text: '3' },
     ],
   },
 };
@@ -76,11 +75,11 @@ export const WALLS = {
 // shapes stay), and the five supporters' logos for dark backgrounds, as they are (never sprayed, recoloured or
 // stretched), in the website's order, sized by its optical heights so they look equally heavy.
 export const END_ART = {
-  logo: { file: 'hobizone-on-dark.svg', at: 5.0, z: 1.02, w: 5.6 },
-  supporters: { z: 2.16, x0: 2.2, x1: 7.8, tallest: 0.36, logos: [
+  logo: { file: 'hobizone-on-dark.svg', at: 5.0, z: 0.92, w: 5.6 },
+  supporters: { z: 2.24, x0: 2.2, x1: 7.8, tallest: 0.36, logos: [
     { name: 'Saue vald', file: 'supporter-saue-vald.svg', opt: 50 },
     { name: 'Velvet', file: 'supporter-velvet.svg', opt: 34 },
-    { name: 'NordRC', file: 'supporter-nordrc.svg', opt: 34 },
+    { name: 'NordRC', file: 'supporter-nordrc.svg', opt: 40 },   // a little bigger than the website's 34 (Janno 28.11.2026)
     { name: 'Küberkaitseüksus', file: 'supporter-kky.svg', opt: 52 },
     { name: 'Eesti Mudellennuühendus', file: 'supporter-mudellend.svg', opt: 56 },
   ] },
