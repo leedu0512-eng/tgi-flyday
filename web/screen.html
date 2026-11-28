@@ -136,7 +136,12 @@ setInterval(trackDaySchedule, 30_000);
 // taking turns with the thank-you screen (30 s / 20 s). The calendar and the names come from
 // the portal through the RD PC (state.trackdayScreen); `?demo` shows made-up data until then.
 const DEMO = new URLSearchParams(location.search).has('demo');
-const TD_MAIN_MS = 30_000, TD_THANKS_MS = 20_000, TD_HOLD_MS = 60_000;
+const TD_MAIN_MS = 30_000, TD_THANKS_MS = 20_000, TD_TRACK_MS = 25_000, TD_HOLD_MS = 60_000;
+// Today's track as a third pane, in the drone view while no practice runs (Janno 28.11.2026), when one is saved
+let hasTrack = false;
+const checkTrack = async () => { try { hasTrack = !!(await (await fetch('/api/track', { cache: 'no-store' })).json()).today; } catch {} };
+checkTrack(); setInterval(checkTrack, 60_000);
+const trackPaneOk = () => view === 'plates' && hasTrack;
 /** The calendar / thank-you turns show in TrackDay, and in tgiFlyDay too while no practice runs (Janno 17.11.2026). */
 const idle = (c) => !c || c.phase === 'stopped' || c.phase === 'waiting';
 const tdOn = () => view === 'pay' || (state && idle(state.clock));
@@ -372,14 +377,15 @@ function renderTrackDay(force = false) {
   const data = tdData();
   // States come several times a second during a session: redraw only when something shown changed.
   const key = [tdPane, tdWeek, tdShown, data?.updated, data?.thanks?.updated, state?.trackdayUrl, LANG, new Date().toDateString(), $('main').className].join('|');
-  if (!force && key === tdKey && $('main').querySelector('.td-left, .td-thanks, .td-join-only')) return;
+  if (!force && key === tdKey && $('main').querySelector('.td-left, .td-thanks, .td-join-only, .td-track')) return;
   tdKey = key;
 
   CARDS[0].url = state?.trackdayUrl || CARDS[0].builtIn;
   CARDS[1].url = pick(data?.join_url) || CARDS[1].builtIn;
   const now = new Date();
   $('main').className = 'pb-main td2';
-  $('main').innerHTML = tdPane === 'thanks' ? thanksHtml(data) : `
+  // the track page in its screen mode, loaded only while this pane is up (it runs the 3D)
+  $('main').innerHTML = tdPane === 'track' ? `<div class="td-track"><iframe src="/track?screen=1" title="${tr("Today's track")}"></iframe></div>` : tdPane === 'thanks' ? thanksHtml(data) : `
     <div class="td-left">
       <div class="td-clock"><div class="cl"><span id="dayClock" class="bigclock num">${dayClock()}</span></div>
         <span class="date">${now.toLocaleDateString(LANG === 'et' ? 'et-EE' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
@@ -387,6 +393,7 @@ function renderTrackDay(force = false) {
     </div>
     <div class="td-right">${qrCardHtml(CARDS[0], 0, 'pay')}</div>`;
   $('main').classList.toggle('td-thanks-pane', tdPane === 'thanks');
+  $('main').classList.toggle('td-track-pane', tdPane === 'track');
   requestAnimationFrame(() => { fitText($('main')); if (tdPane === 'thanks') fitNames(); });
 }
 document.addEventListener('click', (e) => {
@@ -402,10 +409,11 @@ setInterval(() => {
   if (!c || !tdOn()) { tdPane = 'main'; tdSince = Date.now(); tdBar(null); return; }
   if (Date.now() < tdHoldUntil) { tdSince = Date.now(); tdBar(0); return; }
   if (tdWeek !== 0 && tdPane === 'main' && Date.now() - tdSince > TD_HOLD_MS) { tdWeek = 0; renderTrackDay(true); }
-  const due = tdPane === 'main' ? TD_MAIN_MS : TD_THANKS_MS;
+  if (tdPane === 'track' && !trackPaneOk()) { tdPane = 'main'; tdSince = Date.now(); renderTrackDay(true); return; }
+  const due = tdPane === 'main' ? TD_MAIN_MS : tdPane === 'track' ? TD_TRACK_MS : TD_THANKS_MS;
   tdBar((Date.now() - tdSince) / due);
   if (Date.now() - tdSince < due) return;
-  const next = tdPane === 'main' ? 'thanks' : 'main';
+  const next = tdPane === 'main' ? 'thanks' : tdPane === 'thanks' && trackPaneOk() ? 'track' : 'main';
   tdSince = Date.now();
   if (next === tdPane) return;
   $('main').classList.add('td-fade');
@@ -423,6 +431,7 @@ function tdBar(frac) {
 }
 // For screenshots and checking: ?pane=thanks opens on the thank-you screen.
 if (new URLSearchParams(location.search).get('pane') === 'thanks') tdPane = 'thanks';
+if (new URLSearchParams(location.search).get('pane') === 'track') tdPane = 'track';
 
 /** The big time of day, for the TrackDay view when no drone practice runs. */
 function dayClock() {

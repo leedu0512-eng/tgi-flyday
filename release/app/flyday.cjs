@@ -474,7 +474,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1802" : "dev";
+var VERSION = true ? "2026.11.28-1819" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -5131,7 +5131,8 @@ var PAGES = {
   "/me": "me.html",
   "/track": "track.html",
   "/sim": "sim.html",
-  "/ar": "ar.html"
+  "/ar": "ar.html",
+  "/trackview": "trackview.html"
 };
 var TYPES2 = {
   ".html": "text/html; charset=utf-8",

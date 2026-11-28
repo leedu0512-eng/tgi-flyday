@@ -348,6 +348,7 @@ const PAGES: Record<string, string> = {
   '/track': 'track.html',
   '/sim': 'sim.html',
   '/ar': 'ar.html',
+  '/trackview': 'trackview.html',
 };
 
 const TYPES: Record<string, string> = {

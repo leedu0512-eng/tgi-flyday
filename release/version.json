@@ -1,9 +1,9 @@
 {
- "version": "2026.11.28-1802",
+ "version": "2026.11.28-1819",
  "files": [
   {
    "path": "flyday.cjs",
-   "sha256": "28bc2d1abfb17137ba0ac8af1135b3137f6f3cebec15bbe8109643b5846a05f2"
+   "sha256": "a2fbb7964588e2d0115261ae9a67910518ddb6bb32bf94acf9307e0f6a52be43"
   },
   {
    "path": "web/ar.html",
@@ -195,11 +195,15 @@
   },
   {
    "path": "web/assets/style.css",
-   "sha256": "e3692dfc6806a5e927c2eb1b2a7f19ddd01006f51d08445365753eb0b2aec3f0"
+   "sha256": "d1ee50a01b0bf9555d8a9e45fb0e0edb67a82487679808100060f6103a8f8b3e"
   },
   {
    "path": "web/assets/trackgen.js",
    "sha256": "b4b55b278443f4dc309aa9ccf7b09996139cf95ebf9933bb737ee4ca5e05ae6a"
+  },
+  {
+   "path": "web/assets/trackplan.js",
+   "sha256": "6ff4f2c7226f24dfee2d657c66922f72e5056e9b24562717f279dd275bc43d32"
   },
   {
    "path": "web/assets/usdz.js",
@@ -255,7 +259,7 @@
   },
   {
    "path": "web/screen.html",
-   "sha256": "7bb6cbb8600cff2703cae348169ef0cc5d2aa72af453c85e619c0cb5016d30d4"
+   "sha256": "e37301856943674b6f6ad46f7653f49805a60486697de5aae45037217e31395f"
   },
   {
    "path": "web/sim.html",
@@ -263,7 +267,11 @@
   },
   {
    "path": "web/track.html",
-   "sha256": "72f6265f5f90e356c3a81675cdea72570f3e58133bf73d0fbc7ee301cb385670"
+   "sha256": "021a7ec9590b526b8742498ab60d52f0d4f232b71dc625b617b7d94359543e5d"
+  },
+  {
+   "path": "web/trackview.html",
+   "sha256": "1b8e6a74387fe2c33b42fb995da4969fe6d5be99739d7a2e84fcb017f3d70534"
   }
  ]
 }
