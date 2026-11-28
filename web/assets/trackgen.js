@@ -896,7 +896,7 @@ export function toWebFPV(tr, level = 'full', now = new Date()) {
       q(m.el.id, { passSide: cross > 0 ? 'right' : 'left', clearance: r6(Math.max(0.2, ev.d)) });
     } else {
       const dir = Math.atan2(ev.ps.dy, ev.ps.dx), entry = Math.cos(dir - m.yaw) >= 0 ? 1 : -1;
-      if (pc.type === 'cube') { q(m.back.id, { apertureIndex: 0, entry }); q(m.front.id, { apertureIndex: 0, entry }); }
+      if (pc.type === 'cube') { const [a, b] = entry > 0 ? [m.back, m.front] : [m.front, m.back]; q(a.id, { apertureIndex: 0, entry }); q(b.id, { apertureIndex: 0, entry }); }   // in through the near face, out through the far one (fixed 28.11.2026: it was always back then front)
       else {
         if (pc.type.startsWith('ladder')) {
           const stage = Math.max(0, Math.min(m.stages.length - 1, ev.ps.info?.stage ?? 0));

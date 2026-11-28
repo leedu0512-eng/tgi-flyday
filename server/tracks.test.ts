@@ -104,6 +104,26 @@ test('a track goes to WebFPV as its own document: every pass in our order, flags
   }
 });
 
+test('a cube is flown in through the near face and out through the far one, whichever way round (28.11.2026)', () => {
+  let cubes = 0;
+  for (const start of [11, 3, 5, 7, 21, 33]) {
+    const r = G.generate({ ...OPTS, kit: { ...G.KIT_DEFAULT, cube: 4 } }, { ms: 3000, want: 1, start });
+    for (const level of ['full', 'easy']) {
+      const doc = G.toWebFPV(r.best, level);
+      const at = (q: any) => doc.elements.find((x: any) => x.id === q.elementId);
+      for (let k = 0; k + 1 < doc.sequence.length; k++) {
+        const a = at(doc.sequence[k]), b = at(doc.sequence[k + 1]);
+        if (a.name !== 'Cube' || b.name !== 'Cube' || a.group !== b.group) continue;
+        const dir = a.yaw + (doc.sequence[k].entry > 0 ? 0 : Math.PI);
+        const along = (b.position.x - a.position.x) * Math.cos(dir) + (b.position.y - a.position.y) * Math.sin(dir);
+        assert.ok(along > 0.5, `the second face is ahead of the first (${along.toFixed(2)} m)`);
+        cubes++; k++;
+      }
+    }
+  }
+  assert.ok(cubes > 0, 'some cubes were flown');
+});
+
 test('pieces can be taken away, added from the kit and ladders flown another way; saved and built again', () => {
   const r = G.generate({ ...OPTS, pieces: 12 }, { ms: 6000, want: 1, start: 3 });
   const b = r.best, types = b.pieces.map((p: any) => p.type);
