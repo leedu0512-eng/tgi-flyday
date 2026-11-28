@@ -72,6 +72,11 @@ MVP: unattended practice time manager. No timer, no video. Heat loop, pilot kios
 - **Sim PCs** (Janno 22.11.2026): `web/sim.html` (`/sim`) is the home page of the club's four sim PCs' browsers (same wired network): **Fly today's track**, Pro / Beginner, each a `webfpvLink()` (trackgen.js, shared with the track page); a new track saved on the kiosk shows within a minute. Listed with a QR in the console's Phones and screens. It opens in WebFPV's builder, one click (Fly this track) from flying: straight into flying needs a board-published track (`?share=`), which Janno doesn't want done automatically; a letter to WebFPV's author (Mathew Harvey) asks for a way to fly a document without publishing.
 - Next (asked, not built): double and triple gates side by side (power loops, zigzags), the RaceGOW whoop rules, laps tied to the track code, split gates to follow pilots, the track on the big screen.
 
+## Laps tied to the track (Janno 28.11.2026)
+
+- Every timed heat is filed under the track that was today's track when it was flown (main.ts `todayTag()`: its code `HZ-…`, the name the sim's leaderboard uses, and the same `stableId` the track upload uses): server/trackrecords.ts `TrackRecords`, `data/track-records.json`, the last 40 tracks with the 50 best pilots each (best lap, best 3C, laps). No track saved: nothing filed. The heat row in the outbox carries `track` too, for when Flyday's upload takes it (asked of the portal 28.11.2026; schema 1 doesn't send it yet).
+- `GET /api/laps` and `GET /api/times` add `track` (`report(code, name)`: record, board of 10, the pilot's own). The phone page shows "On this track HZ-…": your best there and the track record (`trackView` in me.html); the console's Times page a board of today's track over every session. Test: server/trackrecords.test.ts.
+
 ## Pilot photos
 
 - `data/photos/<pilot id>.jpg` is the live photo; `data/photos/known/<base64url of lowercased callsign>.jpg` remembers it by name (main.ts: rememberPhoto / restorePhotos). After every API call, pilots without a photo whose name is remembered get it back, so `/api/join` and `/api/pilot/add` already answer with `photo` set. Deleting a pilot keeps the remembered copy; removing a photo deletes both.

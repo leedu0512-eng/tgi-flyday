@@ -200,8 +200,17 @@ function lapsView() {
     <div class="me-bests">
       <div><small>Best lap</small><b class="${tone(laps.bestLap?.ms, laps.bestLap)}">${lapTime(laps.bestLap?.ms)}</b>${laps.bestLap?.sb ? badge(true) : ''}</div>
       <div><small>Best 3C</small><b class="${tone(laps.best3?.ms, laps.best3)}">${lapTime(laps.best3?.ms)}</b>${laps.best3?.sb ? badge(true) : ''}</div>
-    </div>
+    </div>${trackView(laps.track)}
     <div class="me-runs">${runs}</div>`;
+}
+
+/** Today's track over every session (Janno 28.11.2026: laps tied to the track): your best there and the record. */
+function trackView(tk) {
+  if (!tk || !(tk.mine || tk.record.best3 || tk.record.lap)) return '';
+  const who = (r) => (r ? ` <span class="who">${esc(r.name)}</span>` : '');
+  return `<div class="me-track"><h3>${tr('On this track')} <span data-no-i18n>${esc(tk.code)}</span></h3>
+    <p><small>${tr('Your best')}</small> 3C <b>${lapTime(tk.mine?.best3)}</b> <span class="sep"></span> ${tr('Lap')} <b>${lapTime(tk.mine?.lap)}</b></p>
+    <p><small>${tr('Track record')}</small> 3C <b class="t-sb">${lapTime(tk.record.best3?.ms)}</b>${who(tk.record.best3)} <span class="sep"></span> ${tr('Lap')} <b class="t-sb">${lapTime(tk.record.lap?.ms)}</b>${who(tk.record.lap)}</p></div>`;
 }
 
 // Fetch this pilot's laps when something changed (every gate pass does), at most every 1.5 s.

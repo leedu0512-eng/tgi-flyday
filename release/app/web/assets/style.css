@@ -708,6 +708,14 @@ body.embedded .kiosk .done-qr #doneQr { width: 200px; height: 200px; }
 .me-bests > div { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; }
 .me-bests small { display: block; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 .me-bests b { display: block; font-family: var(--stencil); font-weight: 900; font-size: 40px; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.me-track { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px; }
+.me-track h3 { margin: 0 0 6px; font-family: var(--display, 'Big Shoulders'), sans-serif; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.me-track h3 span { color: #fff; }
+.me-track p { margin: 4px 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; }
+.me-track small { min-width: 7.5em; color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.me-track b { font-family: var(--stencil); font-weight: 900; font-size: 22px; font-variant-numeric: tabular-nums; }
+.me-track .who { color: var(--muted); font-size: 14px; }
+.me-track .sep { width: 10px; }
 .me-bests .pbsb { position: absolute; top: 10px; right: 10px; }
 body.me .pbsb { display: inline-block; font-style: normal; font-family: var(--display); font-weight: 900; font-size: 13px; letter-spacing: 0.08em; padding: 2px 7px; border-radius: 3px; }
 body.me .pbsb.is-pb { background: var(--pb); color: #000; }

@@ -20,6 +20,7 @@ import { load, saver } from './store.ts';
 import { RotorHazardLink } from './rotorhazard.ts';
 import { Outbox } from './outbox.ts';
 import { Install, publicInstall, stableId } from './flyday.ts';
+import { TrackRecords, type TrackTag } from './trackrecords.ts';
 import { TrackSend, type TrackBody } from './tracksend.ts';
 // @ts-ignore: a browser module, shared with the track page (pure: no DOM)
 import { rebuild, code as trackCode, webfpvPayload } from '../web/assets/trackgen.js';
@@ -185,13 +186,27 @@ function broadcast(type: string, payload: unknown) {
   }
 }
 
+// Lap records per track: every timed heat is filed under the track that was today's track then (trackrecords.ts).
+const trackRecords = new TrackRecords(resolve(DATA_FILE, '..'));
+function todayTag(): TrackTag | null {
+  const t = tracks.data.today;
+  if (!t || !Number.isFinite(t.seed)) return null;
+  return { code: trackCode(t.seed), id: stableId('track', pairing.state.id, t.seed, JSON.stringify(t.opts)) };
+}
 let stateDirty = false;
 const saved = load(DATA_FILE);
 let timerLink: RotorHazardLink | null = null;
 // The outbox: events wait in data/outbox.jsonl until they can go online (see outbox.ts).
 let outbox: Outbox | null = null;
 const engine = new Engine(saved, {
-  onEvent: (type, data) => outbox?.add(type, data),
+  onEvent: (type, data) => {
+    if (type === 'heat') {
+      const tag = todayTag();
+      trackRecords.add(tag, data);
+      data = { ...data, track: tag };   // in the outbox too, for when Flyday's upload takes it
+    }
+    outbox?.add(type, data);
+  },
   onTimer: (cmd) => timerLink?.command(cmd),
   onAudio: (e: AudioEvent) => broadcast('audio', { ...e, at: Date.now() }),
   onChange: () => {
@@ -509,9 +524,9 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     return json(res, 200, { ok: true, result: null });
   }
   // RD console, Times tab: everyone's laps this session.
-  if (path === '/api/times' && req.method === 'GET') return json(res, 200, engine.timesReport());
+  if (path === '/api/times' && req.method === 'GET') return json(res, 200, { ...engine.timesReport(), track: trackRecords.report(todayTag()?.code) });
   // Pilot's phone page: their laps this session (every timed heat, bests, PB / SB).
-  if (path === '/api/laps' && req.method === 'GET') return json(res, 200, engine.lapReport(url.searchParams.get('name') ?? ''));
+  if (path === '/api/laps' && req.method === 'GET') { const name = url.searchParams.get('name') ?? ''; return json(res, 200, { ...engine.lapReport(name), track: trackRecords.report(todayTag()?.code, name) }); }
   // Kiosk: what we remember about a pilot name (their usual channel).
   if (path === '/api/known' && req.method === 'GET') {
     const name = url.searchParams.get('name') ?? '';

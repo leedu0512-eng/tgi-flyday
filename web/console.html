@@ -1540,8 +1540,12 @@ const lapTime = (ms) => ms == null ? '–' : ms >= 60000 ? `${Math.floor(ms / 60
 function renderTimes() {
   const t = times;
   if (!t) return;
+  // today's track over every session (Janno 28.11.2026: laps tied to the track): its record holders first
+  const tk = t.track;
+  const trackBoard = tk && tk.board.length ? `<h3>On this track <span data-no-i18n>${esc(tk.code)}</span> <small>every session</small></h3><table class="lb"><thead><tr><th></th><th>Pilot</th><th>Best 3C</th><th>Best lap</th><th>Laps</th></tr></thead><tbody>
+    ${tk.board.map((l, i) => `<tr><td>${i + 1}</td><td>${esc(NAME(l.name))}</td><td class="${l.best3 != null && l.best3 === tk.record.best3?.ms ? 't-sb' : ''}">${lapTime(l.best3)}</td><td class="${l.lap != null && l.lap === tk.record.lap?.ms ? 't-sb' : ''}">${lapTime(l.lap)}</td><td>${l.laps}</td></tr>`).join('')}</tbody></table>` : '';
   if (!t.runs.length) {
-    $('times').innerHTML = `<p class="hint">${state?.config.timer?.enabled ? 'No laps yet this session. Every timed heat shows up here as soon as pilots cross the gate.' : 'The lap timer is off. Once it is connected, every heat\'s laps show up here.'}</p>`;
+    $('times').innerHTML = trackBoard + `<p class="hint">${state?.config.timer?.enabled ? 'No laps yet this session. Every timed heat shows up here as soon as pilots cross the gate.' : 'The lap timer is off. Once it is connected, every heat\'s laps show up here.'}</p>`;
     return;
   }
   // F1 colours: purple = best of everyone this session, green = that pilot's own best.
@@ -1561,7 +1565,7 @@ function renderTimes() {
         <td class="tot ${tone(p.bestLap, t.sb.lap, me?.bestLap)}"><small>best</small>${lapTime(p.bestLap)}</td></tr>`; }).join('')}</tbody></table>
     </details>`;
   }).join('');
-  $('times').innerHTML = board + `<h3>Heats</h3>` + runs;
+  $('times').innerHTML = board + trackBoard + `<h3>Heats</h3>` + runs;
 }
 $('times').addEventListener('toggle', (e) => {
   const d = e.target.closest?.('details[data-key]');
