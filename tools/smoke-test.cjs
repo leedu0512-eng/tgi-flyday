@@ -295,6 +295,18 @@ async function typeKeys(scope, text) {
       check(n === rowsHere && why && await ap.$eval('#start', (b) => b.disabled), 'AR: the phone page lists the same pieces and says why AR can\'t start in this browser');
       const pv = await ap.evaluate(() => window.__ar.preview());
       check(pv.children > n * 3 && /placed/.test(pv.step) && /m /.test(pv.dist || ''), 'AR: the pieces, their floor marks and the way to the next one are drawn');
+      const uz = await ap.evaluate(async () => atob(await window.__ar.usdz()));
+      check(uz.length > 20000 && uz.startsWith('PK') && uz.includes('#usda 1.0'), 'AR: the iPhone AR file (.usdz) is made');
+      {
+        const ip = await browser.newPage({ viewport: { width: 390, height: 844 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', hasTouch: true, isMobile: true });
+        ip.on('pageerror', (e) => errors.push(`ar ios: ${e.message}`));
+        await ip.goto(B + '/ar#' + arUrl.split('#')[1]);
+        await ip.waitForSelector('#iosMake:not([disabled])', { timeout: 8000 });
+        await ip.click('#iosMake');
+        await ip.waitForSelector('a[rel="ar"] img', { timeout: 15000 });
+        check(await ip.$eval('#android', (a) => a.hidden) && /^blob:.*#allowsContentScaling=0$/.test(await ip.getAttribute('a[rel="ar"]', 'href')), 'AR: an iPhone gets View in AR (Quick Look), not the Android steps');
+        await ip.close();
+      }
       await ap.goto(B + '/ar');
       await ap.waitForSelector('#rows tr', { timeout: 8000 });
       check(/HZ-/.test(await ap.textContent('#facts')), 'AR: without a link it shows today\'s track');

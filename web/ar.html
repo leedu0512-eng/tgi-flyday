@@ -36,6 +36,9 @@ body.arb { margin: 0; min-height: 100vh; background: var(--bg); color: var(--tex
 .arb .go { min-height: 64px; border-radius: 12px; border: 0; background: var(--accent); color: #000; font: 900 28px/1 'Big Shoulders', sans-serif; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
 .arb .go:disabled { opacity: .4; cursor: default; }
 .arb .why { border-color: #7a3b00; }
+.arb .iphone .go, .arb .iphone a.go { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; text-decoration: none; }
+.arb .iphone a.go img { width: 34px; height: 34px; }
+.arb button.dl { justify-self: start; min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font: 700 16px 'Archivo', sans-serif; cursor: pointer; }
 .arb .cp { display: flex; gap: 8px; align-items: center; margin: 6px 0 2px; }
 .arb .cp code { flex: 1; }
 .arb .cp button { flex: none; min-height: 40px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--accent); color: #000; font: 700 15px 'Archivo', sans-serif; }
@@ -80,6 +83,17 @@ body.arb { margin: 0; min-height: 100vh; background: var(--bg); color: var(--tex
 <main id="intro">
   <h1>Build the track</h1>
   <div class="facts" id="facts">Looking for the track…</div>
+  <div class="card iphone" id="iphone">
+    <h2>See it in AR on an iPhone</h2>
+    <p id="iosNote">Opens in the iPhone's own AR viewer, at full size. Nothing to install.</p>
+    <div id="iosGo"><button type="button" class="go" id="iosMake" disabled>Make the AR file</button></div>
+    <ol id="iosSteps">
+      <li>Tap View in AR, then point the phone at the floor. The whole hall appears at full size.</li>
+      <li>Drag it with one finger until the orange post stands on the real carpet corner by the pilots' rail, on the white wall's side. Turn it with two fingers until the orange line runs along the real edge of the carpet.</li>
+      <li>Every piece now stands where it goes, its number above it and on the floor. The green one is the timing gate.</li>
+    </ol>
+  </div>
+  <div id="android">
   <div class="card why" id="why" hidden></div>
   <div class="card">
     <h2>Line up with the hall</h2>
@@ -95,6 +109,7 @@ body.arb { margin: 0; min-height: 100vh; background: var(--bg); color: var(--tex
       <li>Every piece stands where it goes. The one up next is in bright colours, with a green post. Put it there and tap Placed.</li>
       <li>Far from where you lined up, if things look off, line up again with nearer points.</li>
     </ol>
+  </div>
   </div>
   <div class="card">
     <h2>Set-up list</h2>
@@ -122,6 +137,7 @@ import { tr, langSwitch, esc } from './assets/common.js';
 import { HALL, RAILS, TYPES, OPEN, GATE_Z, rebuild, code, unpackTrack, onRail } from './assets/trackgen.js';
 import { pieceMats, pieceObject, yawOf, numberSprite } from './assets/pieces3d.js';
 import { REFS, frameFrom, toWorld, toHall } from './assets/arframe.js';
+import { sceneToUsdz } from './assets/usdz.js';
 
 const $ = (id) => document.getElementById(id);
 $('lang').innerHTML = langSwitch();
@@ -144,10 +160,87 @@ async function load() {
   $('rows').innerHTML = track.pieces.map((pc, i) => `<tr><td><span class="no${pc.type === 'timing' ? ' t' : ''}">${i + 1}</span></td><td>${tr(LABEL[pc.type])}${onRail(pc.type) ? ' <span class="muted">' + tr('hangs from a cable') + '</span>' : ''}</td><td class="num">${(HALL.w - pc.x).toFixed(1)} m</td><td class="num">${pc.y.toFixed(1)} m</td></tr>`).join('');
   placed = readPlaced();
   await checkAR();
+  iphoneCard();
 }
 function readPlaced() { try { return new Set(JSON.parse(localStorage.getItem(placedKey) || '[]')); } catch { return new Set(); } }
 function savePlaced() { try { localStorage.setItem(placedKey, JSON.stringify([...placed])); } catch {} }
 let placed = new Set();
+
+// ---------- iPhone: AR Quick Look with a .usdz file (Janno 28.11.2026) ----------
+// The iPhone's own AR viewer opens a .usdz from a link marked rel="ar": no app, no setting, plain http
+// is fine. It can't be told where the hall is, so the model has its origin on the carpet corner by the
+// rail (white wall's side) and the person drags and turns it onto the real carpet; the orange outline
+// and corner posts are for that. Every other phone gets a download link (to send to an iPhone).
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let usdzUrl = null;
+function plate(n, timing) { // an orange square with the piece's number, both sides
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d'); x.fillStyle = timing ? '#22c55e' : '#ff6b00'; x.fillRect(0, 0, 128, 128);
+  x.fillStyle = '#000'; x.font = '900 84px "Big Shoulders", Impact, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(String(n), 64, 70);
+  const m = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide });
+  return m;
+}
+function iosScene() {
+  const root = new THREE.Group(), Lc = (x, y, z = 0) => new THREE.Vector3(x, z, -y);
+  const orange = new THREE.MeshBasicMaterial({ color: 0xff6b00 }), grey = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+  const strip = (x0, y0, x1, y1, w = 0.06, mat = orange, z = 0.005) => { // a flat band on the floor
+    const a = Lc(x0, y0, z), b = Lc(x1, y1, z), len = a.distanceTo(b), m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.01, len), mat);
+    m.position.copy(a).add(b).multiplyScalar(0.5); m.lookAt(b.x, m.position.y, b.z); root.add(m);
+  };
+  strip(0, 0, HALL.w, 0); strip(HALL.w, 0, HALL.w, HALL.l); strip(HALL.w, HALL.l, 0, HALL.l); strip(0, HALL.l, 0, 0);
+  for (const [x, y, h] of [[0, 0, 1.2], [HALL.w, 0, 0.5], [HALL.w, HALL.l, 0.5], [0, HALL.l, 0.5]]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, h, 12), orange); post.position.copy(Lc(x, y, h / 2)); root.add(post);
+  }
+  for (const x of RAILS) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, HALL.l), grey); c.position.copy(Lc(x, HALL.l / 2, HALL.h)); root.add(c); }
+  const M = pieceMats();
+  track.pieces.forEach((pc, i) => {
+    const o = pieceObject(pc, i, track, LEVEL, M);
+    o.position.copy(Lc(pc.x, pc.y, pc.lift || 0)); o.rotation.y = yawOf(track.passes[i]); root.add(o);
+    const r = TYPES[pc.type].r, ring = new THREE.Mesh(new THREE.RingGeometry(r - 0.04, r, 40), new THREE.MeshBasicMaterial({ color: pc.type === 'timing' ? 0x22c55e : 0xff6b00, side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.copy(Lc(pc.x, pc.y, 0.008 + (onRail(pc.type) ? 0 : pc.lift || 0))); root.add(ring);
+    const mat = plate(i + 1, pc.type === 'timing');
+    const up = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), mat);   // above it, facing the pilots' rail
+    up.position.copy(Lc(pc.x, pc.y, Math.min(HALL.h - 0.2, TYPES[pc.type].zmax + 0.35 + (pc.lift || 0))));
+    if (pc.type === 'ring' || pc.type === 'ladder5') up.position.y = Math.max(0.4, TYPES[pc.type].zmin - 0.3);
+    root.add(up);
+    const down = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), mat);  // on the floor beside its mark, readable from the rail
+    down.rotation.x = -Math.PI / 2; down.position.copy(Lc(pc.x + r + 0.25, pc.y, 0.01 + (onRail(pc.type) ? 0 : pc.lift || 0))); root.add(down);
+  });
+  return root;
+}
+async function makeUsdz() {
+  const bytes = await sceneToUsdz(iosScene());
+  if (usdzUrl) URL.revokeObjectURL(usdzUrl);
+  usdzUrl = URL.createObjectURL(new Blob([bytes], { type: 'model/vnd.usdz+zip' }));
+  return bytes;
+}
+function iphoneCard() {
+  const card = $('iphone');
+  if (!IOS) { // Android and computers: the Android way first, the iPhone file below it
+    $('intro').insertBefore(card, $('intro').lastElementChild);
+    $('iosNote').textContent = tr('On an iPhone, open this page and the AR viewer opens from it. Or download the file here and send it to an iPhone.');
+    $('iosSteps').hidden = true;
+    $('iosMake').textContent = tr('Download the iPhone AR file');
+    $('iosMake').classList.remove('go'); $('iosMake').classList.add('tb', 'dl');
+  } else {
+    $('android').hidden = true;
+  }
+  $('iosMake').disabled = !track;
+}
+$('iosMake').onclick = async () => {
+  const b = $('iosMake'); b.disabled = true; b.textContent = tr('Making the AR file…');
+  let bytes;
+  try { bytes = await makeUsdz(); } catch (e) { b.textContent = tr('That didn\'t work: {why}', { why: e.message }); return; }
+  const name = `${code(track.seed)}.usdz`;
+  if (IOS) {
+    // Safari opens AR Quick Look from a link with rel="ar" whose first child is an image
+    $('iosGo').innerHTML = `<a class="go" rel="ar" href="${usdzUrl}#allowsContentScaling=0"><img src="assets/icons/app-icon-192.png" alt=""><span>${tr('View in AR')}</span></a>`;
+  } else {
+    const a = document.createElement('a'); a.href = usdzUrl; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    b.disabled = false; b.textContent = tr('Download the iPhone AR file');
+  }
+  window.__usdzBytes = bytes.length;
+};
 
 // ---------- can this phone do AR here? ----------
 async function checkAR() {
@@ -162,7 +255,7 @@ async function checkAR() {
       <li>${tr('Copy this and paste it in the box under the highlighted setting, then set it to Enabled:')}${copyRow(origin)}</li>
       <li>${tr('Tap Relaunch at the bottom. Chrome opens this page again by itself.')}</li></ol>`;
   } else if (!navigator.xr) {
-    why.innerHTML = `<h2>${tr('This browser has no AR')}</h2><p>${tr('Open this page in Chrome on an Android phone. iPhones can\'t show AR from a web page yet.')}</p>`;
+    why.innerHTML = `<h2>${tr('This browser has no AR')}</h2><p>${tr('Open this page in Chrome on an Android phone, or on an iPhone.')}</p>`;
   } else {
     try { ok = await navigator.xr.isSessionSupported('immersive-ar'); } catch {}
     if (!ok) why.innerHTML = `<h2>${tr('This phone can\'t do AR here')}</h2><p>${tr('It needs Chrome on an Android phone with Google Play Services for AR (most phones from the last few years). Install or update it from the Play Store, then open this page again.')}</p>`;
@@ -396,7 +489,7 @@ function alertWhy(e) {
   why.hidden = false;
 }
 // for the smoke test, which has no AR: the scene as it would stand, drawn once from the rail corner
-window.__ar = { frameFrom, toWorld, REFS, get track() { return track; }, preview() {
+window.__ar = { frameFrom, toWorld, REFS, get track() { return track; }, async usdz() { const u = await makeUsdz(); let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(b); }, preview() {
   if (!renderer) setupScene();
   frame = frameFrom(REFS.rail, { x: 0, y: -1.4, z: 0 }, { x: 5, y: -1.4, z: 0 }); phase = 'build'; cur = 1;
   drawHall(); placeHall(); $('overlay').hidden = false; say();
