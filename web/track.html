@@ -722,9 +722,9 @@ function renderSel() {
     return;
   }
   const step = onRail(pc.type) ? 90 : 15;
-  const last = track.pieces.filter((p) => p.passes && p.passes.length).length;
+  const last = track.pieces.filter((p) => p.type !== 'flag' && p.passes && p.passes.length).length;   // flags are listed after every piece flown through
   let html = `<span class="name">${picked + 1} · ${tr(LABEL[pc.type])}</span>`
-    + `<span class="order"><span class="muted">${tr('Place in the lap')}</span><button type="button" class="tb" data-order="-1" ${picked <= 1 ? 'disabled' : ''} aria-label="${tr('Fly it earlier')}">◀</button><b>${picked + 1}</b><button type="button" class="tb" data-order="1" ${picked >= last - 1 ? 'disabled' : ''} aria-label="${tr('Fly it later')}">▶</button></span>`
+    + (pc.type === 'flag' ? '' : `<span class="order"><span class="muted">${tr('Place in the lap')}</span><button type="button" class="tb" data-order="-1" ${picked <= 1 ? 'disabled' : ''} aria-label="${tr('Fly it earlier')}">◀</button><b>${picked + 1}</b><button type="button" class="tb" data-order="1" ${picked >= last - 1 ? 'disabled' : ''} aria-label="${tr('Fly it later')}">▶</button></span>`)
     + `<button type="button" class="tb" data-rot="${-step}" aria-label="Turn left">⟲ ${step}°</button><button type="button" class="tb" data-rot="${step}" aria-label="Turn right">⟳ ${step}°</button>`
     + `<button type="button" class="tb" data-nudge="-0.1,0" aria-label="Left 10 cm">←</button><button type="button" class="tb" data-nudge="0,0.1" aria-label="Up 10 cm">↑</button><button type="button" class="tb" data-nudge="0,-0.1" aria-label="Down 10 cm">↓</button><button type="button" class="tb" data-nudge="0.1,0" aria-label="Right 10 cm">→</button>`;
   if (pc.type.startsWith('ladder')) { // how the ladder is flown (Janno 23.11.2026)
@@ -1045,9 +1045,9 @@ $('sel').addEventListener('click', (e) => {
   if (b.dataset.order) {
     const was = picked, n = picked + 1 + Number(b.dataset.order);
     change((c) => { c.order = { ...(c.order || {}), [key]: n }; });
-    if (picked === was) { // flown together with other pieces (a trick), or the timing gate: it keeps its place
+    if (picked === was) { // the timing gate, or nowhere further that way
       const c = undo.pop(); if (c) { apply(c); picked = was; renderSheet(); renderSel(); }
-      toast(tr('This piece is flown together with others in one trick, so it keeps its place.'));
+      toast(tr('It can\'t go that way.'));
     }
     return;
   }

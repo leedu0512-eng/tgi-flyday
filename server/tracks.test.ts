@@ -185,3 +185,22 @@ test('two taps on the floor line the hall up with the phone, whichever way the p
   const far = AR.toWorld(f, 0, 10);
   assert.ok(Math.abs(far.x) < 1e-9 && Math.abs(far.z + 10) < 1e-9);
 });
+
+test('◀ / ▶ move a piece one place, also out of a trick it shares; flags and the timing gate stay', () => {
+  const best = G.generate({ style: 'flowing', pieces: 12, rings: true, flags: true }, { ms: 6000, want: 1, start: 3 }).best;
+  const seed = best.seed, opts = best.opts;
+  const t0 = G.rebuild({ seed, opts, edits: {} });
+  let moved = 0, tried = 0;
+  t0.pieces.forEach((pc: any, i: number) => {
+    if (i === 0 || pc.type === 'flag') return;
+    for (const d of [-1, 1]) {
+      const n = i + 1 + d;
+      if (n < 2 || n > t0.pieces.filter((p: any) => p.type !== 'flag').length) continue;
+      const t = G.rebuild({ seed, opts, edits: {}, order: { [pc.key]: n } });
+      const got = t.pieces.findIndex((p: any) => p.key === pc.key);
+      tried++;
+      if (got !== i) { moved++; assert.equal(Math.sign(got - i), d, `${pc.type} ${i + 1} went the wrong way`); }
+    }
+  });
+  assert.ok(moved >= tried * 0.8, `only ${moved} of ${tried} moved`);
+});

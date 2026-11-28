@@ -474,7 +474,7 @@ function tidy(dir, keep) {
 }
 
 // server/version.ts
-var VERSION = true ? "2026.11.28-1749" : "dev";
+var VERSION = true ? "2026.11.28-1754" : "dev";
 
 // server/types.ts
 var DEFAULT_CONFIG = {
@@ -4605,30 +4605,36 @@ function resequence(A, moves, removed) {
   }
   return A;
 }
+function unitsOf(A) {
+  const units = [];
+  A.forEach((q, j) => {
+    const id = q.zone ? "z" + q.zone : q.who != null ? "w" + q.who : null;
+    if (!id) return;
+    const u = units[units.length - 1];
+    if (u && u.id === id && u.end === j - 1) {
+      u.end = j;
+      if (q.who != null) u.whos.add(q.who);
+    } else units.push({ id, start: j, end: j, whos: new Set(q.who != null ? [q.who] : []) });
+  });
+  return units.filter((u) => u.whos.size);
+}
 function placeInOrder(A, order, all) {
   const want = Object.entries(order || {}).map(([key, n]) => ({ who: all.findIndex((pc) => pc.key === key), n })).filter((o) => o.who > 0).sort((a, b) => a.n - b.n);
   for (const { who, n } of want) {
-    const units = [];
-    A.forEach((q, j) => {
-      const id = q.zone ? "z" + q.zone : q.who != null ? "w" + q.who : null;
-      if (!id) return;
-      const u = units[units.length - 1];
-      if (u && u.id === id && u.end === j - 1) {
-        u.end = j;
-        if (q.who != null) u.whos.add(q.who);
-      } else units.push({ id, start: j, end: j, whos: new Set(q.who != null ? [q.who] : []) });
-    });
-    const flown = units.filter((u) => u.whos.size);
+    const flown = unitsOf(A);
     const mine = flown.find((u) => u.whos.has(who));
-    if (!mine || mine.whos.size > 1 || mine.whos.has(0)) continue;
+    if (!mine) continue;
     const seq = [];
     for (const u of flown) for (const w of u.whos) if (all[w] && all[w].type !== "flag" && !seq.some((q) => q.w === w)) seq.push({ w, u });
     const now = seq.findIndex((q) => q.w === who), there = seq[Math.max(0, Math.min(n - 1, seq.length - 1))];
-    if (now < 0 || !there || there.u === mine) continue;
-    const seg = A.slice(mine.start, mine.end + 1), rest = A.slice(0, mine.start).concat(A.slice(mine.end + 1));
-    const t = there.u, later = n - 1 > now;
-    const edge2 = later ? t.end + 1 : t.start;
-    const at = edge2 > mine.end ? edge2 - seg.length : edge2;
+    if (now < 0 || !there || there.w === who) continue;
+    const shared = mine.whos.size > 1;
+    const take = (q, j) => j >= mine.start && j <= mine.end && (!shared || q.who === who);
+    let seg = A.filter(take), rest = A.filter((q, j) => !take(q, j));
+    if (shared) seg = seg.map((q) => ({ ...q, zone: "O" + who }));
+    const t = unitsOf(rest).find((u) => u.whos.has(there.w));
+    if (!t) continue;
+    const at = n - 1 > now ? t.end + 1 : t.start;
     A = rest.slice(0, at).concat(seg, rest.slice(at));
   }
   return A;

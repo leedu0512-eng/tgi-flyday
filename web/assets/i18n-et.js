@@ -736,7 +736,7 @@ export const ET = {
   'Start from scratch': 'Alusta nullist',
   'Check in 3D': 'Vaata 3D-s',
   'Place in the lap': 'Koht ringil',
-  'This piece is flown together with others in one trick, so it keeps its place.': 'Seda elementi lennatakse koos teistega ühe trikina, seega jääb ta oma kohale.',
+  "It can't go that way.": 'Sinna see ei liigu.',
   'Build the track': 'Ehita rada',
   'Looking for the track…': 'Otsin rada…',
   'Line up with the hall': 'Joonda saaliga',
